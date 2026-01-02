@@ -1,0 +1,39 @@
+{
+  "agents": [
+    {
+      "id": "petco",
+      "name": "Petco Agent",
+      "description": "AI-powered shopping assistant for Petco. Browse products, manage cart, and checkout.",
+      "icon": "🛒",
+      "api_base": "http://localhost:8088",
+      "endpoints": {
+        "chat": "/chat",
+        "chat_stream": "/chat/stream",
+        "info": "/info",
+        "clear_session": "/session"
+      },
+      "features": {
+        "streaming": true,
+        "widgets": true,
+        "session": true
+      },
+      "color": "#FF6B35"
+    }
+  ],
+  "widget_templates": {
+    "base_url": "https://mcp.agentfly.shyftops.io",
+    "mapping": {
+      "ui://widget/category-list.html": "/widgets/category-list.html",
+      "ui://widget/products-list.html": "/widgets/products-list.html",
+      "ui://widget/product-detail.html": "/widgets/product-detail.html",
+      "ui://widget/cart.html": "/widgets/cart.html",
+      "ui://widget/checkout.html": "/widgets/checkout.html"
+    }
+  },
+  "ui_config": {
+    "title": "Agent Playground",
+    "subtitle": "Test and interact with AI agents",
+    "default_agent": "petco"
+  }
+}
+

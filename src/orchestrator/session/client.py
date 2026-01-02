@@ -1,0 +1,718 @@
+"""
+Session Client - Unified interface for short-term and long-term memory.
+
+Integrates session providers (short-term) with mem0 (long-term) using standardized IDs.
+Provides a high-level API for managing conversations and memory.
+
+Tracing is handled automatically via the @observe decorator.
+"""
+
+import threading
+from typing import Any
+
+from orchestrator.logging import get_logger
+from orchestrator.memory import MemoryClient
+from orchestrator.observability.decorators import observe
+from orchestrator.observability.error_reporter import report_error
+from orchestrator.session.base import BaseSessionProvider
+from orchestrator.session.config import SessionConfig
+from orchestrator.session.exceptions import (
+    SessionError,
+    SessionMessageLimitError,
+    SessionNotEnabledError,
+    SessionNotFoundError,
+)
+from orchestrator.session.providers import create_provider, list_providers
+from orchestrator.session.types import ChatMessage, SessionMetadata
+
+logger = get_logger(__name__)
+
+# Global client state
+_global_lock = threading.Lock()
+_global_session_client: "SessionClient | None" = None
+_initialized = False
+
+
+class SessionClient:
+    """
+    Unified session client integrating session providers (short-term) and mem0 (long-term) memory.
+
+    This client provides a high-level interface that:
+        - Manages conversation history via session providers (short-term)
+        - Integrates with mem0 for long-term memory
+        - Uses standardized IDs (session_id maps to run_id in mem0)
+        - Automatic tracing via @observe decorator
+        - Supports multiple providers (Redis, DynamoDB, etc.)
+
+    Example:
+        ```python
+        from orchestrator.session import SessionClient
+
+        client = SessionClient()
+
+        # Create or get session
+        session_id = await client.get_or_create_session(
+            user_id="user-123",
+            agent_id="agent-456"
+        )
+
+        # Add user message
+        await client.add_message(
+            session_id=session_id,
+            message=ChatMessage(role="user", content="What's the weather like?")
+        )
+
+        # Get conversation history (short-term from provider)
+        messages = await client.get_conversation_history(session_id)
+
+        # Get relevant long-term memories (from mem0)
+        memories = await client.get_relevant_memories(
+            session_id=session_id,
+            query="What does the user prefer?"
+        )
+        ```
+    """
+
+    def __init__(
+        self,
+        session_config: SessionConfig | None = None,
+        memory_client: MemoryClient | None = None,
+        provider: BaseSessionProvider | None = None,
+        auto_initialize: bool = True,
+    ):
+        """
+        Initialize the Session Client.
+
+        Args:
+            session_config: Optional session configuration. Uses global settings if not provided.
+            memory_client: Optional memory client. Uses global client if not provided.
+            provider: Optional session provider. Created from registry if not provided.
+            auto_initialize: Whether to initialize clients immediately.
+        """
+        self._session_config = session_config or SessionConfig()
+        self._provider: BaseSessionProvider | None = provider
+        self._memory_client: MemoryClient | None = memory_client
+        self._initialized = False
+        self._lock = threading.Lock()
+
+        if auto_initialize:
+            self.initialize()
+
+    @property
+    def provider(self) -> BaseSessionProvider:
+        """Get the session provider."""
+        if not self._provider:
+            self._initialize_provider()
+        return self._provider  # type: ignore
+
+    @property
+    def config(self) -> SessionConfig:
+        """Get the current configuration."""
+        return self._session_config
+
+    @property
+    def memory_client(self) -> MemoryClient:
+        """Get the memory client from Container."""
+        if not self._memory_client:
+            from orchestrator.core.container import get_container
+
+            self._memory_client = get_container().memory_client
+        return self._memory_client
+
+    @property
+    def is_enabled(self) -> bool:
+        """Check if sessions are enabled."""
+        return self._session_config.enabled
+
+    def _initialize_provider(self) -> None:
+        """Initialize the session provider using the registry."""
+        if self._provider is not None:
+            return
+
+        if not self._session_config.enabled:
+            logger.info("Sessions are disabled. Set SESSION_ENABLED=true to enable.")
+            return
+
+        try:
+            provider_name = self._session_config.provider
+            available = list_providers()
+
+            if not available:
+                logger.error(
+                    "No session providers available. Install a provider package "
+                    "(e.g., pip install redis for Redis provider)"
+                )
+                return
+
+            if provider_name not in available:
+                logger.warning(
+                    f"Provider '{provider_name}' not available. "
+                    f"Available providers: {available}. Falling back to '{available[0]}'"
+                )
+                provider_name = available[0]
+
+            self._provider = create_provider(provider_name, self._session_config)
+            logger.info(f"Session provider initialized: {provider_name}")
+
+        except ImportError as e:
+            logger.error(f"Failed to import session provider: {e}")
+        except Exception as e:
+            logger.error(f"Failed to initialize session provider: {e}")
+
+    def initialize(self) -> bool:
+        """
+        Initialize the session and memory clients.
+
+        Thread-safe initialization that only runs once.
+
+        Returns:
+            True if initialization was successful, False otherwise.
+        """
+        with self._lock:
+            if self._initialized:
+                return True
+
+            # Initialize session provider (if not already provided via constructor)
+            if self._session_config.enabled and not self._provider:
+                self._initialize_provider()
+
+            # Initialize memory client from Container (if not provided)
+            if not self._memory_client:
+                from orchestrator.core.container import get_container
+
+                self._memory_client = get_container().memory_client
+
+            self._initialized = True
+            return True
+
+    def _ensure_enabled(self) -> None:
+        """Raise error if sessions are not enabled."""
+        if not self.is_enabled:
+            raise SessionNotEnabledError(
+                "Session operations require sessions to be enabled. "
+                "Set SESSION_ENABLED=true in your environment."
+            )
+
+    @observe(name="session_get_or_create", capture_output=True)
+    async def get_or_create_session(
+        self,
+        session_id: str | None = None,
+        user_id: str | None = None,
+        agent_id: str | None = None,
+    ) -> str:
+        """
+        Get existing session or create a new one.
+
+        Uses standardized IDs: session_id maps to run_id in mem0 for alignment.
+
+        Args:
+            session_id: Optional session ID. If not provided, generates a new UUID.
+            user_id: Optional user identifier (used for mem0 isolation).
+            agent_id: Optional agent identifier (used for mem0 isolation).
+
+        Returns:
+            Session ID (existing or newly created).
+
+        Raises:
+            SessionNotEnabledError: If sessions are disabled.
+            SessionConnectionError: If Redis connection fails.
+        """
+        self._ensure_enabled()
+
+        try:
+            session_id = await self.provider.get_or_create_session(
+                session_id=session_id,
+                user_id=user_id,
+                agent_id=agent_id,
+            )
+
+            logger.info(
+                f"Session ready: {session_id}", extra={"user_id": user_id, "agent_id": agent_id}
+            )
+
+            return session_id
+
+        except Exception as e:
+            logger.error(f"Failed to get or create session: {e}")
+            report_error(
+                e,
+                context="session_get_or_create",
+                user_id=user_id,
+                metadata={"session_id": session_id},
+            )
+            raise
+
+    @observe(name="session_add_message", capture_output=True)
+    async def add_message(
+        self,
+        session_id: str,
+        message: ChatMessage,
+        *,
+        metadata: dict[str, Any] | None = None,
+        store_in_memory: bool = True,
+    ) -> None:
+        """
+        Add a message to the session.
+
+        Optionally stores the message in long-term memory (mem0) for fact extraction.
+
+        Args:
+            session_id: Session ID.
+            message: Chat message to add.
+            metadata: Additional metadata for the message.
+            store_in_memory: Whether to also store in long-term memory (mem0).
+
+        Raises:
+            SessionNotEnabledError: If sessions are disabled.
+            SessionError: If operation fails.
+        """
+        self._ensure_enabled()
+
+        try:
+            # Add to short-term memory (via provider)
+            await self.provider.add_message(
+                session_id=session_id,
+                message=message,
+                metadata=metadata,
+            )
+
+            # Optionally add to long-term memory (mem0)
+            # Memory storage is best-effort - failures should not break session operations
+            if store_in_memory and self.memory_client.is_enabled:
+                try:
+                    # Get session metadata to extract user_id and agent_id
+                    session_metadata = await self.provider.get_session_metadata(session_id)
+
+                    if session_metadata:
+                        # Build memory metadata for proper scoping
+                        memory_metadata = dict(metadata) if metadata else {}
+
+                        # Include session_id and run_id for RUN-scoped filtering
+                        if session_id:
+                            memory_metadata["session_id"] = session_id
+                            memory_metadata["run_id"] = session_id
+
+                        # Include user_id and agent_id for additional filtering
+                        if session_metadata.user_id:
+                            memory_metadata["_user_id"] = session_metadata.user_id
+                        if session_metadata.agent_id:
+                            memory_metadata["_agent_id"] = session_metadata.agent_id
+
+                        # Log memory storage attempt
+                        logger.info(
+                            f"💾 SESSION → MEMORY: Storing message in memory: "
+                            f"role={message.role}, "
+                            f"content='{message.content[:100] if message.content else 'empty'}...', "
+                            f"user_id={session_metadata.user_id[:8] if session_metadata.user_id else 'none'}, "
+                            f"agent_id={session_metadata.agent_id[:8] if session_metadata.agent_id else 'none'}, "
+                            f"run_id={session_id[:8] if session_id else 'none'}, "
+                            f"metadata={memory_metadata}"
+                        )
+
+                        result = await self.memory_client.add(
+                            messages=[message.to_dict()],
+                            user_id=session_metadata.user_id,
+                            agent_id=session_metadata.agent_id,
+                            run_id=session_id,
+                            metadata=memory_metadata,
+                        )
+
+                        # Log memory storage result
+                        logger.info(
+                            f"✅ MEMORY STORED: {result.message}, "
+                            f"extracted {len(result.results)} facts/memories"
+                        )
+                        if result.results:
+                            for idx, fact in enumerate(result.results[:3], 1):  # Log first 3 facts
+                                # Handle both dict and object formats
+                                if isinstance(fact, dict):
+                                    fact_text = fact.get("memory") or fact.get("text") or str(fact)
+                                else:
+                                    fact_text = (
+                                        getattr(fact, "memory", None)
+                                        or getattr(fact, "text", None)
+                                        or str(fact)
+                                    )
+                                logger.info(
+                                    f"   Fact #{idx}: {fact_text[:100] if fact_text else 'N/A'}..."
+                                )
+                    else:
+                        logger.warning(
+                            f"⚠️ Cannot store memory: Session metadata not found for session_id={session_id[:8] if session_id else 'none'}"
+                        )
+                except Exception as mem_error:
+                    # Memory storage failures should not break session operations
+                    logger.error(f"❌ Memory storage failed: {mem_error}", exc_info=True)
+                    logger.warning(
+                        f"Failed to store message in long-term memory: {mem_error}",
+                        extra={"session_id": session_id, "role": message.role},
+                    )
+                    report_error(
+                        mem_error,
+                        context="session_memory_storage",
+                        metadata={"session_id": session_id, "message_role": message.role},
+                    )
+
+            logger.debug(
+                f"Added message to session: {session_id}",
+                extra={"role": message.role, "store_in_memory": store_in_memory},
+            )
+
+        except (SessionNotFoundError, SessionMessageLimitError):
+            raise
+        except Exception as e:
+            logger.error(f"Failed to add message to session: {e}")
+            report_error(
+                e,
+                context="session_add_message",
+                metadata={"session_id": session_id, "message_role": message.role},
+            )
+            raise SessionError(
+                f"Failed to add message to session: {str(e)}",
+                session_id=session_id,
+                original_error=e,
+            ) from e
+
+    @observe(name="session_get_history", capture_output=True)
+    async def get_conversation_history(
+        self,
+        session_id: str,
+        limit: int | None = None,
+    ) -> list[ChatMessage]:
+        """
+        Get conversation history from short-term memory (Redis).
+
+        Args:
+            session_id: Session ID.
+            limit: Optional limit on number of messages to retrieve.
+
+        Returns:
+            List of ChatMessage objects in chronological order.
+
+        Raises:
+            SessionNotEnabledError: If sessions are disabled.
+            SessionError: If operation fails.
+        """
+        self._ensure_enabled()
+
+        try:
+            messages = await self.provider.get_messages(
+                session_id=session_id,
+                limit=limit,
+            )
+            return messages
+
+        except (SessionNotFoundError, SessionMessageLimitError):
+            raise
+        except Exception as e:
+            logger.error(f"Failed to get conversation history: {e}")
+            report_error(
+                e,
+                context="session_get_history",
+                metadata={"session_id": session_id},
+            )
+            raise SessionError(
+                f"Failed to get conversation history: {str(e)}",
+                session_id=session_id,
+                original_error=e,
+            ) from e
+
+    @observe(name="session_get_memories", capture_output=True)
+    async def get_relevant_memories(
+        self,
+        session_id: str,
+        query: str,
+        limit: int | None = None,
+    ) -> list[Any]:
+        """
+        Get relevant long-term memories from mem0.
+
+        Uses standardized IDs: session_id maps to run_id in mem0.
+
+        Args:
+            session_id: Session ID (maps to run_id in mem0).
+            query: Search query for semantic search.
+            limit: Maximum number of memories to retrieve.
+
+        Returns:
+            List of MemoryEntry objects.
+
+        Raises:
+            SessionNotEnabledError: If sessions are disabled.
+            SessionError: If operation fails.
+        """
+        self._ensure_enabled()
+
+        if not self.memory_client.is_enabled:
+            logger.warning("Memory client not enabled, returning empty list")
+            return []
+
+        try:
+            # Get session metadata to extract user_id and agent_id
+            session_metadata = await self.provider.get_session_metadata(session_id)
+
+            if not session_metadata:
+                logger.warning(f"Session metadata not found: {session_id}")
+                return []
+
+            # Use standardized IDs: session_id maps to run_id in mem0
+            search_result = await self.memory_client.search(
+                query=query,
+                user_id=session_metadata.user_id,
+                agent_id=session_metadata.agent_id,
+                run_id=session_id,
+                limit=limit,
+            )
+
+            return search_result.results
+
+        except Exception as e:
+            logger.error(f"Failed to get relevant memories: {e}")
+            report_error(
+                e,
+                context="session_get_memories",
+                metadata={"session_id": session_id, "query": query[:100]},
+            )
+            raise SessionError(
+                f"Failed to get relevant memories: {str(e)}",
+                session_id=session_id,
+                original_error=e,
+            ) from e
+
+    @observe(name="session_clear", capture_output=True)
+    async def clear_session(self, session_id: str) -> bool:
+        """
+        Clear all messages from a session (but keep metadata).
+
+        Args:
+            session_id: Session ID.
+
+        Returns:
+            True if cleared successfully.
+
+        Raises:
+            SessionNotEnabledError: If sessions are disabled.
+            SessionError: If operation fails.
+        """
+        self._ensure_enabled()
+
+        try:
+            result = await self.provider.clear_session(session_id=session_id)
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to clear session: {e}")
+            report_error(
+                e,
+                context="session_clear",
+                metadata={"session_id": session_id},
+            )
+            raise SessionError(
+                f"Failed to clear session: {str(e)}",
+                session_id=session_id,
+                original_error=e,
+            ) from e
+
+    @observe(name="session_delete", capture_output=True)
+    async def delete_session(self, session_id: str) -> bool:
+        """
+        Delete a session completely (messages and metadata).
+
+        Args:
+            session_id: Session ID.
+
+        Returns:
+            True if deleted successfully.
+
+        Raises:
+            SessionNotEnabledError: If sessions are disabled.
+            SessionError: If operation fails.
+        """
+        self._ensure_enabled()
+
+        try:
+            result = await self.provider.delete_session(session_id=session_id)
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to delete session: {e}")
+            report_error(
+                e,
+                context="session_delete",
+                metadata={"session_id": session_id},
+            )
+            raise SessionError(
+                f"Failed to delete session: {str(e)}",
+                session_id=session_id,
+                original_error=e,
+            ) from e
+
+    @observe(name="session_get_metadata", capture_output=True)
+    async def get_session_metadata(self, session_id: str) -> SessionMetadata | None:
+        """
+        Get session metadata.
+
+        Args:
+            session_id: Session ID.
+
+        Returns:
+            SessionMetadata if found, None otherwise.
+
+        Raises:
+            SessionNotEnabledError: If sessions are disabled.
+            SessionError: If operation fails.
+        """
+        self._ensure_enabled()
+
+        try:
+            return await self.provider.get_session_metadata(session_id=session_id)
+
+        except Exception as e:
+            logger.error(f"Failed to get session metadata: {e}")
+            report_error(
+                e,
+                context="session_get_metadata",
+                metadata={"session_id": session_id},
+            )
+            raise SessionError(
+                f"Failed to get session metadata: {str(e)}",
+                session_id=session_id,
+                original_error=e,
+            ) from e
+
+    @observe(name="session_update_metadata", capture_output=True)
+    async def update_session_metadata(
+        self,
+        session_id: str,
+        metadata: SessionMetadata,
+    ) -> bool:
+        """
+        Update session metadata.
+
+        Args:
+            session_id: Session ID.
+            metadata: Updated session metadata.
+
+        Returns:
+            True if updated successfully.
+
+        Raises:
+            SessionNotEnabledError: If sessions are disabled.
+            SessionError: If operation fails.
+        """
+
+        self._ensure_enabled()
+
+        try:
+            # For Redis provider, we need to update metadata directly
+            # This is provider-specific, but we'll handle it here for now
+            # Future: Add update_metadata method to BaseSessionProvider
+            if hasattr(self.provider, "_get_metadata_key") and hasattr(self.provider, "_redis"):
+                import json
+
+                metadata_key = self.provider._get_metadata_key(session_id)  # type: ignore
+                await self.provider._redis.setex(  # type: ignore
+                    metadata_key,
+                    self._session_config.ttl_seconds,
+                    json.dumps(metadata.to_dict()),
+                )
+                logger.debug(f"Updated session metadata: {session_id}")
+                return True
+            else:
+                # For other providers, we may need a different approach
+                logger.warning(
+                    f"update_session_metadata not fully supported for provider: {self.provider.provider_name}"
+                )
+                return False
+
+        except Exception as e:
+            logger.error(f"Failed to update session metadata: {e}")
+            report_error(
+                e,
+                context="session_update_metadata",
+                metadata={"session_id": session_id},
+            )
+            raise SessionError(
+                f"Failed to update session metadata: {str(e)}",
+                session_id=session_id,
+                original_error=e,
+            ) from e
+
+
+# =============================================================================
+# Global Session Client Functions
+# =============================================================================
+
+
+def initialize_global_session_client(
+    session_config: SessionConfig | None = None,
+    memory_client: MemoryClient | None = None,
+) -> bool:
+    """
+    Initialize the global Session Client.
+
+    This should be called once at application startup. Subsequent calls
+    will return the existing initialization status.
+
+    Args:
+        session_config: Optional session configuration. Uses global settings if not provided.
+        memory_client: Optional memory client. Uses global client if not provided.
+
+    Returns:
+        True if initialization was successful.
+
+    Example:
+        ```python
+        from orchestrator.session import initialize_global_session_client
+
+        # At application startup
+        if initialize_global_session_client():
+            print("Session Client ready")
+        else:
+            print("Session Client not configured or disabled")
+        ```
+    """
+    global _global_session_client, _initialized
+
+    with _global_lock:
+        if _initialized:
+            return _global_session_client is not None and _global_session_client.is_enabled
+
+        _global_session_client = SessionClient(
+            session_config=session_config,
+            memory_client=memory_client,
+            auto_initialize=True,
+        )
+        _initialized = True
+
+        return _global_session_client.is_enabled
+
+
+def get_global_session_client() -> SessionClient:
+    """
+    Get the global Session Client.
+
+    Auto-initializes if not already initialized.
+
+    Returns:
+        The global SessionClient instance.
+
+    Example:
+        ```python
+        client = get_global_session_client()
+        if client.is_enabled:
+            session_id = await client.get_or_create_session(user_id="user-123")
+        ```
+    """
+    global _global_session_client, _initialized
+
+    if not _initialized:
+        initialize_global_session_client()
+
+    if _global_session_client is None:
+        with _global_lock:
+            if _global_session_client is None:
+                _global_session_client = SessionClient(auto_initialize=True)
+                _initialized = True
+
+    return _global_session_client

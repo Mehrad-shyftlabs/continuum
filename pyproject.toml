@@ -1,0 +1,107 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shyftlabs-continuum"
+version = "0.2.0"
+description = "A Python SDK for agentic AI orchestration with multi-LLM provider support, observability, and error tracking"
+readme = "README.md"
+requires-python = ">=3.13"
+license = {text = "MIT"}
+authors = [
+    {name = "Bhavik Ardeshna", email = "bhavik@shyftlabs.io"}
+]
+keywords = [
+    "ai",
+    "llm",
+    "orchestration",
+    "agents",
+    "langfuse",
+    "memory",
+    "session",
+    "mcp"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "aiohttp>=3.13.2",  # Explicit dependency - latest version fixes enable_cleanup_closed deprecation warning for Python 3.13+
+    "litellm>=1.71.0",
+    "langfuse>=2.57.0,<3.0.0",  # Pin to v2.x for LiteLLM compatibility
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+    "python-dotenv>=1.0.1",
+    "mem0ai>=1.0.0",
+    "qdrant-client>=1.16.0",
+    "redis>=5.0.0",
+    "mcp>=1.23.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+]
+embeddings = [
+    "sentence-transformers>=2.2.0",
+]
+cohere = [
+    "cohere>=5.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/bhavik-shyftlabs/shyftlabs-continuum"
+Documentation = "https://github.com/bhavik-shyftlabs/shyftlabs-continuum/docs"
+Repository = "https://github.com/bhavik-shyftlabs/shyftlabs-continuum"
+Issues = "https://github.com/bhavik-shyftlabs/shyftlabs-continuum/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["orchestrator*"]
+exclude = ["tests*", "playground*"]
+
+[tool.setuptools.package-data]
+"orchestrator" = ["py.typed"]
+"*" = ["litellm_config.yaml"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["orchestrator"]
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+packages = ["src/orchestrator"]
