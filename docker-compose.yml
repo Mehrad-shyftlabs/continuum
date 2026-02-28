@@ -150,9 +150,10 @@ services:
     environment:
       - REDIS_PASSWORD=${SESSION_REDIS_PASSWORD:-}
     command: >
-      --requirepass ${SESSION_REDIS_PASSWORD:-}
+      redis-server
       --maxmemory-policy noeviction
       --maxmemory 512mb
+      ${SESSION_REDIS_PASSWORD:+--requirepass ${SESSION_REDIS_PASSWORD}}
     ports:
       - "6380:6379"
     volumes:
