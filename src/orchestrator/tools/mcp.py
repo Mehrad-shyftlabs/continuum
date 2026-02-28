@@ -130,6 +130,7 @@ class _MCPServerWithClientSession(MCPServer, abc.ABC):
         retry_backoff_seconds_base: float = 1.0,
         message_handler: MessageHandlerFnT | None = None,
         context_config: ToolContextConfig | None = None,
+        validate_on_connect: bool = False,
     ):
         """
         Args:
@@ -155,6 +156,8 @@ class _MCPServerWithClientSession(MCPServer, abc.ABC):
                 ClientSession.
             context_config: Configuration for automatic context variable capture and injection.
                 Enables session management across tool calls.
+            validate_on_connect: If True, call list_tools() once after connect to fail fast on
+                misconfiguration. Default False so slow servers are not penalized.
         """
         super().__init__(
             use_structured_content=use_structured_content,
@@ -166,6 +169,7 @@ class _MCPServerWithClientSession(MCPServer, abc.ABC):
         self._cleanup_called: bool = False
         self.cache_tools_list = cache_tools_list
         self.server_initialize_result: InitializeResult | None = None
+        self.validate_on_connect = validate_on_connect
 
         self.client_session_timeout_seconds = client_session_timeout_seconds
         self.max_retry_attempts = max_retry_attempts
@@ -311,6 +315,9 @@ class _MCPServerWithClientSession(MCPServer, abc.ABC):
             server_result = await session.initialize()
             self.server_initialize_result = server_result
             self.session = session
+
+            if self.validate_on_connect:
+                await self.list_tools()
         except Exception as e:
             logger.error(f"Error initializing MCP server: {e}")
             await self.cleanup()
@@ -506,6 +513,7 @@ class MCPServerStdio(_MCPServerWithClientSession):
         retry_backoff_seconds_base: float = 1.0,
         message_handler: MessageHandlerFnT | None = None,
         context_config: ToolContextConfig | None = None,
+        validate_on_connect: bool = False,
     ):
         """Create a new MCP server based on the stdio transport.
 
@@ -537,6 +545,7 @@ class MCPServerStdio(_MCPServerWithClientSession):
                 ClientSession.
             context_config: Configuration for automatic context variable capture and injection.
                 Enables session management across tool calls.
+            validate_on_connect: If True, call list_tools() once after connect to fail fast.
         """
         super().__init__(
             cache_tools_list,
@@ -547,6 +556,7 @@ class MCPServerStdio(_MCPServerWithClientSession):
             retry_backoff_seconds_base,
             message_handler=message_handler,
             context_config=context_config,
+            validate_on_connect=validate_on_connect,
         )
 
         self.params = StdioServerParameters(
@@ -612,6 +622,7 @@ class MCPServerSse(_MCPServerWithClientSession):
         retry_backoff_seconds_base: float = 1.0,
         message_handler: MessageHandlerFnT | None = None,
         context_config: ToolContextConfig | None = None,
+        validate_on_connect: bool = False,
     ):
         """Create a new MCP server based on the HTTP with SSE transport.
 
@@ -645,6 +656,7 @@ class MCPServerSse(_MCPServerWithClientSession):
                 ClientSession.
             context_config: Configuration for automatic context variable capture and injection.
                 Enables session management across tool calls.
+            validate_on_connect: If True, call list_tools() once after connect to fail fast.
         """
         super().__init__(
             cache_tools_list,
@@ -655,6 +667,7 @@ class MCPServerSse(_MCPServerWithClientSession):
             retry_backoff_seconds_base,
             message_handler=message_handler,
             context_config=context_config,
+            validate_on_connect=validate_on_connect,
         )
 
         self.params = params
@@ -723,6 +736,7 @@ class MCPServerStreamableHttp(_MCPServerWithClientSession):
         retry_backoff_seconds_base: float = 1.0,
         message_handler: MessageHandlerFnT | None = None,
         context_config: ToolContextConfig | None = None,
+        validate_on_connect: bool = False,
     ):
         """Create a new MCP server based on the Streamable HTTP transport.
 
@@ -757,6 +771,7 @@ class MCPServerStreamableHttp(_MCPServerWithClientSession):
                 ClientSession.
             context_config: Configuration for automatic context variable capture and injection.
                 Enables session management across tool calls (e.g., capturing session_id).
+            validate_on_connect: If True, call list_tools() once after connect to fail fast.
         """
         super().__init__(
             cache_tools_list,
@@ -767,6 +782,7 @@ class MCPServerStreamableHttp(_MCPServerWithClientSession):
             retry_backoff_seconds_base,
             message_handler=message_handler,
             context_config=context_config,
+            validate_on_connect=validate_on_connect,
         )
 
         self.params = params

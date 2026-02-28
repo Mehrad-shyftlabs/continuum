@@ -523,8 +523,16 @@ class HealthCheck:
                 settings.temporal_host,
                 namespace=settings.temporal_namespace,
             )
-            # Verify by listing schedules (lightweight operation)
             latency = (time.time() - start_time) * 1000
+
+            # Close the throwaway client so the underlying gRPC channel is released.
+            service_client = getattr(client, "service_client", None)
+            if service_client is not None:
+                bridge = getattr(service_client, "_bridge_client", None)
+                if bridge is not None:
+                    # Drop the Rust reference; the gRPC channel will be
+                    # reclaimed once the reference count reaches zero.
+                    service_client._bridge_client = None
 
             return HealthCheckResult(
                 name="temporal",

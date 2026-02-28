@@ -14,6 +14,11 @@ from typing import Any
 
 from temporalio.client import Client, WorkflowHandle
 
+try:
+    from temporalio.contrib.pydantic import pydantic_data_converter
+except ImportError:
+    pydantic_data_converter = None
+
 from orchestrator.config import settings
 from orchestrator.logging import get_logger
 from orchestrator.temporal.config import TemporalConfig
@@ -37,8 +42,11 @@ class TemporalClient:
         target_ns = namespace or self._config.namespace
 
         try:
+            connect_kw: dict[str, Any] = {}
+            if pydantic_data_converter is not None:
+                connect_kw["data_converter"] = pydantic_data_converter
             self._client = await Client.connect(
-                target_host, namespace=target_ns
+                target_host, namespace=target_ns, **connect_kw
             )
             logger.info(f"Connected to Temporal at {target_host} (ns={target_ns})")
         except Exception as e:
@@ -50,8 +58,26 @@ class TemporalClient:
             ) from e
 
     async def disconnect(self) -> None:
-        """Disconnect from Temporal server."""
-        self._client = None
+        """Disconnect from Temporal server.
+
+        The temporalio SDK does not expose an explicit ``close()`` on its
+        ``Client``.  The underlying gRPC channel lives inside a Rust bridge
+        object; dropping the Python reference lets the Rust destructor
+        reclaim the channel once the reference count reaches zero.
+
+        We proactively nil the bridge reference so the channel is released
+        immediately rather than waiting for Python GC.
+        """
+        if self._client is not None:
+            try:
+                service_client = getattr(self._client, "service_client", None)
+                if service_client is not None:
+                    bridge = getattr(service_client, "_bridge_client", None)
+                    if bridge is not None:
+                        service_client._bridge_client = None
+            except Exception as e:
+                logger.debug(f"Non-critical: could not release bridge client: {e}")
+            self._client = None
         logger.info("Disconnected from Temporal")
 
     @property

@@ -91,7 +91,7 @@ class WorkerManager:
         if not self._running or self._worker is None:
             return
 
-        self._worker.shutdown()
+        await self._worker.shutdown()
         if self._worker_task:
             try:
                 await self._worker_task

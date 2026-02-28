@@ -123,6 +123,7 @@ markers = [
     "integration: Integration tests (require running services)",
     "e2e: End-to-end tests (require all services)",
     "slow: Tests that take more than 5 seconds",
+    "live_mcp: Integration tests that require a live MCP server (set MCP_SERVER_URL)",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

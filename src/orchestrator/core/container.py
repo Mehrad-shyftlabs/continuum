@@ -505,6 +505,17 @@ class Container:
                 except Exception as e:
                     logger.warning(f"Error closing session manager: {e}")
 
+        # Close LLM client async resources (LiteLLM aiohttp sessions)
+        if self._llm_initialized and self._llm_client is not None:
+            try:
+                if hasattr(self._llm_client, "cleanup"):
+                    await asyncio.wait_for(self._llm_client.cleanup(), timeout=3.0)
+                    logger.debug("LLM client cleanup complete")
+            except TimeoutError:
+                logger.warning("LLM client cleanup timed out after 3s, continuing...")
+            except Exception as e:
+                logger.warning(f"Error during LLM client cleanup: {e}")
+
         # Reset all state
         self.reset()
         logger.info("Container shutdown complete")

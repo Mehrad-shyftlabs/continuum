@@ -662,7 +662,7 @@ class OrchestratorLifecycle:
                     "Langfuse is a shared service, skipping all operations (no flush, no shutdown)"
                 )
 
-        # Temporal worker shutdown
+        # Temporal: stop worker then disconnect client (closes aiohttp/gRPC connections)
         if "temporal" in self._initialized_components:
             try:
                 from orchestrator.temporal import get_worker_manager
@@ -675,9 +675,44 @@ class OrchestratorLifecycle:
                 pass
             except Exception as e:
                 logger.warning(f"Error stopping Temporal worker: {e}")
+            try:
+                from orchestrator.temporal import get_temporal_client
 
-        # Note: Redis and Qdrant connections are managed by Container
-        # Container.shutdown() handles their cleanup based on shared_services_enabled
+                client = get_temporal_client()
+                if client.is_connected:
+                    await client.disconnect()
+                    logger.debug("Temporal client disconnected")
+            except ImportError:
+                pass
+            except Exception as e:
+                logger.warning(f"Error disconnecting Temporal client: {e}")
+
+        # Container shutdown: memory, session, LLM (LiteLLM aiohttp), etc.
+        try:
+            from orchestrator.core.container import get_container
+
+            container = get_container()
+            await container.shutdown()
+        except Exception as e:
+            logger.warning(f"Error during container shutdown: {e}")
+
+        # The lifecycle initialises a *global* memory client via
+        # initialize_global_memory() which is independent from the
+        # container's lazily-created memory client.  Close it explicitly
+        # so we don't leak the Mem0Provider resources.
+        if "memory" in self._initialized_components:
+            try:
+                from orchestrator.memory.client import (
+                    get_global_memory_client,
+                    reset_global_memory,
+                )
+
+                global_mem = get_global_memory_client()
+                if global_mem and global_mem.is_enabled:
+                    await global_mem.close()
+                reset_global_memory()
+            except Exception as e:
+                logger.debug(f"Non-critical: global memory client cleanup: {e}")
 
     async def get_health(self) -> OverallHealthResult:
         """

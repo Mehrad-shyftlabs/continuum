@@ -1057,9 +1057,46 @@ class LLMClient:
             ```
         """
         try:
-            # LiteLLM has a cleanup function for async clients
             if hasattr(litellm, "close_litellm_async_clients"):
                 await litellm.close_litellm_async_clients()
-                logger.debug("LiteLLM async clients closed")
+
+            # close_litellm_async_clients iterates the cache but may miss aiohttp
+            # sessions that are nested inside httpx transports.  Walk the cache
+            # ourselves and close any remaining aiohttp ClientSessions directly.
+            await self._close_remaining_aiohttp_sessions()
+
+            # Yield once so any pending close() coroutines (e.g. scheduled via
+            # asyncio.create_task inside LiteLLMAiohttpTransport) get a chance
+            # to complete before the loop shuts down.
+            await asyncio.sleep(0)
+
+            logger.debug("LiteLLM async clients closed")
         except Exception as e:
             logger.warning(f"Error cleaning up LiteLLM async clients: {e}")
+
+    @staticmethod
+    async def _close_remaining_aiohttp_sessions() -> None:
+        """Walk the LiteLLM client cache and close aiohttp sessions that the
+        default cleanup may have missed (e.g. sessions buried inside httpx
+        transports or created lazily by LiteLLMAiohttpTransport)."""
+        try:
+            import aiohttp
+
+            cache = getattr(litellm, "in_memory_llm_clients_cache", None)
+            if cache is None:
+                return
+            cache_dict: dict = getattr(cache, "cache_dict", {})
+            for handler in cache_dict.values():
+                # AsyncHTTPHandler wraps an httpx.AsyncClient whose _transport
+                # may be a LiteLLMAiohttpTransport holding an aiohttp session.
+                httpx_client = getattr(handler, "client", None)
+                if httpx_client is None:
+                    continue
+                transport = getattr(httpx_client, "_transport", None)
+                if transport is None:
+                    continue
+                session = getattr(transport, "client", None)
+                if isinstance(session, aiohttp.ClientSession) and not session.closed:
+                    await session.close()
+        except Exception:
+            pass

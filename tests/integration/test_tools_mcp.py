@@ -1,9 +1,9 @@
 """
 Integration tests for MCP tool integration.
 
-Requires access to an MCP server.
-
-Converted from tests/test_tools.py manual test script.
+- Tests that use the fake server run without any external MCP server.
+- Tests marked live_mcp require a real MCP server; set MCP_SERVER_URL to run them.
+  Run without live: pytest -m "integration and not live_mcp"
 """
 
 import os
@@ -24,18 +24,22 @@ from orchestrator.tools import (
     create_static_tool_filter,
 )
 
+from tests.integration.mcp_fake_server import FakeMCPServer
+
 
 pytestmark = [pytest.mark.integration]
 
-MCP_SERVER_URL = "https://mcp.agentfly.shyftops.io/mcp"
+# Default URL for live tests; override with env MCP_SERVER_URL
+DEFAULT_MCP_SERVER_URL = "https://mcp.agentfly.shyftops.io/mcp"
 
 
 @pytest.fixture
 async def mcp_server():
-    """Create and connect to an MCP server, cleanup on teardown."""
+    """Create and connect to a live MCP server, cleanup on teardown. Skips if unavailable."""
+    url = os.environ.get("MCP_SERVER_URL", DEFAULT_MCP_SERVER_URL)
     server = MCPServerStreamableHttp(
         {
-            "url": MCP_SERVER_URL,
+            "url": url,
             "timeout": 30.0,
             "sse_read_timeout": 60.0,
         },
@@ -54,6 +58,90 @@ async def mcp_server():
             pass
 
 
+# --- Tests that use the FAKE server (no network) ---
+
+
+class TestMCPFakeServer:
+    """Integration tests using FakeMCPServer. No live MCP server required."""
+
+    @pytest.fixture
+    async def fake_server(self):
+        server = FakeMCPServer(name="fake-integration")
+        await server.connect()
+        try:
+            yield server
+        finally:
+            await server.cleanup()
+
+    async def test_fake_connect_list_tools(self, fake_server):
+        tools = await fake_server.list_tools()
+        assert len(tools) >= 1
+        names = [t.name for t in tools]
+        assert "echo" in names
+
+    async def test_fake_convert_tools(self, fake_server):
+        tools = await MCPUtil.get_function_tools(fake_server)
+        assert len(tools) >= 1
+        for tool in tools:
+            assert tool.function.name is not None
+            assert tool.function.parameters is not None
+
+    async def test_fake_executor_initialization(self, fake_server):
+        executor = ToolExecutor({fake_server: None})
+        await executor.initialize()
+        available = executor.get_available_tools()
+        assert isinstance(available, list)
+        assert len(available) > 0
+
+    async def test_fake_executor_execute_tool(self, fake_server):
+        executor = ToolExecutor({fake_server: None})
+        await executor.initialize()
+        from orchestrator.llm.types import ToolCall
+        from orchestrator.llm.types import FunctionCall
+
+        tool_call = ToolCall(
+            id="call-1",
+            function=FunctionCall(name="echo", arguments='{"message": "hello"}'),
+        )
+        msg = await executor.execute_tool_call(tool_call)
+        assert msg.role == "tool"
+        assert "hello" in (msg.content or "")
+
+
+class TestMCPE2E:
+    """End-to-end: connect → executor init → list tools → execute → cleanup."""
+
+    @pytest.mark.asyncio
+    async def test_e2e_connect_execute_cleanup(self):
+        server = FakeMCPServer(name="e2e-fake")
+        await server.connect()
+        try:
+            executor = ToolExecutor({server: None})
+            await executor.initialize()
+            tools = executor.get_available_tools()
+            assert len(tools) > 0
+            from orchestrator.llm.types import ToolCall, FunctionCall
+
+            tool_call = ToolCall(
+                id="e2e-call-1",
+                function=FunctionCall(name="add", arguments='{"a": 2, "b": 3}'),
+            )
+            msg = await executor.execute_tool_call(tool_call)
+            assert msg.role == "tool"
+            assert "5" in (msg.content or "")
+            artifacts = executor.run_artifacts
+            assert not artifacts.is_empty()
+            by_tool = artifacts.get_by_tool("add")
+            assert len(by_tool) >= 1
+        finally:
+            await server.cleanup()
+        assert not server._connected
+
+
+# --- Tests that require a LIVE MCP server (marked live_mcp) ---
+
+
+@pytest.mark.live_mcp
 class TestMCPConnection:
     async def test_connect(self, mcp_server):
         logger.info("MCPConnection: connect")
@@ -85,9 +173,10 @@ class TestMCPConnection:
             allowed_tool_names=[mcp_tools[0].name]
         )
 
+        url = os.environ.get("MCP_SERVER_URL", DEFAULT_MCP_SERVER_URL)
         filtered_server = MCPServerStreamableHttp(
             {
-                "url": MCP_SERVER_URL,
+                "url": url,
                 "timeout": 30.0,
                 "sse_read_timeout": 60.0,
             },
@@ -101,6 +190,7 @@ class TestMCPConnection:
             await filtered_server.cleanup()
 
 
+@pytest.mark.live_mcp
 class TestToolExecutor:
     async def test_executor_initialization(self, mcp_server):
         logger.info("ToolExecutor: executor initialization")
