@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- Python 3.13 or higher
+- Python 3.13
 - Docker (for local development with services)
 
 **Important**: Langfuse must be version 2.x (not 3.x) for LiteLLM compatibility. The SDK pins Langfuse to `>=2.57.0,<3.0.0`.

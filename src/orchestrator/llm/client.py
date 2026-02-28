@@ -6,7 +6,10 @@ Supports synchronous, asynchronous, and streaming modes.
 Includes full observability integration with Langfuse.
 """
 
+import asyncio
+import json
 import os
+import time
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from typing import Any
@@ -49,6 +52,35 @@ from orchestrator.observability.trace_context import (
 )
 
 logger = get_logger(__name__)
+
+
+class _LLMRateLimiter:
+    """Simple token-bucket rate limiter for LLM API requests (RPM)."""
+
+    def __init__(self, rpm: int):
+        self.rpm = rpm
+        self.tokens = float(rpm)
+        self._lock = asyncio.Lock()
+        self._last_update: float | None = None
+
+    async def acquire(self) -> None:
+        async with self._lock:
+            now = time.monotonic()
+            if self._last_update is None:
+                self._last_update = now
+                self.tokens -= 1
+                return
+
+            elapsed = now - self._last_update
+            self._last_update = now
+            self.tokens = min(float(self.rpm), self.tokens + elapsed * (self.rpm / 60.0))
+
+            if self.tokens < 1:
+                wait_time = (1 - self.tokens) / (self.rpm / 60.0)
+                await asyncio.sleep(wait_time)
+                self.tokens = 0
+            else:
+                self.tokens -= 1
 
 
 class LLMClient:
@@ -113,13 +145,18 @@ class LLMClient:
         """
         self.default_config = config or LLMConfig()
         self._langfuse_enabled = enable_langfuse
+        self._rate_limiter: _LLMRateLimiter | None = None
 
-        # IMPORTANT: Setup LiteLLM config FIRST (for pricing)
-        # Then setup Langfuse callbacks (which need the config for cost calculation)
+        if self.default_config.rate_limit_rpm and self.default_config.rate_limit_rpm > 0:
+            self._rate_limiter = _LLMRateLimiter(self.default_config.rate_limit_rpm)
+
         self._setup_litellm()
 
         if enable_langfuse:
-            setup_langfuse()
+            try:
+                setup_langfuse()
+            except Exception:
+                logger.debug("Langfuse setup skipped (not configured or unavailable)")
 
     def _handle_tools_with_json_mode(
         self,
@@ -354,6 +391,73 @@ class LLMClient:
         return "unknown"
 
     # =========================================================================
+    # JSON mode helpers (extracted to eliminate duplication)
+    # =========================================================================
+
+    def _log_json_mode_status(self, llm_kwargs: dict, model: str) -> None:
+        """Log JSON mode configuration status if response_format is set."""
+        if "response_format" not in llm_kwargs:
+            return
+        response_format = llm_kwargs["response_format"]
+        if isinstance(response_format, dict):
+            if response_format.get("type") == "json_object":
+                logger.info(
+                    f"JSON mode active: json_object mode for model {model}",
+                    extra={"model": model, "json_mode": "json_object"},
+                )
+            elif response_format.get("type") == "json_schema":
+                logger.info(
+                    f"JSON mode active: json_schema mode for model {model}",
+                    extra={
+                        "model": model,
+                        "json_mode": "json_schema",
+                        "strict": response_format.get("json_schema", {}).get("strict", False),
+                    },
+                )
+        elif isinstance(response_format, type):
+            logger.info(
+                f"JSON mode active: Pydantic model schema ({response_format.__name__}) for model {model}",
+                extra={
+                    "model": model,
+                    "json_mode": "pydantic_schema",
+                    "schema_name": response_format.__name__,
+                },
+            )
+
+    def _validate_json_response(self, content: str | None, llm_kwargs: dict, model: str) -> None:
+        """Validate and log JSON response format if JSON mode was requested."""
+        if "response_format" not in llm_kwargs or not content:
+            return
+        try:
+            content_stripped = content.strip()
+            is_json = (
+                content_stripped.startswith("{") and content_stripped.endswith("}")
+            ) or (content_stripped.startswith("[") and content_stripped.endswith("]"))
+            if is_json:
+                parsed = json.loads(content)
+                logger.info(
+                    "LLM response is valid JSON format (expected with JSON mode)",
+                    extra={
+                        "model": model,
+                        "json_keys": list(parsed.keys()) if isinstance(parsed, dict) else None,
+                        "content_length": len(content),
+                    },
+                )
+            else:
+                logger.warning(
+                    "LLM response doesn't appear to be JSON format despite JSON mode being enabled",
+                    extra={"model": model, "content_preview": content_stripped[:100]},
+                )
+        except json.JSONDecodeError:
+            logger.warning(
+                "LLM response is not valid JSON despite JSON mode being enabled",
+                extra={
+                    "model": model,
+                    "content_preview": content[:100] if content else None,
+                },
+            )
+
+    # =========================================================================
     # Synchronous Methods
     # =========================================================================
 
@@ -401,34 +505,7 @@ class LLMClient:
 
         # Handle tools + JSON mode compatibility
         self._handle_tools_with_json_mode(llm_kwargs, effective_config, tools_dict)
-
-        # Log JSON mode status in request
-        if "response_format" in llm_kwargs:
-            response_format = llm_kwargs["response_format"]
-            if isinstance(response_format, dict):
-                if response_format.get("type") == "json_object":
-                    logger.info(
-                        f"📋 JSON mode active: json_object mode for model {effective_config.model}",
-                        extra={"model": effective_config.model, "json_mode": "json_object"},
-                    )
-                elif response_format.get("type") == "json_schema":
-                    logger.info(
-                        f"📋 JSON mode active: json_schema mode for model {effective_config.model}",
-                        extra={
-                            "model": effective_config.model,
-                            "json_mode": "json_schema",
-                            "strict": response_format.get("json_schema", {}).get("strict", False),
-                        },
-                    )
-            elif isinstance(response_format, type):
-                logger.info(
-                    f"📋 JSON mode active: Pydantic model schema ({response_format.__name__}) for model {effective_config.model}",
-                    extra={
-                        "model": effective_config.model,
-                        "json_mode": "pydantic_schema",
-                        "schema_name": response_format.__name__,
-                    },
-                )
+        self._log_json_mode_status(llm_kwargs, effective_config.model)
 
         if tools_dict:
             llm_kwargs["tools"] = tools_dict
@@ -448,41 +525,7 @@ class LLMClient:
             response = litellm.completion(messages=messages_dict, **llm_kwargs)
             llm_response = LLMResponse.from_litellm_response(response)
 
-            # Log response format verification if JSON mode was expected
-            if "response_format" in llm_kwargs and llm_response.content:
-                import json
-
-                try:
-                    content_stripped = llm_response.content.strip()
-                    is_json = (
-                        content_stripped.startswith("{") and content_stripped.endswith("}")
-                    ) or (content_stripped.startswith("[") and content_stripped.endswith("]"))
-                    if is_json:
-                        parsed = json.loads(llm_response.content)
-                        logger.info(
-                            f"✅ LLM response is valid JSON format (expected with JSON mode)",
-                            extra={
-                                "model": effective_config.model,
-                                "json_keys": list(parsed.keys()) if isinstance(parsed, dict) else None,
-                                "content_length": len(llm_response.content),
-                            },
-                        )
-                    else:
-                        logger.warning(
-                            f"⚠️ LLM response doesn't appear to be JSON format despite JSON mode being enabled",
-                            extra={
-                                "model": effective_config.model,
-                                "content_preview": content_stripped[:100],
-                            },
-                        )
-                except json.JSONDecodeError:
-                    logger.warning(
-                        f"⚠️ LLM response is not valid JSON despite JSON mode being enabled",
-                        extra={
-                            "model": effective_config.model,
-                            "content_preview": llm_response.content[:100] if llm_response.content else None,
-                        },
-                    )
+            self._validate_json_response(llm_response.content, llm_kwargs, effective_config.model)
 
             return llm_response
         except Exception as e:
@@ -712,34 +755,7 @@ class LLMClient:
 
         # Handle tools + JSON mode compatibility
         self._handle_tools_with_json_mode(llm_kwargs, effective_config, tools_dict)
-
-        # Log JSON mode status in request
-        if "response_format" in llm_kwargs:
-            response_format = llm_kwargs["response_format"]
-            if isinstance(response_format, dict):
-                if response_format.get("type") == "json_object":
-                    logger.info(
-                        f"📋 JSON mode active: json_object mode for model {effective_config.model}",
-                        extra={"model": effective_config.model, "json_mode": "json_object"},
-                    )
-                elif response_format.get("type") == "json_schema":
-                    logger.info(
-                        f"📋 JSON mode active: json_schema mode for model {effective_config.model}",
-                        extra={
-                            "model": effective_config.model,
-                            "json_mode": "json_schema",
-                            "strict": response_format.get("json_schema", {}).get("strict", False),
-                        },
-                    )
-            elif isinstance(response_format, type):
-                logger.info(
-                    f"📋 JSON mode active: Pydantic model schema ({response_format.__name__}) for model {effective_config.model}",
-                    extra={
-                        "model": effective_config.model,
-                        "json_mode": "pydantic_schema",
-                        "schema_name": response_format.__name__,
-                    },
-                )
+        self._log_json_mode_status(llm_kwargs, effective_config.model)
 
         if tools_dict:
             llm_kwargs["tools"] = tools_dict
@@ -755,46 +771,14 @@ class LLMClient:
             llm_kwargs["metadata"] = metadata
 
         try:
+            if self._rate_limiter:
+                await self._rate_limiter.acquire()
+
             logger.debug(f"Attempting async completion with model: {effective_config.model}")
-            # LiteLLM handles fallbacks automatically if configured via fallbacks parameter
             response = await litellm.acompletion(messages=messages_dict, **llm_kwargs)
             llm_response = LLMResponse.from_litellm_response(response)
 
-            # Log response format verification if JSON mode was expected
-            if "response_format" in llm_kwargs and llm_response.content:
-                import json
-
-                try:
-                    content_stripped = llm_response.content.strip()
-                    is_json = (
-                        content_stripped.startswith("{") and content_stripped.endswith("}")
-                    ) or (content_stripped.startswith("[") and content_stripped.endswith("]"))
-                    if is_json:
-                        parsed = json.loads(llm_response.content)
-                        logger.info(
-                            f"✅ LLM response is valid JSON format (expected with JSON mode)",
-                            extra={
-                                "model": effective_config.model,
-                                "json_keys": list(parsed.keys()) if isinstance(parsed, dict) else None,
-                                "content_length": len(llm_response.content),
-                            },
-                        )
-                    else:
-                        logger.warning(
-                            f"⚠️ LLM response doesn't appear to be JSON format despite JSON mode being enabled",
-                            extra={
-                                "model": effective_config.model,
-                                "content_preview": content_stripped[:100],
-                            },
-                        )
-                except json.JSONDecodeError:
-                    logger.warning(
-                        f"⚠️ LLM response is not valid JSON despite JSON mode being enabled",
-                        extra={
-                            "model": effective_config.model,
-                            "content_preview": llm_response.content[:100] if llm_response.content else None,
-                        },
-                    )
+            self._validate_json_response(llm_response.content, llm_kwargs, effective_config.model)
 
             # Auto-save messages to session if session_id is provided and auto_session is enabled
             # NOTE: When auto_session=False, the caller is managing the message loop

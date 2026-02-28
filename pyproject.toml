@@ -49,6 +49,12 @@ dependencies = [
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
+    "pytest-cov>=5.0.0",
+    "pytest-mock>=3.14.0",
+    "pytest-timeout>=2.3.0",
+    "pytest-xdist>=3.5.0",
+    "fakeredis>=2.21.0",
+    "respx>=0.21.0",
     "ruff>=0.8.0",
     "mypy>=1.13.0",
 ]
@@ -57,6 +63,9 @@ embeddings = [
 ]
 cohere = [
     "cohere>=5.0.0",
+]
+temporal = [
+    "temporalio>=1.23.0",
 ]
 
 [project.urls]
@@ -105,3 +114,39 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 packages = ["src/orchestrator"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "unit: Unit tests (no external dependencies)",
+    "integration: Integration tests (require running services)",
+    "e2e: End-to-end tests (require all services)",
+    "slow: Tests that take more than 5 seconds",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["src/orchestrator"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/playground/*",
+]
+
+[tool.coverage.report]
+fail_under = 0
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.",
+    "pass",
+    "raise NotImplementedError",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"

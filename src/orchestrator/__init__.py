@@ -143,6 +143,30 @@ except ImportError:
     # MCP not available (missing dependency)
     pass
 
+# Temporal (optional -- requires `pip install shyftlabs-continuum[temporal]`)
+try:
+    from orchestrator.temporal import (
+        AgentRegistry,
+        AgentStep,
+        AgentWorkflow,
+        ApprovalDecision,
+        ApprovalRequest,
+        ApprovalStep,
+        HumanInLoopManager,
+        ParallelStep,
+        TemporalClient,
+        TemporalConfig,
+        WorkerManager,
+        WorkflowInput,
+        WorkflowResult,
+        get_agent_registry,
+        get_temporal_client,
+        get_worker_manager,
+        run_agent_activity,
+    )
+except ImportError:
+    pass  # temporalio not installed
+
 # Session
 # Agent Orchestration
 from orchestrator.agent import (
@@ -361,4 +385,22 @@ __all__ = [
     "AgentExecutionError",
     "MaxTurnsExceededError",
     "HandoffError",
+    # Temporal (optional)
+    "TemporalClient",
+    "TemporalConfig",
+    "WorkerManager",
+    "AgentRegistry",
+    "get_agent_registry",
+    "get_temporal_client",
+    "get_worker_manager",
+    "HumanInLoopManager",
+    "AgentStep",
+    "ApprovalStep",
+    "ParallelStep",
+    "WorkflowInput",
+    "WorkflowResult",
+    "ApprovalRequest",
+    "ApprovalDecision",
+    "AgentWorkflow",
+    "run_agent_activity",
 ]

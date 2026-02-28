@@ -161,24 +161,24 @@ class TokenUsage:
 
     def add(self, other: TokenUsage) -> TokenUsage:
         """Add token usage from another instance."""
+        all_models = set(self.model_usage.keys()) | set(other.model_usage.keys())
+        merged_usage: dict[str, dict[str, int]] = {}
+        for model in all_models:
+            self_usage = self.model_usage.get(model, {})
+            other_usage = other.model_usage.get(model, {})
+            merged_usage[model] = {
+                "prompt_tokens": self_usage.get("prompt_tokens", 0)
+                + other_usage.get("prompt_tokens", 0),
+                "completion_tokens": self_usage.get("completion_tokens", 0)
+                + other_usage.get("completion_tokens", 0),
+                "total_tokens": self_usage.get("total_tokens", 0)
+                + other_usage.get("total_tokens", 0),
+            }
         return TokenUsage(
             prompt_tokens=self.prompt_tokens + other.prompt_tokens,
             completion_tokens=self.completion_tokens + other.completion_tokens,
             total_tokens=self.total_tokens + other.total_tokens,
-            model_usage={
-                **self.model_usage,
-                **{
-                    k: {
-                        "prompt_tokens": self.model_usage.get(k, {}).get("prompt_tokens", 0)
-                        + v.get("prompt_tokens", 0),
-                        "completion_tokens": self.model_usage.get(k, {}).get("completion_tokens", 0)
-                        + v.get("completion_tokens", 0),
-                        "total_tokens": self.model_usage.get(k, {}).get("total_tokens", 0)
-                        + v.get("total_tokens", 0),
-                    }
-                    for k, v in other.model_usage.items()
-                },
-            },
+            model_usage=merged_usage,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -347,9 +347,17 @@ class RunState:
     messages: list[dict[str, Any]] = field(default_factory=list)
     pending_tool_calls: list[dict[str, Any]] = field(default_factory=list)
 
-    # Handoff state
+    # Handoff state (stored as dicts for Redis serialization)
     handoff_chain: list[dict[str, Any]] = field(default_factory=list)
     current_handoff: dict[str, Any] | None = None
+
+    def get_handoff_chain_as_data(self) -> list[HandoffData]:
+        """Convert handoff_chain dicts to HandoffData objects."""
+        return [HandoffData.from_dict(h) for h in self.handoff_chain]
+
+    def add_handoff(self, handoff: HandoffData) -> None:
+        """Add a handoff (stores as dict for serialization)."""
+        self.handoff_chain.append(handoff.to_dict())
 
     # Execution state
     status: RunStatus = RunStatus.PENDING
@@ -854,3 +862,15 @@ class RunContext:
             "tags": self.tags,
             "usage": self.usage.to_dict(),
         }
+
+
+@dataclass
+class PrepareRunResult:
+    """Result of AgentRunner._prepare_run()."""
+
+    success: bool
+    context: RunContext | None = None
+    run_state: RunState | None = None
+    initial_message_count: int = 0
+    tool_context_state: Any = None
+    error_response: AgentResponse | None = None

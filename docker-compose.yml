@@ -186,6 +186,67 @@ services:
     volumes:
       - langfuse_postgres_data:/var/lib/postgresql/data
 
+  # --------------------------------------------------------------------------
+  # Temporal Server (optional - for workflow orchestration)
+  # --------------------------------------------------------------------------
+  postgres-temporal:
+    image: postgres:17
+    container_name: orchestrator-postgres-temporal
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    volumes:
+      - temporal_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    networks:
+      - orchestrator-network
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    container_name: orchestrator-temporal
+    depends_on:
+      postgres-temporal:
+        condition: service_healthy
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=postgres-temporal
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+    ports:
+      - "7233:7233"
+    volumes:
+      - ./temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
+    networks:
+      - orchestrator-network
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "namespace", "describe", "--namespace", "default"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    container_name: orchestrator-temporal-ui
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8233:8080"
+    networks:
+      - orchestrator-network
+
   # Qdrant Vector Database for Long-term Memory
   qdrant:
     image: qdrant/qdrant:latest
@@ -218,6 +279,8 @@ volumes:
   qdrant_storage:
     driver: local
   redis_sdk_data:
+    driver: local
+  temporal_postgres_data:
     driver: local
 
 networks:

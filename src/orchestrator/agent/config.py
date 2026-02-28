@@ -151,6 +151,10 @@ class AgentConfig:
     # Type hint uses string to avoid circular import (TYPE_CHECKING)
     context_management: "ContextManagementConfig | None" = None  # noqa: UP037  # None = use global defaults
 
+    # Input sanitization
+    input_sanitization: bool = True
+    injection_detection: bool = False
+
     # Output settings
     output_type: Literal["text", "json", "structured"] = "text"
 
@@ -172,6 +176,8 @@ class AgentConfig:
             "context_management": (
                 self.context_management.to_dict() if self.context_management else None
             ),
+            "input_sanitization": self.input_sanitization,
+            "injection_detection": self.injection_detection,
             "output_type": self.output_type,
             "trace_all_turns": self.trace_all_turns,
             "log_to_session": self.log_to_session,
@@ -206,6 +212,10 @@ class RunnerConfig:
     retry_on_error: bool = True
     max_retries: int = 3
 
+    # Circuit breaker
+    circuit_breaker_threshold: int = 5
+    circuit_breaker_cooldown: int = 60
+
     # Tracing
     trace_enabled: bool = True
 
@@ -221,6 +231,8 @@ class RunnerConfig:
             "tool_timeout": self.tool_timeout,
             "retry_on_error": self.retry_on_error,
             "max_retries": self.max_retries,
+            "circuit_breaker_threshold": self.circuit_breaker_threshold,
+            "circuit_breaker_cooldown": self.circuit_breaker_cooldown,
             "trace_enabled": self.trace_enabled,
         }
 

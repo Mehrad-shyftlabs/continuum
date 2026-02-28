@@ -175,6 +175,19 @@ class Settings(BaseSettings):
     context_cache_ttl_seconds: int = 3600  # Cache TTL for summaries (1 hour)
 
     # -------------------------------------------------------------------------
+    # Temporal Configuration (Optional - requires `pip install shyftlabs-continuum[temporal]`)
+    # -------------------------------------------------------------------------
+    temporal_enabled: bool = False
+    temporal_host: str = "localhost:7233"
+    temporal_namespace: str = "default"
+    temporal_task_queue: str = "orchestrator-agents"
+    temporal_enable_human_in_loop: bool = True
+    temporal_approval_timeout_seconds: int = 86400  # 24h default
+    temporal_workflow_execution_timeout: int = 86400 * 7  # 7 days
+    temporal_activity_start_to_close_timeout: int = 300  # 5 min per activity
+    temporal_activity_retry_max_attempts: int = 3
+
+    # -------------------------------------------------------------------------
     # Lifecycle Configuration (Shutdown Behavior)
     # -------------------------------------------------------------------------
     shared_services_enabled: bool = (
@@ -182,6 +195,21 @@ class Settings(BaseSettings):
     )
     # When True: Only flush Langfuse traces, don't shutdown client. Don't close Redis connections.
     # When False: Fully shutdown Langfuse and close Redis connections on shutdown.
+
+    def __repr__(self) -> str:
+        """Mask all secret/key/password fields in repr output."""
+        from orchestrator.utils.secrets import mask_value
+
+        parts: list[str] = []
+        for field_name in type(self).model_fields:
+            value = getattr(self, field_name)
+            if any(
+                s in field_name for s in ("_key", "_secret", "_password", "api_key")
+            ) and isinstance(value, str):
+                parts.append(f"{field_name}={mask_value(value)!r}")
+            else:
+                parts.append(f"{field_name}={value!r}")
+        return f"Settings({', '.join(parts)})"
 
 
 @lru_cache

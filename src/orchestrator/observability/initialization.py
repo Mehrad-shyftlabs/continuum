@@ -78,6 +78,16 @@ def initialize_observability(
             )
 
     _initialized = True
+
+    # Wire up the lazy error reporter hook in exceptions module
+    try:
+        from orchestrator.exceptions import set_error_reporter
+        from orchestrator.observability.error_reporter import report_error
+
+        set_error_reporter(report_error)
+    except Exception:
+        pass
+
     return manager
 
 

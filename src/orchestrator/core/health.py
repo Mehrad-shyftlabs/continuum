@@ -109,6 +109,7 @@ class HealthCheck:
         self._checks["qdrant"] = self._check_qdrant
         self._checks["langfuse"] = self._check_langfuse
         self._checks["llm"] = self._check_llm
+        self._checks["temporal"] = self._check_temporal
 
     def register_check(
         self,
@@ -495,6 +496,66 @@ class HealthCheck:
                     "gemini": has_gemini,
                     "azure": has_azure,
                     "warning": str(e),
+                },
+            )
+
+
+    async def check_temporal(self) -> HealthCheckResult:
+        """Check Temporal connectivity."""
+        return await self._check_temporal()
+
+    async def _check_temporal(self) -> HealthCheckResult:
+        """Internal Temporal health check."""
+        start_time = time.time()
+
+        if not settings.temporal_enabled:
+            return HealthCheckResult(
+                name="temporal",
+                status=HealthStatus.HEALTHY,
+                message="Temporal disabled (TEMPORAL_ENABLED=false)",
+                details={"enabled": False},
+            )
+
+        try:
+            from temporalio.client import Client
+
+            client = await Client.connect(
+                settings.temporal_host,
+                namespace=settings.temporal_namespace,
+            )
+            # Verify by listing schedules (lightweight operation)
+            latency = (time.time() - start_time) * 1000
+
+            return HealthCheckResult(
+                name="temporal",
+                status=HealthStatus.HEALTHY,
+                message="Temporal connection successful",
+                latency_ms=latency,
+                details={
+                    "enabled": True,
+                    "host": settings.temporal_host,
+                    "namespace": settings.temporal_namespace,
+                },
+            )
+
+        except ImportError:
+            return HealthCheckResult(
+                name="temporal",
+                status=HealthStatus.DEGRADED,
+                message="temporalio package not installed (pip install shyftlabs-continuum[temporal])",
+                details={"enabled": True, "installed": False},
+            )
+        except Exception as e:
+            latency = (time.time() - start_time) * 1000
+            return HealthCheckResult(
+                name="temporal",
+                status=HealthStatus.UNHEALTHY,
+                message=f"Temporal connection failed: {str(e)}",
+                latency_ms=latency,
+                details={
+                    "host": settings.temporal_host,
+                    "namespace": settings.temporal_namespace,
+                    "error": str(e),
                 },
             )
 

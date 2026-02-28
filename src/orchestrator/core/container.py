@@ -19,6 +19,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from orchestrator.config import settings
 from orchestrator.logging import get_logger
 
+from orchestrator.protocols import ILLMClient, IMemoryClient, ISessionClient
+
 if TYPE_CHECKING:
     from orchestrator.llm import LLMClient
     from orchestrator.memory import MemoryClient
@@ -153,12 +155,11 @@ class Container:
         self._llm_initialized = True
         logger.debug("LLM client initialized via container")
 
-    def set_llm_client(self, client: LLMClient) -> None:
+    def set_llm_client(self, client: LLMClient | ILLMClient) -> None:
         """
         Set a custom LLM client (for testing or custom configuration).
 
-        Args:
-            client: LLM client instance to use
+        Accepts any object implementing ILLMClient protocol.
         """
         with self._lock:
             self._llm_client = client
@@ -199,8 +200,8 @@ class Container:
         self._memory_initialized = True
         logger.debug("Memory client initialized via container")
 
-    def set_memory_client(self, client: MemoryClient | None) -> None:
-        """Set a custom memory client."""
+    def set_memory_client(self, client: MemoryClient | IMemoryClient | None) -> None:
+        """Set a custom memory client. Accepts any object implementing IMemoryClient protocol."""
         with self._lock:
             self._memory_client = client
             self._memory_initialized = True
@@ -275,16 +276,15 @@ class Container:
 
     def set_session_client(
         self,
-        client: SessionClient | None,
+        client: SessionClient | ISessionClient | None,
         provider: BaseSessionProvider | None = None,
     ) -> None:
-        """Set a custom session client."""
+        """Set a custom session client. Accepts any object implementing ISessionClient protocol."""
 
         with self._lock:
             self._session_client = client
             if client and provider:
-                # Update client's provider if provided
-                client._provider = provider
+                client.set_provider(provider)
             self._session_initialized = True
 
     def has_session_client(self) -> bool:
@@ -609,7 +609,7 @@ def get_container(config: ContainerConfig | None = None) -> Container:
 
 def reset_container() -> None:
     """
-    Reset the global container.
+    Reset the global container and all associated global client state.
 
     Useful for testing to ensure a clean state.
     """
@@ -619,3 +619,18 @@ def reset_container() -> None:
         if _global_container is not None:
             _global_container.reset()
             _global_container = None
+
+    # Also reset the module-level globals in memory and session clients
+    try:
+        from orchestrator.memory.client import reset_global_memory
+
+        reset_global_memory()
+    except ImportError:
+        pass
+
+    try:
+        from orchestrator.session.client import reset_global_session
+
+        reset_global_session()
+    except ImportError:
+        pass

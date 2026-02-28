@@ -50,6 +50,14 @@ COMMON_CONTEXT_VARIABLES = {
     "storeId",
 }
 
+SENSITIVE_CONTEXT_VARIABLES = {
+    "auth_token",
+    "token",
+    "access_token",
+    "authToken",
+    "bearer",
+}
+
 
 class ToolExecutorConfig:
     """Configuration for the ToolExecutor."""
@@ -85,9 +93,7 @@ class RateLimiter:
         """
         self.rate_per_second = rate_per_second
         self.tokens = rate_per_second
-        # Use 0 as initial time - will be properly set on first acquire()
-        # Avoids issues with get_event_loop() deprecation in Python 3.10+
-        self.last_update: float = 0
+        self.last_update: float | None = None
         self._lock = asyncio.Lock()
 
     async def acquire(self) -> None:
@@ -98,27 +104,26 @@ class RateLimiter:
         replenished at rate_per_second.
         """
         if self.rate_per_second <= 0:
-            return  # Rate limiting disabled
+            return
 
         async with self._lock:
             loop = asyncio.get_running_loop()
             now = loop.time()
-            # Handle first call (last_update is 0)
-            if self.last_update == 0:
+
+            if self.last_update is None:
                 self.last_update = now
                 self.tokens -= 1
                 return
+
             elapsed = now - self.last_update
             self.last_update = now
 
-            # Replenish tokens based on elapsed time
             self.tokens = min(
-                self.rate_per_second,  # Max tokens = rate
+                self.rate_per_second,
                 self.tokens + elapsed * self.rate_per_second,
             )
 
             if self.tokens < 1:
-                # Wait for tokens to replenish
                 wait_time = (1 - self.tokens) / self.rate_per_second
                 await asyncio.sleep(wait_time)
                 self.tokens = 0
@@ -370,9 +375,10 @@ class ToolExecutor:
             if not should_capture:
                 continue
 
-            # Store the value
-            self._context_state.set(namespace, key, value, scope=scope)
-            captured.append(f"{key}={str(value)[:30]}")
+            is_sensitive = key in SENSITIVE_CONTEXT_VARIABLES
+            self._context_state.set(namespace, key, value, scope=scope, sensitive=is_sensitive)
+            display_value = "****" if is_sensitive else str(value)[:30]
+            captured.append(f"{key}={display_value}")
 
         if captured:
             logger.info(f"📥 Captured context variables from {tool_name}: {', '.join(captured)}")

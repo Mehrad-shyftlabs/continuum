@@ -11,6 +11,10 @@ from typing import TYPE_CHECKING, Any
 from orchestrator.agent.interfaces.handler_interface import IMessageBuilder
 from orchestrator.logging import get_logger
 from orchestrator.observability.decorators import observe
+from orchestrator.utils.sanitization import (
+    detect_injection_patterns,
+    sanitize_user_input,
+)
 
 if TYPE_CHECKING:
     from orchestrator.agent.base import BaseAgent
@@ -126,12 +130,30 @@ class MessageBuilder(IMessageBuilder):
             except Exception as e:
                 logger.warning(f"Failed to load session history: {e}")
 
+        # Sanitize user input if enabled via agent config
+        should_sanitize = not agent.config or agent.config.input_sanitization
+        should_detect = agent.config and agent.config.injection_detection
+        if isinstance(input, str):
+            if should_sanitize:
+                input = sanitize_user_input(input)
+            if should_detect:
+                detected = detect_injection_patterns(input)
+                if detected:
+                    logger.warning(
+                        f"Potential prompt injection detected in input to agent "
+                        f"'{agent.name}': {detected}"
+                    )
+
         # Add user input
         if isinstance(input, str):
             messages.append({"role": "user", "content": input})
         elif isinstance(input, list):
             for item in input:
-                messages.append(self._message_to_dict(item))
+                msg = self._message_to_dict(item)
+                if should_sanitize and msg.get("role") == "user" and msg.get("content"):
+                    msg = msg.copy()
+                    msg["content"] = sanitize_user_input(msg["content"])
+                messages.append(msg)
 
         # Apply context management (proactive compression) if enabled
         try:

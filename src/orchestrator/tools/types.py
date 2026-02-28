@@ -270,6 +270,9 @@ class ToolContextVariable:
     required: bool = False
     """If True, tool call fails if variable is not available and not provided by LLM."""
 
+    sensitive: bool = False
+    """If True, the variable value is masked in serialized output (to_dict, logs)."""
+
 
 @dataclass
 class ToolContextConfig:
@@ -403,6 +406,7 @@ class ToolContextState:
         name: str,
         value: Any,
         scope: Literal["session", "run"] = "session",
+        sensitive: bool = False,
     ) -> None:
         """Set a variable value."""
         if namespace not in self._variables:
@@ -412,7 +416,7 @@ class ToolContextState:
         # Store metadata
         if namespace not in self._metadata:
             self._metadata[namespace] = {}
-        self._metadata[namespace][name] = {"scope": scope}
+        self._metadata[namespace][name] = {"scope": scope, "sensitive": sensitive}
 
     def get_all(self, namespace: str) -> dict[str, Any]:
         """Get all variables for a namespace."""
@@ -452,10 +456,24 @@ class ToolContextState:
                 self._metadata[namespace] = {}
             self._metadata[namespace].update(meta)
 
+    def _is_sensitive(self, namespace: str, name: str) -> bool:
+        """Check if a variable is marked as sensitive."""
+        return self._metadata.get(namespace, {}).get(name, {}).get("sensitive", False)
+
     def to_dict(self) -> dict[str, Any]:
-        """Serialize to dictionary for storage."""
+        """Serialize to dictionary for storage. Sensitive values are masked."""
+        from orchestrator.utils.secrets import mask_value
+
+        masked_vars: dict[str, dict[str, Any]] = {}
+        for ns, variables in self._variables.items():
+            masked_vars[ns] = {}
+            for name, value in variables.items():
+                if self._is_sensitive(ns, name) and isinstance(value, str):
+                    masked_vars[ns][name] = mask_value(value)
+                else:
+                    masked_vars[ns][name] = value
         return {
-            "variables": self._variables,
+            "variables": masked_vars,
             "metadata": self._metadata,
         }
 
@@ -471,6 +489,8 @@ class ToolContextState:
         """
         Generate a context string for system prompt injection.
 
+        Sensitive variables are excluded from the prompt context.
+
         Returns:
             String describing available context, or None if empty.
         """
@@ -480,13 +500,17 @@ class ToolContextState:
         lines = ["Current tool context (use these values for tool calls):"]
         for namespace, vars in self._variables.items():
             if vars:
-                lines.append(f"  [{namespace}]")
+                ns_lines: list[str] = []
                 for name, value in vars.items():
-                    # Truncate long values
+                    if self._is_sensitive(namespace, name):
+                        continue
                     str_value = str(value)
                     if len(str_value) > 50:
                         str_value = str_value[:47] + "..."
-                    lines.append(f"    {name}: {str_value}")
+                    ns_lines.append(f"    {name}: {str_value}")
+                if ns_lines:
+                    lines.append(f"  [{namespace}]")
+                    lines.extend(ns_lines)
 
         return "\n".join(lines) if len(lines) > 1 else None
 

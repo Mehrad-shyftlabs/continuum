@@ -52,6 +52,9 @@ class LLMConfig(BaseModel):
     api_version: str | None = None
     custom_llm_provider: str | None = None
 
+    # Rate limiting
+    rate_limit_rpm: int | None = None
+
     # Caching
     cache: bool = False
     cache_ttl: int | None = None

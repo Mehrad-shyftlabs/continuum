@@ -22,6 +22,22 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+from orchestrator.utils.secrets import redact_dict, redact_sensitive_values
+
+# Module-level error reporter hook (set by observability module when initialized)
+_error_reporter: Any = None
+
+
+def set_error_reporter(reporter: Any) -> None:
+    """Set the global error reporter function (called by observability init)."""
+    global _error_reporter
+    _error_reporter = reporter
+
+
+def get_error_reporter() -> Any:
+    """Get the current error reporter (for testing)."""
+    return _error_reporter
+
 
 class ErrorSeverity(str, Enum):
     """Severity levels for errors."""
@@ -120,29 +136,22 @@ class OrchestratorError(Exception):
 
         super().__init__(self.message)
 
-        # Auto-report to Langfuse if enabled
-        if should_report:
-            self._report_to_langfuse()
-
-    def _report_to_langfuse(self) -> None:
-        """Report this error to Langfuse."""
-        try:
-            from orchestrator.observability.error_reporter import report_error
-
-            report_error(self)
-        except ImportError:
-            pass  # Error reporter not available yet
-        except Exception:
-            pass  # Don't fail on reporting errors
+        if should_report and _error_reporter:
+            try:
+                _error_reporter(self)
+            except Exception:
+                pass
 
     def __str__(self) -> str:
-        """Format error as string."""
-        parts = [f"[{self.error_code}] {self.message}"]
+        """Format error as string with sensitive data redacted."""
+        parts = [f"[{self.error_code}] {redact_sensitive_values(self.message)}"]
         if self.context:
-            context_str = ", ".join(f"{k}={v}" for k, v in self.context.items())
+            safe_context = redact_dict(self.context)
+            context_str = ", ".join(f"{k}={v}" for k, v in safe_context.items())
             parts.append(f"Context: {context_str}")
         if self.original_error:
-            parts.append(f"Caused by: {type(self.original_error).__name__}: {self.original_error}")
+            safe_msg = redact_sensitive_values(str(self.original_error))
+            parts.append(f"Caused by: {type(self.original_error).__name__}: {safe_msg}")
         return " | ".join(parts)
 
     def __repr__(self) -> str:
@@ -159,17 +168,19 @@ class OrchestratorError(Exception):
         """
         Convert error to dictionary for serialization.
 
+        Sensitive data in context is automatically redacted.
+
         Returns:
             Dictionary representation of the error.
         """
         data = {
             "error_type": self.__class__.__name__,
-            "message": self.message,
+            "message": redact_sensitive_values(self.message),
             "error_code": self.error_code,
             "category": self.category.value,
             "severity": self.severity.value,
             "timestamp": self.timestamp.isoformat(),
-            "context": self.context,
+            "context": redact_dict(self.context) if self.context else {},
         }
 
         if self.trace_id:
@@ -179,7 +190,7 @@ class OrchestratorError(Exception):
         if self.original_error:
             data["original_error"] = {
                 "type": type(self.original_error).__name__,
-                "message": str(self.original_error),
+                "message": redact_sensitive_values(str(self.original_error)),
             }
 
         return data

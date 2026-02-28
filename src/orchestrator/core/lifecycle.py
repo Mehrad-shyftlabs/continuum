@@ -451,6 +451,20 @@ class OrchestratorLifecycle:
             except Exception as e:
                 logger.warning(f"Failed to initialize Session client: {e}")
 
+        # Initialize Temporal client (optional)
+        if settings.temporal_enabled:
+            try:
+                from orchestrator.temporal import get_temporal_client
+
+                client = get_temporal_client()
+                await client.connect()
+                self._initialized_components.append("temporal")
+                logger.debug("Temporal client connected")
+            except ImportError:
+                logger.debug("temporalio not installed, skipping Temporal init")
+            except Exception as e:
+                logger.warning(f"Failed to connect to Temporal: {e}")
+
     def _log_service_configurations(self) -> None:
         """Log service configurations and modes."""
         logger.info("📊 Service Configurations:")
@@ -647,6 +661,20 @@ class OrchestratorLifecycle:
                 logger.debug(
                     "Langfuse is a shared service, skipping all operations (no flush, no shutdown)"
                 )
+
+        # Temporal worker shutdown
+        if "temporal" in self._initialized_components:
+            try:
+                from orchestrator.temporal import get_worker_manager
+
+                manager = get_worker_manager()
+                if manager.is_running:
+                    await manager.stop()
+                    logger.debug("Temporal worker stopped")
+            except ImportError:
+                pass
+            except Exception as e:
+                logger.warning(f"Error stopping Temporal worker: {e}")
 
         # Note: Redis and Qdrant connections are managed by Container
         # Container.shutdown() handles their cleanup based on shared_services_enabled

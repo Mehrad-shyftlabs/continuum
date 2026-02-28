@@ -165,6 +165,9 @@ class MemoryClient:
         Handles the case where we're already in an event loop
         (e.g., Jupyter notebook) vs. no event loop.
 
+        Uses a dedicated thread with its own event loop to avoid deadlocks
+        when called from within an existing async context.
+
         Args:
             coro: Coroutine to run
 
@@ -172,22 +175,15 @@ class MemoryClient:
             Result of the coroutine
         """
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
         except RuntimeError:
-            # No event loop running - create one
             return asyncio.run(coro)
 
-        # Event loop exists - use it
-        if loop.is_running():
-            # We're inside an async context (e.g., Jupyter)
-            # Use nest_asyncio pattern or run in thread
-            import concurrent.futures
+        import concurrent.futures
 
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(asyncio.run, coro)
-                return future.result()
-        else:
-            return loop.run_until_complete(coro)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(asyncio.run, coro)
+            return future.result()
 
     def _build_scope(
         self,
@@ -623,3 +619,12 @@ def get_global_memory_client() -> MemoryClient:
                 _initialized = True
 
     return _global_memory_client
+
+
+def reset_global_memory() -> None:
+    """Reset the global memory client. Useful for testing."""
+    global _global_memory_client, _initialized
+
+    with _global_lock:
+        _global_memory_client = None
+        _initialized = False

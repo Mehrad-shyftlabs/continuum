@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from orchestrator.config import settings
+from orchestrator.utils.secrets import redact_dict, redact_sensitive_values
 
 if TYPE_CHECKING:
     from orchestrator.exceptions import OrchestratorError
@@ -177,10 +178,10 @@ class ErrorReporter:
                 {
                     "error_type": error.__class__.__name__,
                     "error_code": error.error_code,
-                    "message": error.message,
+                    "message": redact_sensitive_values(error.message),
                     "category": error.category.value,
                     "severity": error.severity.value,
-                    "context_data": error.context,
+                    "context_data": redact_dict(error.context) if error.context else {},
                 }
             )
             trace_id = trace_id or error.trace_id
@@ -188,7 +189,7 @@ class ErrorReporter:
             if error.original_error:
                 error_data["original_error"] = {
                     "type": type(error.original_error).__name__,
-                    "message": str(error.original_error),
+                    "message": redact_sensitive_values(str(error.original_error)),
                 }
         else:
             # Handle standard exceptions
@@ -196,7 +197,7 @@ class ErrorReporter:
                 {
                     "error_type": type(error).__name__,
                     "error_code": "UNKNOWN_ERROR",
-                    "message": str(error),
+                    "message": redact_sensitive_values(str(error)),
                     "category": "unknown",
                     "severity": "high",
                 }
@@ -254,7 +255,7 @@ class ErrorReporter:
         if error_data.get("original_error"):
             metadata["original_error"] = error_data["original_error"]
         if error_data.get("metadata"):
-            metadata.update(error_data["metadata"])
+            metadata.update(redact_dict(error_data["metadata"]))
 
         # Input is the error message and traceback
         input_data = {

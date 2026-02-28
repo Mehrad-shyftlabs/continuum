@@ -47,6 +47,10 @@ class HandoffExecutor(IHandoffExecutor):
         self._agent_registry = agent_registry or {}
         self._executor = executor
 
+    def set_executor(self, executor: Any) -> None:
+        """Set the executor instance for recursive execution of target agents."""
+        self._executor = executor
+
     def register_agent(self, agent: BaseAgent) -> None:
         """Register an agent for handoffs."""
         self._agent_registry[agent.name] = agent

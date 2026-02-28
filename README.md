@@ -6,7 +6,7 @@ A Python SDK for agentic AI orchestration with multi-LLM provider support, obser
 
 ### Prerequisites
 
-- **Python 3.13+** (required)
+- **Python 3.13** (required)
 - pip (latest version recommended)
 
 ### Environment Setup
@@ -90,7 +90,7 @@ pip install -e . --upgrade --force-reinstall --no-cache-dir
 # Check SDK version
 python -c "from orchestrator import __version__; print(f'SDK version: {__version__}')"
 
-# Check Python version (should be 3.13+)
+# Check Python version (should be 3.13)
 python --version
 
 # Verify core imports work
@@ -134,6 +134,73 @@ response = await runner.run(
 print(response.content)
 ```
 
+## Temporal Workflow Integration (Optional)
+
+The SDK supports [Temporal](https://temporal.io) as an optional durable
+workflow engine. Any `BaseAgent` can be orchestrated as a fault-tolerant
+Temporal workflow with human-in-the-loop approval gates.
+
+### Install
+
+```bash
+pip install -e ".[temporal]"
+```
+
+### Quick example
+
+```python
+from orchestrator.agent import BaseAgent
+from orchestrator.temporal import (
+    AgentWorkflow,
+    WorkflowInput,
+    get_agent_registry,
+    get_temporal_client,
+    get_worker_manager,
+)
+
+# Register agents
+registry = get_agent_registry()
+registry.register(BaseAgent(name="summarizer", instructions="Summarize the input."))
+registry.register(BaseAgent(name="reviewer", instructions="Review for accuracy."))
+
+# Connect and start worker
+client = get_temporal_client()
+await client.connect()
+await get_worker_manager().start()
+
+# Run a workflow
+handle = await client.start_workflow(
+    AgentWorkflow.run,
+    WorkflowInput(
+        steps=[
+            {"type": "agent", "agent_name": "summarizer"},
+            {"type": "approval", "description": "Review before publishing"},
+            {"type": "agent", "agent_name": "reviewer"},
+        ],
+        initial_input="Temporal is a durable execution platform...",
+    ),
+    id="my-workflow",
+    task_queue="orchestrator-agents",
+)
+result = await handle.result()
+```
+
+### Features
+
+- **Agent-agnostic**: any `BaseAgent` works as a workflow step
+- **Declarative steps**: sequential, parallel, conditional, loop, wait, approval
+- **Human-in-the-loop**: approval gates with notifications, escalation, timeout
+- **Fault-tolerant**: automatic retries, durable state, workflow cancellation
+- **Docker Compose**: Temporal server, UI, and Postgres included
+
+See the [Temporal docs](docs/temporal/) for the full guide:
+- [Getting Started](docs/temporal/getting-started.md)
+- [Custom Agents](docs/temporal/custom-agents.md)
+- [Human-in-the-Loop](docs/temporal/human-in-loop.md)
+- [Workflow Patterns](docs/temporal/workflow-patterns.md)
+- [Custom Workflows](docs/temporal/custom-workflows.md)
+- [Docker Setup](docs/temporal/docker.md)
+
 ## Documentation
 
 Full documentation is available in the [docs/](docs/) folder:
@@ -146,6 +213,7 @@ Full documentation is available in the [docs/](docs/) folder:
 - [Observability](docs/observability.md) - Tracing and metrics
 - [Tools](docs/tools.md) - MCP integration
 - [Core](docs/core.md) - Container and lifecycle
+- [Temporal Integration](docs/temporal/) - Durable workflow orchestration
 
 ## License
 

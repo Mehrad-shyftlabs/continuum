@@ -124,6 +124,10 @@ class SessionClient:
         """Check if sessions are enabled."""
         return self._session_config.enabled
 
+    def set_provider(self, provider: BaseSessionProvider) -> None:
+        """Set the session provider."""
+        self._provider = provider
+
     def _initialize_provider(self) -> None:
         """Initialize the session provider using the registry."""
         if self._provider is not None:
@@ -716,3 +720,12 @@ def get_global_session_client() -> SessionClient:
                 _initialized = True
 
     return _global_session_client
+
+
+def reset_global_session() -> None:
+    """Reset the global session client. Useful for testing."""
+    global _global_session_client, _initialized
+
+    with _global_lock:
+        _global_session_client = None
+        _initialized = False
