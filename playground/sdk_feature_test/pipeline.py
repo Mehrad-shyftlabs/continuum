@@ -457,7 +457,20 @@ async def run_hitl_pipeline(
         second_choice = sorted(remaining)[0]
     second_name, second_agent = remaining[second_choice]
 
-    user_query = input("\nEnter your query (or press Enter for default): ").strip()
+    print("\nEnter your query (paste multi-line text, then press Enter on an empty line to finish):")
+    print("(Or just press Enter for the default query)")
+    query_lines: list[str] = []
+    while True:
+        try:
+            line = input()
+        except EOFError:
+            break
+        if line == "" and query_lines:
+            break
+        if line == "" and not query_lines:
+            break
+        query_lines.append(line)
+    user_query = "\n".join(query_lines).strip()
     if not user_query:
         user_query = "What are three key benefits of renewable energy? Summarize briefly."
 
