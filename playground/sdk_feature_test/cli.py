@@ -31,6 +31,7 @@ from playground.sdk_feature_test.pipeline import (
     run_health_only,
     run_hitl_pipeline,
     run_no_temporal,
+    run_reasoning_patterns,
     run_workflow_only,
 )
 
@@ -45,9 +46,9 @@ def _parse_args() -> argparse.Namespace:
     run_parser = sub.add_parser("run", help="Run a scenario")
     run_parser.add_argument(
         "--scenario",
-        choices=["full", "workflow-only", "no-temporal", "health", "hitl"],
+        choices=["full", "workflow-only", "no-temporal", "health", "hitl", "reasoning-patterns"],
         default="full",
-        help="full = all features; workflow-only = core + router/seq/par/loop; no-temporal = full without Temporal; health = health checks only; hitl = Temporal with human-in-the-loop approval",
+        help="full = all features; workflow-only = core + router/seq/par/loop; no-temporal = full without Temporal; health = health checks only; hitl = Temporal with human-in-the-loop approval; reasoning-patterns = two-pass reasoning + ReAct + ReflectionAgent",
     )
     run_parser.add_argument(
         "--user-id",
@@ -85,6 +86,9 @@ async def _run_scenario(scenario: str, user_id: str | None, verbose: bool) -> in
     if scenario == "full":
         ok = await run_full_pipeline(cfg, uid, session_id, include_temporal=cfg.enable_temporal)
         return 0 if ok else 1
+    if scenario == "reasoning-patterns":
+        ok = await run_reasoning_patterns(cfg, uid, session_id)
+        return 0 if ok else 1
     return 1
 
 
@@ -95,8 +99,9 @@ def _interactive_menu() -> int:
     print(" 3. Full (no Temporal)")
     print(" 4. Full (with Temporal if enabled)")
     print(" 5. Human-in-the-Loop (Temporal + approval gate)")
+    print(" 6. Reasoning patterns (two-pass + ReAct + ReflectionAgent)")
     print(" q. Quit")
-    choice = input("Choice [1-5/q]: ").strip().lower()
+    choice = input("Choice [1-6/q]: ").strip().lower()
     if choice == "q":
         return 0
     scenario_map = {
@@ -105,6 +110,7 @@ def _interactive_menu() -> int:
         "3": "no-temporal",
         "4": "full",
         "5": "hitl",
+        "6": "reasoning-patterns",
     }
     scenario = scenario_map.get(choice, "health")
     return asyncio.run(_run_scenario(scenario, None, verbose=True))

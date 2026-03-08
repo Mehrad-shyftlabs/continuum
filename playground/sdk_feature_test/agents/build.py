@@ -13,6 +13,8 @@ from orchestrator import (
     AgentConfig,
     AgentMemoryConfig,
     BaseAgent,
+    ReflectionAgent,
+    ReflectionConfig,
     create_loop_agent,
     create_parallel_agent,
     create_router_agent,
@@ -252,6 +254,92 @@ def build_loop_agent(cfg: SDKFeatureTestConfig) -> BaseAgent:
         termination_type=TerminationType.LLM_DECISION,
         max_iterations=cfg.loop_max_iterations,
         termination_prompt="Is the text already clear and final? Reply with exactly 'COMPLETE' if done, or 'CONTINUE' if more refinement is needed.",
+    )
+
+
+# ---- Reasoning patterns ----
+
+def build_two_pass_agent(cfg: SDKFeatureTestConfig) -> BaseAgent:
+    """Agent with two-pass reasoning: silent think-first LLM call before responding."""
+    return BaseAgent(
+        name="two-pass-reasoner",
+        instructions="You are a thoughtful analyst. Answer the question clearly and thoroughly.",
+        model=cfg.default_model,
+        temperature=cfg.agent_temperature,
+        config=AgentConfig(
+            max_turns=cfg.max_turns,
+            reasoning_mode=True,
+            log_to_session=False,
+        ),
+        memory_config=AgentMemoryConfig(search_memories=False, store_memories=False),
+    )
+
+
+def build_react_agent(
+    cfg: SDKFeatureTestConfig,
+    tools: list[Any] | None = None,
+    tool_executor: Any | None = None,
+) -> BaseAgent:
+    """Agent with ReAct mode: reasons via think() tool before calling real tools."""
+    return BaseAgent(
+        name="react-agent",
+        instructions="You are a problem-solving agent. Use tools to get real data. Think before acting.",
+        model=cfg.default_model,
+        temperature=cfg.agent_temperature,
+        tools=tools or [],
+        tool_executor=tool_executor,
+        config=AgentConfig(
+            max_turns=cfg.max_turns,
+            react_mode=True,
+            log_to_session=False,
+        ),
+        memory_config=AgentMemoryConfig(search_memories=False, store_memories=False),
+    )
+
+
+def build_normal_agent(
+    cfg: SDKFeatureTestConfig,
+    tools: list[Any] | None = None,
+    tool_executor: Any | None = None,
+) -> BaseAgent:
+    """Same as react agent but without react_mode — for direct comparison."""
+    return BaseAgent(
+        name="normal-agent",
+        instructions="You are a problem-solving agent. Use tools to get real data.",
+        model=cfg.default_model,
+        temperature=cfg.agent_temperature,
+        tools=tools or [],
+        tool_executor=tool_executor,
+        config=AgentConfig(
+            max_turns=cfg.max_turns,
+            react_mode=False,
+            log_to_session=False,
+        ),
+        memory_config=AgentMemoryConfig(search_memories=False, store_memories=False),
+    )
+
+
+def build_reflection_agent(cfg: SDKFeatureTestConfig) -> ReflectionAgent:
+    """ReflectionAgent wrapping a writer agent: self-critiques and retries if needed."""
+    inner = BaseAgent(
+        name="reflection-inner-writer",
+        instructions="You are a concise writer. Answer the question in 2-3 clear sentences.",
+        model=cfg.default_model,
+        temperature=cfg.agent_temperature,
+        config=AgentConfig(max_turns=cfg.max_turns, log_to_session=False),
+        memory_config=AgentMemoryConfig(search_memories=False, store_memories=False),
+    )
+    return ReflectionAgent(
+        name="reflection-writer",
+        agent=inner,
+        reflection_config=ReflectionConfig(
+            critique_prompt=(
+                "Review the response above. Reply ONLY 'PASS' if it fully and clearly answers "
+                "the request in 2-3 sentences, or 'NEEDS IMPROVEMENT: <reason>' if not."
+            ),
+            max_reflections=2,
+        ),
+        memory_config=AgentMemoryConfig(search_memories=False, store_memories=False),
     )
 
 

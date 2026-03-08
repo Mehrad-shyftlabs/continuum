@@ -26,6 +26,7 @@ from orchestrator.agent.config import (
     HandoffConfig,
     LoopConfig,
     ParallelConfig,
+    ReflectionConfig,
     RouterConfig,
     RunnerConfig,
     SequentialConfig,
@@ -144,8 +145,11 @@ from orchestrator.agent.utils import (
 from orchestrator.agent.workflow import (
     LoopAgent,
     ParallelAgent,
+    ReflectionAgent,
     RouterAgent,
     SequentialAgent,
+    create_reflection_agent,
+    generate_critique_prompt,
 )
 from orchestrator.agent.workflow.loop import create_loop_agent
 from orchestrator.agent.workflow.parallel import create_parallel_agent
@@ -166,11 +170,14 @@ __all__ = [
     "SequentialAgent",
     "ParallelAgent",
     "LoopAgent",
+    "ReflectionAgent",
     # Factory Functions
     "create_router_agent",
     "create_sequential_agent",
     "create_parallel_agent",
     "create_loop_agent",
+    "create_reflection_agent",
+    "generate_critique_prompt",
     # Handoff Management
     "HandoffManager",
     "HistorySummarizer",
@@ -189,6 +196,7 @@ __all__ = [
     "SequentialConfig",
     "ParallelConfig",
     "LoopConfig",
+    "ReflectionConfig",
     # Types
     "AgentResponse",
     "AgentEvent",

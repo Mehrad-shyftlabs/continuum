@@ -121,6 +121,25 @@ class HandoffConfig:
 
 
 # =============================================================================
+# Reflection Configuration
+# =============================================================================
+
+
+@dataclass
+class ReflectionConfig:
+    """
+    Configuration for ReflectionAgent self-critique behavior.
+    """
+
+    critique_prompt: str = (
+        "Review the response above. Reply ONLY 'PASS' if it fully answers the request, "
+        "or 'NEEDS IMPROVEMENT: <reason>' if not."
+    )
+    max_reflections: int = 2
+    reflection_model: str | None = None  # defaults to the inner agent's model
+
+
+# =============================================================================
 # Agent Configuration
 # =============================================================================
 
@@ -158,6 +177,10 @@ class AgentConfig:
     # Output settings
     output_type: Literal["text", "json", "structured"] = "text"
 
+    # Reasoning modes
+    reasoning_mode: bool = False  # two-pass: silent think-first LLM call before the turn loop
+    react_mode: bool = False  # ReAct: appends Thought/Action/Observation template to system prompt
+
     # Tracing
     trace_all_turns: bool = True  # Trace every turn
     log_to_session: bool = True  # Log messages to session
@@ -179,6 +202,8 @@ class AgentConfig:
             "input_sanitization": self.input_sanitization,
             "injection_detection": self.injection_detection,
             "output_type": self.output_type,
+            "reasoning_mode": self.reasoning_mode,
+            "react_mode": self.react_mode,
             "trace_all_turns": self.trace_all_turns,
             "log_to_session": self.log_to_session,
         }

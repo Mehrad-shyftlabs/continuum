@@ -43,11 +43,15 @@ from orchestrator.core.lifecycle import OrchestratorLifecycle
 from playground.sdk_feature_test.agents.build import (
     build_fact_checker_agent,
     build_loop_agent,
+    build_normal_agent,
     build_parallel_agents,
+    build_react_agent,
+    build_reflection_agent,
     build_research_route_agent,
     build_router_agent,
     build_sequential_agent,
     build_summarize_route_agent,
+    build_two_pass_agent,
     build_qa_route_agent,
 )
 from playground.sdk_feature_test.config import SDKFeatureTestConfig
@@ -392,6 +396,99 @@ async def run_full_pipeline(
 async def run_no_temporal(cfg: SDKFeatureTestConfig, user_id: str, session_id: str | None) -> bool:
     """Same as full pipeline but skip Temporal."""
     return await run_full_pipeline(cfg, user_id, session_id, include_temporal=False)
+
+
+async def run_reasoning_patterns(
+    cfg: SDKFeatureTestConfig, user_id: str, session_id: str | None
+) -> bool:
+    """
+    Smoke-test the three new reasoning pattern features:
+    1. Two-pass reasoning (reasoning_mode=True)
+    2. ReAct mode (react_mode=True)
+    3. ReflectionAgent (self-critique + retry)
+    """
+    from dataclasses import replace
+
+    logger.info("Running reasoning-patterns scenario...")
+    validate_configuration()
+    lifecycle = get_lifecycle_manager(
+        fail_on_unhealthy=cfg.fail_on_unhealthy,
+        verify_connections=cfg.verify_connections,
+    )
+    await lifecycle.initialize()
+    container = get_container()
+
+    cfg_noreg = replace(cfg, enable_memory=False, enable_session=False)
+
+    # Connect fake MCP so react/normal agents have real tools to compare
+    tools_list = []
+    tool_executor = None
+    fake_server = None
+    if cfg.use_fake_mcp and MCPUtil and ToolExecutor:
+        try:
+            fake_server, tools_list, tool_executor = await _connect_fake_mcp()
+            logger.info(f"MCP fake connected for reasoning patterns: {len(tools_list)} tools")
+        except Exception as e:
+            logger.warning(f"MCP fake connect failed, agents will have no tools: {e}")
+
+    two_pass = build_two_pass_agent(cfg_noreg)
+    react = build_react_agent(cfg_noreg, tools=tools_list, tool_executor=tool_executor)
+    normal = build_normal_agent(cfg_noreg, tools=tools_list, tool_executor=tool_executor)
+    reflection = build_reflection_agent(cfg_noreg)
+
+    runner = AgentRunner(
+        container=container,
+        tool_executor=tool_executor,
+        config=RunnerConfig(default_max_turns=cfg.max_turns, persist_state=False),
+    )
+
+    query = "What are three key benefits of renewable energy? Be concise."
+
+    try:
+        # 1. Two-pass reasoning
+        r1 = await runner.run(two_pass, query, user_id=user_id)
+        logger.info(f"[two-pass reasoning] response length: {len(r1.content or '')} | tokens: {r1.usage.total_tokens}")
+
+        # 2. Normal mode (no react) — baseline
+        r2 = await runner.run(normal, query, user_id=user_id)
+        logger.info(f"[normal mode]        response length: {len(r2.content or '')} | tokens: {r2.usage.total_tokens}")
+        logger.info(f"[normal mode]        answer: {(r2.content or '')[:300]}")
+
+        # 3. ReAct mode — same query, same tools, with think() reasoning
+        r3 = await runner.run(react, query, user_id=user_id)
+        logger.info(f"[react mode]         response length: {len(r3.content or '')} | tokens: {r3.usage.total_tokens}")
+        logger.info(f"[react mode]         answer: {(r3.content or '')[:300]}")
+
+        # Token difference shows the cost of ReAct reasoning
+        token_diff = r3.usage.total_tokens - r2.usage.total_tokens
+        logger.info(f"[comparison]         ReAct used {token_diff:+d} tokens vs normal mode")
+
+        # 4. ReflectionAgent — uses runner.run via execute() internally
+        r4 = await reflection.execute(
+            input_text=query,
+            runner=runner,
+            context=None,  # type: ignore[arg-type]
+        )
+        logger.info(f"[reflection agent]   response length: {len(r4.content or '')} | tokens: {r4.usage.total_tokens}")
+
+    except Exception:
+        logger.exception("Reasoning-patterns scenario failed")
+        if fake_server:
+            try:
+                await fake_server.cleanup()
+            except Exception:
+                pass
+        await lifecycle.shutdown()
+        return False
+
+    if fake_server:
+        try:
+            await fake_server.cleanup()
+        except Exception:
+            pass
+
+    await lifecycle.shutdown()
+    return True
 
 
 async def run_hitl_pipeline(

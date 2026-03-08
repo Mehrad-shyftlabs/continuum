@@ -25,6 +25,42 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+_REACT_TEMPLATE_BASE = """
+Before answering, call the 'think' tool to reason step by step.
+Then give your final answer.
+"""
+
+_REACT_TEMPLATE_WITH_TOOLS = """
+Before calling any tool or giving a final answer, call the 'think' tool to reason step by step.
+
+Example flow:
+1. think(thought="I need X, so I will call tool Y with Z")
+2. Call the actual tool
+3. think(thought="The result shows X, now I need to...") — if more steps needed
+4. Give your final answer
+
+Available tools (besides 'think'):
+{tool_list}
+"""
+
+
+def _build_react_template(agent: Any) -> str:
+    """Build the ReAct template, injecting tool names if the agent has tools."""
+    tools = agent.get_tools_for_llm() if hasattr(agent, "get_tools_for_llm") else []
+    if not tools:
+        return _REACT_TEMPLATE_BASE
+    tool_lines = []
+    for t in tools:
+        fn = t.get("function", {})
+        name = fn.get("name", "")
+        if not name or name == "think":  # skip think — it's internal to ReAct
+            continue
+        desc = fn.get("description", "")
+        tool_lines.append(f"- {name}: {desc}" if desc else f"- {name}")
+    if not tool_lines:
+        return _REACT_TEMPLATE_BASE
+    return _REACT_TEMPLATE_WITH_TOOLS.format(tool_list="\n".join(tool_lines))
+
 
 class MessageBuilder(IMessageBuilder):
     """
@@ -91,6 +127,10 @@ class MessageBuilder(IMessageBuilder):
         # Add system prompt
         if agent.system_prompt:
             messages.append({"role": "system", "content": agent.system_prompt})
+
+        # Inject ReAct scaffold if enabled (must come before user messages)
+        if agent.config and agent.config.react_mode:
+            messages.append({"role": "system", "content": _build_react_template(agent)})
 
         # Inject tool context into system prompt for LLM awareness
         if tool_context_state and not tool_context_state.is_empty():

@@ -136,4 +136,8 @@ poetry.lock
 # Project specific
 *.db
 *.sqlite
+gap-analysis/
+run-related/
+iteration-docs/
+playground/comparisons/
 

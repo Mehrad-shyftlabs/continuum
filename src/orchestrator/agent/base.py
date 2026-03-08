@@ -25,6 +25,25 @@ if TYPE_CHECKING:
     from orchestrator.tools import MCPServer, ToolExecutor
 
 
+_THINK_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "think",
+        "description": "Reason step by step before calling other tools or giving a final answer. Use this to plan your next action.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "thought": {
+                    "type": "string",
+                    "description": "Your reasoning about what to do next",
+                }
+            },
+            "required": ["thought"],
+        },
+    },
+}
+
+
 @dataclass
 class BaseAgent:
     """
@@ -140,6 +159,8 @@ class BaseAgent:
         Get all tools formatted for LLM consumption.
 
         Includes both regular tools and handoffs as special tools.
+        When react_mode is enabled, prepends a 'think' tool so the LLM
+        can express reasoning steps via function calling before acting.
         """
         tools = []
 
@@ -152,9 +173,17 @@ class BaseAgent:
             else:
                 tools.append(tool)
 
+        # Capture whether there are regular tools before adding handoffs
+        has_regular_tools = bool(tools)
+
         # Add handoffs as tools
         for handoff in self.handoffs:
             tools.append(handoff.to_tool_definition())
+
+        # Inject think tool only when react_mode is enabled AND there are regular tools
+        # Without regular tools, react_mode has no effect (same as normal mode)
+        if self.config and self.config.react_mode and has_regular_tools:
+            tools.insert(0, _THINK_TOOL)
 
         return tools
 

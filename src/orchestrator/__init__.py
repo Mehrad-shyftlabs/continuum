@@ -194,6 +194,8 @@ from orchestrator.agent import (
     MaxTurnsExceededError,
     MergeStrategy,
     ParallelAgent,
+    ReflectionAgent,
+    ReflectionConfig,
     ResponseStatus,
     Route,
     # Workflow Agents
@@ -211,6 +213,8 @@ from orchestrator.agent import (
     create_agent,
     create_loop_agent,
     create_parallel_agent,
+    create_reflection_agent,
+    generate_critique_prompt,
     # Factory Functions
     create_router_agent,
     create_sequential_agent,
@@ -350,10 +354,15 @@ __all__ = [
     "SequentialAgent",
     "ParallelAgent",
     "LoopAgent",
+    "ReflectionAgent",
     "create_router_agent",
     "create_sequential_agent",
     "create_parallel_agent",
     "create_loop_agent",
+    "create_reflection_agent",
+    "generate_critique_prompt",
+    # Reasoning Configuration
+    "ReflectionConfig",
     # Handoff
     "HandoffManager",
     "Handoff",

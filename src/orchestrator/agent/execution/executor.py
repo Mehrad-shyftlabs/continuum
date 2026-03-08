@@ -94,6 +94,22 @@ class Executor(IExecutor):
         # Collect tool execution summaries for session storage
         all_tool_summaries: list[ToolExecutionSummary] = []
 
+        # Two-pass reasoning: silent think-first call before the main loop
+        if agent.config and agent.config.reasoning_mode:
+            reasoning_text, reasoning_usage = await self._run_reasoning_pass(
+                messages=messages,
+                agent=agent,
+                session_id=context.session_id,
+            )
+            messages.append(
+                {"role": "system", "content": f"<reasoning>\n{reasoning_text}\n</reasoning>"}
+            )
+            total_usage = total_usage.add(reasoning_usage)
+            logger.info(
+                f"🧠 Reasoning pass completed for agent {agent.name} "
+                f"({reasoning_usage.total_tokens} tokens)"
+            )
+
         while turn < context.max_turns:
             turn += 1
             run_state.turn_count = turn
@@ -251,6 +267,43 @@ class Executor(IExecutor):
                             handoff_calls.append((tc, target))
                         else:
                             regular_tool_calls.append(tc)
+
+                    # Handle think tool calls inline (ReAct reasoning step)
+                    # think() is a no-op that logs the LLM's reasoning and returns immediately
+                    think_calls = [
+                        tc for tc in regular_tool_calls
+                        if (
+                            tc.function.name
+                            if hasattr(tc, "function")
+                            else tc.get("function", {}).get("name", "")
+                        ) == "think"
+                    ]
+                    regular_tool_calls = [
+                        tc for tc in regular_tool_calls
+                        if (
+                            tc.function.name
+                            if hasattr(tc, "function")
+                            else tc.get("function", {}).get("name", "")
+                        ) != "think"
+                    ]
+                    for tc in think_calls:
+                        import json as _json
+                        tc_id = tc.id if hasattr(tc, "id") else tc.get("id", "")
+                        args_str = (
+                            tc.function.arguments
+                            if hasattr(tc, "function")
+                            else tc.get("function", {}).get("arguments", "{}")
+                        )
+                        try:
+                            thought = _json.loads(args_str).get("thought", "")
+                        except Exception:
+                            thought = str(args_str)
+                        logger.info(f"💭 Agent thought: {thought}")
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tc_id,
+                            "content": "Thought recorded.",
+                        })
 
                     # Execute regular tools
                     if regular_tool_calls and self._tool_handler:
@@ -448,6 +501,244 @@ class Executor(IExecutor):
             agent_name=agent.name,
             run_id=context.run_id,
         )
+
+    async def _run_reasoning_pass(
+        self,
+        messages: list[dict[str, Any]],
+        agent: "BaseAgent",
+        session_id: str | None,
+    ) -> tuple[str, TokenUsage]:
+        """
+        Run a silent think-first LLM call and return (reasoning_text, token_usage).
+
+        The reasoning output is NOT shown to the user; it is injected as a
+        <reasoning> system message to guide the main turn loop.
+        """
+        reasoning_messages = list(messages) + [
+            {
+                "role": "user",
+                "content": (
+                    "Before responding to the user, think step-by-step about how to best "
+                    "answer the request. Lay out your reasoning clearly."
+                ),
+            }
+        ]
+
+        reasoning_config = LLMConfig.from_agent_config(agent)
+        reasoning_config.max_tokens = 512
+
+        response = await self.llm_client.chat(
+            messages=reasoning_messages,
+            config=reasoning_config,
+            session_id=session_id,
+            auto_session=False,
+        )
+
+        usage = TokenUsage()
+        if response.usage:
+            usage = TokenUsage(
+                prompt_tokens=response.usage.prompt_tokens or 0,
+                completion_tokens=response.usage.completion_tokens or 0,
+                total_tokens=response.usage.total_tokens or 0,
+            )
+
+        return response.content or "", usage
+
+    async def _execute_react_loop(
+        self,
+        agent: "BaseAgent",
+        messages: list[dict[str, Any]],
+        context: RunContext,
+        run_state: RunState,
+    ) -> AgentResponse:
+        """
+        Execute the ReAct (Reason+Act) loop.
+
+        Instead of function calling, the LLM writes actions as text:
+            Thought: ...
+            Action: <tool_name or 'Reason' or 'Final Answer'>
+            Action Input: {...}
+
+        This method parses that text, executes the named tool via ToolHandler,
+        then injects the real result as:
+            Observation: <result>
+
+        The loop repeats until the LLM writes 'Action: Final Answer'.
+        """
+        from orchestrator.agent.utils.message_utils import message_to_dict
+
+        turn = 0
+        total_usage = TokenUsage()
+
+        while turn < context.max_turns:
+            turn += 1
+            run_state.turn_count = turn
+
+            llm_config = LLMConfig.from_agent_config(agent)
+
+            # ReAct does NOT use function calling — LLM writes actions as plain text
+            response = await self.llm_client.chat(
+                messages=messages,
+                tools=None,
+                config=llm_config,
+                session_id=context.session_id,
+                auto_session=False,
+            )
+
+            if response.usage:
+                total_usage = total_usage.add(
+                    TokenUsage(
+                        prompt_tokens=response.usage.prompt_tokens or 0,
+                        completion_tokens=response.usage.completion_tokens or 0,
+                        total_tokens=response.usage.total_tokens or 0,
+                    )
+                )
+
+            content = response.content or ""
+            action, action_input, final_answer = self._parse_react_action(content)
+
+            logger.info(f"🔄 ReAct turn {turn}: action={action!r}")
+
+            # Final Answer — stop the loop
+            if final_answer is not None:
+                messages.append({"role": "assistant", "content": content})
+                run_state.messages = [message_to_dict(m) for m in messages]
+                return AgentResponse(
+                    content=final_answer,
+                    agent_name=agent.name,
+                    status=ResponseStatus.SUCCESS,
+                    usage=total_usage,
+                    turn_count=turn,
+                    messages=messages,
+                )
+
+            # No action parsed — treat full response as final answer
+            if action is None:
+                messages.append({"role": "assistant", "content": content})
+                return AgentResponse(
+                    content=content,
+                    agent_name=agent.name,
+                    status=ResponseStatus.SUCCESS,
+                    usage=total_usage,
+                    turn_count=turn,
+                    messages=messages,
+                )
+
+            # Action: Reason — LLM uses its own knowledge, no tool call needed
+            if action.lower() == "reason":
+                messages.append({"role": "assistant", "content": content})
+                run_state.messages = [message_to_dict(m) for m in messages]
+                continue
+
+            # Action: tool name — execute via ToolHandler
+            # Strip any fabricated Observation the LLM may have written
+            truncated = self._truncate_before_observation(content)
+            messages.append({"role": "assistant", "content": truncated})
+
+            observation = await self._execute_react_tool(
+                agent=agent,
+                tool_name=action,
+                tool_args=action_input or {},
+                context=context,
+            )
+
+            logger.info(f"✅ ReAct observation for '{action}': {observation[:200]}")
+
+            # Inject the real observation so the LLM sees it on the next turn
+            messages.append({"role": "user", "content": f"Observation: {observation}"})
+            run_state.messages = [message_to_dict(m) for m in messages]
+
+        raise MaxTurnsExceededError(
+            max_turns=context.max_turns,
+            current_turn=turn,
+            agent_name=agent.name,
+            run_id=context.run_id,
+        )
+
+    def _parse_react_action(
+        self,
+        content: str,
+    ) -> tuple[str | None, dict[str, Any] | None, str | None]:
+        """
+        Parse a ReAct-format LLM response.
+
+        Returns:
+            (action, action_input, final_answer)
+            - action:       tool name, 'Reason', or 'Final Answer'
+            - action_input: parsed dict of arguments (for tool calls)
+            - final_answer: the answer text when action == 'Final Answer'
+        """
+        import json
+        import re
+
+        # Find all Action lines — use the last one as the current step
+        action_matches = list(re.finditer(r"^Action:\s*(.+?)$", content, re.MULTILINE))
+        if not action_matches:
+            return None, None, None
+
+        action = action_matches[-1].group(1).strip()
+
+        if action == "Final Answer":
+            final_match = re.search(r"Final Answer:\s*(.*?)$", content, re.DOTALL)
+            answer = final_match.group(1).strip() if final_match else content
+            return "Final Answer", None, answer
+
+        # Parse Action Input JSON
+        input_match = re.search(r"Action Input:\s*(\{.*?\})", content, re.DOTALL)
+        action_input = None
+        if input_match:
+            try:
+                action_input = json.loads(input_match.group(1))
+            except json.JSONDecodeError:
+                action_input = {}
+
+        return action, action_input, None
+
+    def _truncate_before_observation(self, content: str) -> str:
+        """Strip any fabricated 'Observation:' line the LLM wrote so we can inject the real one."""
+        import re
+
+        match = re.search(r"\nObservation:", content)
+        if match:
+            return content[: match.start()].rstrip()
+        return content
+
+    async def _execute_react_tool(
+        self,
+        agent: "BaseAgent",
+        tool_name: str,
+        tool_args: dict[str, Any],
+        context: RunContext,
+    ) -> str:
+        """Execute a single tool in ReAct mode and return its result as a string."""
+        import json
+
+        from orchestrator.llm.types import FunctionCall
+        from orchestrator.llm.types import ToolCall as LLMToolCall
+
+        tc = LLMToolCall(
+            id=f"react_{tool_name}_{context.run_id[:8]}",
+            type="function",
+            function=FunctionCall(
+                name=tool_name,
+                arguments=json.dumps(tool_args),
+            ),
+        )
+
+        if self._tool_handler:
+            try:
+                results = await self._tool_handler.execute_tools_batch(
+                    agent=agent,
+                    tool_calls=[tc],
+                    context=context,
+                )
+                if results:
+                    return str(results[0].get("content", "No result"))
+            except Exception as e:
+                logger.warning(f"ReAct tool '{tool_name}' failed: {e}")
+                return f"Error executing '{tool_name}': {e}"
+
+        return f"Tool '{tool_name}' is not available"
 
     def _merge_tool_summaries(
         self,
