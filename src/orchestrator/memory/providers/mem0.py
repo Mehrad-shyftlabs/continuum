@@ -201,6 +201,7 @@ class Mem0Provider(BaseMemoryProvider):
         run_id: str | None = None,
         metadata: dict[str, Any] | None = None,
         custom_prompt: str | None = None,
+        infer: bool = True,
     ) -> MemoryAddResult:
         """
         Add memories using mem0's Memory.add() via asyncio.to_thread().
@@ -223,6 +224,9 @@ class Mem0Provider(BaseMemoryProvider):
 
         if metadata:
             kwargs["metadata"] = metadata
+
+        if not infer:
+            kwargs["infer"] = False
 
         # Custom fact extraction prompt
         # See: https://docs.mem0.ai/open-source/features/custom-fact-extraction-prompt

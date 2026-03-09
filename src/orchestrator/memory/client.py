@@ -231,6 +231,7 @@ class MemoryClient:
         run_id: str | None = None,
         metadata: MemoryMetadata | dict[str, Any] | None = None,
         custom_prompt: str | None = None,
+        infer: bool = True,
     ) -> MemoryAddResult:
         """
         Add memories from messages or text.
@@ -263,6 +264,7 @@ class MemoryClient:
             **identifiers,
             metadata=metadata_dict,
             custom_prompt=custom_prompt,
+            infer=infer,
         )
 
     async def search(

@@ -80,6 +80,9 @@ from orchestrator.memory import (
     MemoryAddResult,
     # Client
     MemoryClient,
+    # Intelligence layer
+    IntelligenceConfig,
+    IntelligentMemoryClient,
     # Config
     MemoryConfig,
     MemoryEntry,
@@ -288,6 +291,9 @@ __all__ = [
     "MemoryClient",
     "get_global_memory_client",
     "initialize_global_memory",
+    # Memory - Intelligence layer
+    "IntelligentMemoryClient",
+    "IntelligenceConfig",
     # Memory - Config
     "MemoryConfig",
     # Memory - Scopes
