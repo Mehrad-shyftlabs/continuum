@@ -319,6 +319,21 @@ class LoopMaxIterationsError(LoopWorkflowError):
         self.max_iterations = max_iterations
 
 
+class PlannerWorkflowError(WorkflowError):
+    """Raised when planner workflow execution fails."""
+
+    def __init__(
+        self,
+        message: str,
+        failed_agent: str | None = None,
+        **kwargs: Any,
+    ):
+        super().__init__(message, workflow_type="planner", **kwargs)
+        self.failed_agent = failed_agent
+        if failed_agent:
+            self.context["failed_agent"] = failed_agent
+
+
 # =============================================================================
 # State Errors
 # =============================================================================
