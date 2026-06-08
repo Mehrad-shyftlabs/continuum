@@ -537,6 +537,11 @@ class AgentResponse:
     trace_id: str | None = None
     span_id: str | None = None
 
+    # Decision trace (reasoning traceability). The ordered, tree-structured record
+    # of how this response was produced, shaped by DECISION_TRACE_DETAIL. None when
+    # tracing is disabled or detail is 'off'. The full trace is persisted by run_id.
+    decision_trace: dict[str, Any] | None = None
+
     # Multi-agent info
     agents_used: list[str] = field(default_factory=list)
     handoff_chain: list[str] = field(default_factory=list)
@@ -936,6 +941,11 @@ class RunContext:
     # or any other runtime signal. The PriorityDispatcher uses this to order
     # API calls when multiple requests are queued for the same provider.
     priority: int = 5
+
+    # Decision-trace recorder for this run (a trace.recorder.TraceRecorder).
+    # Runtime-only: not serialized to Redis. Shared across handoffs/branches so
+    # the trace spans the whole run. None when DECISION_TRACE_ENABLED is false.
+    recorder: Any = field(default=None, repr=False, compare=False)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""

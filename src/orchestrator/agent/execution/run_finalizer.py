@@ -59,6 +59,8 @@ class RunFinalizer:
 
         self.attach_run_artifacts(agent, response)
 
+        await self._finalize_decision_trace(context, response)
+
         # Run product output scanners (e.g. LLM Guard Sensitive/PII for TaxPilot).
         # Scanners redact PII in response.content before it is saved to session or returned.
         # Fail-open: if a scanner crashes the response is still returned unmodified.
@@ -113,6 +115,50 @@ class RunFinalizer:
 
         await self._lifecycle.report_metrics(context, metrics)
         await self._lifecycle.end_trace(agent, context, response)
+
+    async def _finalize_decision_trace(
+        self, context: RunContext, response: AgentResponse
+    ) -> None:
+        """Build, persist, and (per detail level) attach the decision trace.
+
+        Best-effort: a failure here never affects the response. Only the top-level
+        run owns finalization — sub-agents share the recorder but suppress their
+        session log, so we skip them to avoid persisting a partial trace twice.
+        """
+        recorder = context.recorder
+        if recorder is None or context.suppress_session_log:
+            return
+        await self.persist_decision_trace(context, response)
+
+    async def persist_decision_trace(
+        self, context: RunContext, response: AgentResponse
+    ) -> None:
+        """Build + persist + (per detail) attach the trace, ignoring the
+        suppress-session-log guard. Workflow orchestrators call this once at the
+        top level (their sub-runs are suppressed, so normal finalization skips
+        them) to own finalization of the one trace spanning all their sub-agents.
+        """
+        recorder = context.recorder
+        if recorder is None:
+            return
+        try:
+            from datetime import UTC, datetime
+
+            from orchestrator.agent.trace.config import get_trace_store, trace_detail
+            from orchestrator.agent.trace.types import TraceDetail
+
+            trace = recorder.build_trace(
+                final_response=response.content or "",
+                status=response.status.value,
+                completed_at=datetime.now(UTC),
+            )
+            await get_trace_store().save(trace)
+
+            detail = trace_detail()
+            if detail != TraceDetail.OFF:
+                response.decision_trace = trace.to_dict(detail)
+        except Exception as e:
+            logger.warning("Decision trace finalization failed (ignored): %s", e)
 
     async def handle_error(
         self,

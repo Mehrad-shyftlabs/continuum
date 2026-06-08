@@ -299,6 +299,20 @@ class AgentRunner:
                     ),
                 )
 
+        # Attach a decision-trace recorder (once per run). Reuse an existing one
+        # so handoffs/workflow branches that share this context contribute to a
+        # single trace spanning the whole run.
+        if context.recorder is None:
+            from orchestrator.agent.trace.config import checkpoint_enabled, is_trace_enabled
+
+            if is_trace_enabled():
+                from orchestrator.agent.trace.recorder import TraceRecorder
+
+                query = input if isinstance(input, str) else str(input)
+                context.recorder = TraceRecorder(
+                    context.run_id, agent.name, query, checkpoint=checkpoint_enabled()
+                )
+
         run_state = await self._context_service.create_run_state(agent, context)
         input_preview = input if isinstance(input, str) else str(input)[:500]
         await self._lifecycle.start_trace(agent, context, run_state, input_preview)
@@ -530,6 +544,176 @@ class AgentRunner:
                 trace_id=ctx.trace_id,
                 original_error=e,
             ) from e
+
+    # =========================================================================
+    # Fork (time-travel: replay a run from a step with an edit)
+    # =========================================================================
+
+    async def fork(
+        self,
+        run_id: str,
+        from_step: str,
+        *,
+        override: dict[str, Any] | None = None,
+        agent: BaseAgent | None = None,
+        label: str | None = None,
+    ) -> AgentResponse:
+        """Re-run a past run from ``from_step`` with an optional edit applied.
+
+        Steps before ``from_step`` are replayed from the persisted trace (the
+        restored message checkpoint) — not re-executed — and the agent loop runs
+        forward from there. The parent run is never mutated; the new run records
+        its lineage. Requires DECISION_TRACE_CHECKPOINT to have been on for the
+        parent run. Single-agent runs only (handoff/workflow forks are not yet
+        supported).
+
+        Args:
+            run_id: The parent run to fork from.
+            from_step: The step id to resume at (its message checkpoint is the
+                resume point).
+            override: Optional edit applied to the restored messages — see
+                ``trace.fork.apply_override`` (e.g. ``{"set_tool_result": ...}``).
+            agent: The agent to run. Defaults to the parent's root agent looked up
+                in the registry.
+            label: Optional human label stored on the new run's edit metadata.
+
+        Returns:
+            The forked run's ``AgentResponse`` (with its own ``decision_trace``).
+        """
+        from orchestrator.agent.trace.config import (
+            checkpoint_enabled,
+            get_trace_store,
+        )
+        from orchestrator.agent.trace.fork import apply_override
+        from orchestrator.agent.trace.recorder import TraceRecorder
+
+        start_time = time.time()
+
+        parent = await get_trace_store().get(run_id)
+        if parent is None:
+            raise ValueError(f"fork: parent run '{run_id}' not found in trace store")
+
+        step = next((s for s in parent.steps if s.step_id == from_step), None)
+        if step is None:
+            raise ValueError(f"fork: step '{from_step}' not found in run '{run_id}'")
+
+        # Workflow orchestrators have their own control flow and resume via the
+        # Forkable protocol. If a Forkable orchestrator is supplied (agent=) or is
+        # the run's root agent, delegate to it; otherwise fall through to the
+        # built-in single-agent / handoff resume below.
+        from orchestrator.agent.interfaces.forkable import Forkable
+
+        orchestrator = agent or self._agent_registry.get(parent.root_agent)
+        if isinstance(orchestrator, Forkable):
+            resume_ctx = create_run_context(max_turns=orchestrator.config.max_turns)
+            return await orchestrator.resume_from(
+                parent_trace=parent,
+                from_step=from_step,
+                override=override,
+                runner=self,
+                context=resume_ctx,
+            )
+
+        if step.messages_snapshot is None:
+            raise ValueError(
+                f"fork: step '{from_step}' has no message checkpoint. Enable "
+                "DECISION_TRACE_CHECKPOINT on the original run to make it forkable."
+            )
+
+        # Resume the agent that produced the forked step (so handoff/multi-agent
+        # runs resume the right agent, not always the root), unless the caller
+        # overrides with agent=.
+        step_agent_name = step.agent_name or parent.root_agent
+        target = agent or self._agent_registry.get(step_agent_name)
+        if target is None:
+            raise ValueError(
+                f"fork: agent '{step_agent_name}' not in registry; pass agent= explicitly "
+                "or register it via runner.register_agent()."
+            )
+        if target.name not in self._agent_registry:
+            self.register_agent(target)
+
+        # The handoff stack active at the forked step. Restoring it keeps handoff
+        # depth/cycle checks correct when the resumed agent (or one it hands off
+        # to) hands off again as the run replays forward. Terminal handoffs
+        # re-fire naturally through the executor; return-to-parent handoffs (where
+        # a parent synthesizes the final answer after a child returns) are not yet
+        # reconstructed — the resumed agent's own answer is returned (Phase 3).
+        resume_stack = list(step.agent_stack) or [target.name]
+        if len(resume_stack) > 1:
+            logger.info(
+                "fork: resuming multi-agent run '%s' at agent '%s' (stack: %s).",
+                run_id,
+                target.name,
+                " → ".join(resume_stack),
+            )
+
+        messages = apply_override(step.messages_snapshot, override)
+
+        ctx = create_run_context(max_turns=target.config.max_turns)
+        ctx.recorder = TraceRecorder(
+            ctx.run_id, target.name, parent.user_query, checkpoint=checkpoint_enabled()
+        )
+        ctx.recorder.trace.parent_run_id = run_id
+        ctx.recorder.trace.forked_from_step = from_step
+        ctx.recorder.trace.edit = {"override": override, "label": label}
+
+        run_state = await self._context_service.create_run_state(target, ctx)
+        run_state.agent_stack = resume_stack
+        run_state.current_agent = target.name
+        run_state.messages = list(messages)
+
+        response = await self._executor.execute_loop(
+            agent=target, messages=messages, context=ctx, run_state=run_state
+        )
+        if target.on_end:
+            target.on_end(target, {"context": ctx, "response": response})
+
+        await self._finalizer.finalize(
+            target, ctx, run_state, response, 0, None, start_time, run_state.messages
+        )
+        return response
+
+    # =========================================================================
+    # Workflow trace lifecycle (used by workflow orchestrators)
+    # =========================================================================
+    def ensure_recorder(self, context: RunContext, root_agent: str, query: str = "") -> bool:
+        """Ensure a decision-trace recorder exists on ``context``, rooted at
+        ``root_agent``.
+
+        Workflow orchestrators run their sub-agents via ``runner.run`` with a
+        shared context and ``suppress_session_log=True``, so the normal per-run
+        finalization never persists their trace. They call this at the start of
+        ``execute`` to own the one trace spanning all sub-agents, then call
+        :meth:`persist_decision_trace` at the end.
+
+        Returns True iff this call created the recorder (so the caller owns
+        finalization). No-op returning False when tracing is disabled or a
+        recorder already exists (e.g. an outer workflow/handoff created it).
+        """
+        if context.recorder is not None:
+            return False
+        from orchestrator.agent.trace.config import checkpoint_enabled, is_trace_enabled
+
+        if not is_trace_enabled():
+            return False
+        from orchestrator.agent.trace.recorder import TraceRecorder
+
+        context.recorder = TraceRecorder(
+            context.run_id, root_agent, query, checkpoint=checkpoint_enabled()
+        )
+        return True
+
+    async def persist_decision_trace(
+        self, context: RunContext, response: AgentResponse
+    ) -> None:
+        """Build, persist, and attach the decision trace for a workflow run.
+
+        Bypasses the suppress-session-log guard (workflow sub-runs are
+        suppressed). Only the orchestrator that created the recorder
+        (see :meth:`ensure_recorder`) should call this.
+        """
+        await self._finalizer.persist_decision_trace(context, response)
 
     # =========================================================================
     # Run (streaming)

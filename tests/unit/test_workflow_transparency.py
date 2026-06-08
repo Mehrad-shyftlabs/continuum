@@ -73,6 +73,7 @@ class TestSequentialTransparency:
         agent_b = _make_agent("b", log_to_session=True)
 
         runner = MagicMock()
+        runner.ensure_recorder = MagicMock(return_value=False)  # tracing not under test here
         runner.save_turn = AsyncMock()
 
         async def capturing_run(agent, input, context=None):
@@ -102,6 +103,7 @@ class TestSequentialTransparency:
         agent_b = _make_agent("b", log_to_session=True)
 
         runner = MagicMock()
+        runner.ensure_recorder = MagicMock(return_value=False)  # tracing not under test here
         runner.run = AsyncMock(return_value=_mock_response())
         runner.save_turn = AsyncMock()
 
@@ -122,6 +124,7 @@ class TestSequentialTransparency:
         agent_a = _make_agent("a", log_to_session=True)
 
         runner = MagicMock()
+        runner.ensure_recorder = MagicMock(return_value=False)  # tracing not under test here
         runner.run = AsyncMock(side_effect=RuntimeError("step failed"))
         runner.save_turn = AsyncMock()
 
@@ -146,6 +149,7 @@ class TestSequentialTransparency:
         agent_b = _make_agent("b")
 
         runner = MagicMock()
+        runner.ensure_recorder = MagicMock(return_value=False)  # tracing not under test here
         runner.run = AsyncMock(
             side_effect=[
                 _mock_response("step1 output"),
@@ -171,6 +175,7 @@ class TestSequentialTransparency:
 
         agent_a = _make_agent("a")
         runner = MagicMock()
+        runner.ensure_recorder = MagicMock(return_value=False)  # tracing not under test here
         runner.run = AsyncMock(return_value=_mock_response("output"))
         runner.save_turn = AsyncMock()
 
@@ -195,6 +200,7 @@ class TestSequentialTransparency:
         captured_contexts: list = []
 
         runner = MagicMock()
+        runner.ensure_recorder = MagicMock(return_value=False)  # tracing not under test here
         runner.save_turn = AsyncMock()
 
         async def capturing_run(agent, input, context=None):
@@ -230,6 +236,7 @@ class TestSequentialTransparency:
 
         agent_a = _make_agent("a")
         runner = MagicMock()
+        runner.ensure_recorder = MagicMock(return_value=False)  # tracing not under test here
         runner.run = AsyncMock(return_value=_mock_response("done"))
         runner.save_turn = AsyncMock()
 
@@ -256,6 +263,7 @@ class TestParallelTransparency:
         agent_b = _make_agent("b", log_to_session=True)
 
         runner = MagicMock()
+        runner.ensure_recorder = MagicMock(return_value=False)  # tracing not under test here
         runner.save_turn = AsyncMock()
 
         async def capturing_run(agent, input, context=None):
@@ -283,6 +291,7 @@ class TestParallelTransparency:
         agent_b = _make_agent("b", log_to_session=True)
 
         runner = MagicMock()
+        runner.ensure_recorder = MagicMock(return_value=False)  # tracing not under test here
         runner.run = AsyncMock(return_value=_mock_response())
         runner.save_turn = AsyncMock()
 
@@ -302,6 +311,7 @@ class TestParallelTransparency:
         agent_b = _make_agent("b")
 
         runner = MagicMock()
+        runner.ensure_recorder = MagicMock(return_value=False)  # tracing not under test here
         runner.run = AsyncMock(return_value=_mock_response("parallel output"))
         runner.save_turn = AsyncMock()
 
@@ -329,6 +339,7 @@ class TestLoopTransparency:
         sub = _make_agent("looper", log_to_session=True)
 
         runner = MagicMock()
+        runner.ensure_recorder = MagicMock(return_value=False)  # tracing not under test here
         runner.save_turn = AsyncMock()
 
         call_count = 0
@@ -367,6 +378,7 @@ class TestLoopTransparency:
 
         sub = _make_agent("looper", log_to_session=True)
         runner = MagicMock()
+        runner.ensure_recorder = MagicMock(return_value=False)  # tracing not under test here
         runner.save_turn = AsyncMock()
 
         call_count = 0

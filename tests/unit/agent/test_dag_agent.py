@@ -109,7 +109,10 @@ class TestDAGConstruction:
         ctx = _make_context()
         with _patch_span():
             with pytest.raises(AgentConfigurationError):
-                asyncio.get_event_loop().run_until_complete(dag.execute("input", runner, ctx))
+                # asyncio.run() rather than the deprecated get_event_loop(), which
+                # raises "no current event loop" once any async test has closed the
+                # session loop first (collection-order dependent).
+                asyncio.run(dag.execute("input", runner, ctx))
 
     def test_create_dag_agent_factory(self):
         dag = create_dag_agent(

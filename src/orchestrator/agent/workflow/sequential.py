@@ -108,6 +108,10 @@ class SequentialAgent(BaseAgent):
         Returns:
             Final AgentResponse from the pipeline
         """
+        # Own the one decision trace spanning all pipeline sub-agents (rooted at
+        # this workflow). Sub-runs share this recorder but are suppressed, so we
+        # persist it ourselves at the end.
+        _trace_created = runner.ensure_recorder(context, self.name, input_text)
         context.suppress_session_log = True
         try:
             current_input = input_text
@@ -263,10 +267,93 @@ class SequentialAgent(BaseAgent):
                     agent=None,
                 )
 
+            if _trace_created:
+                await runner.persist_decision_trace(context, result)
+
             return result
         finally:
             if context.metadata is not None:
                 context.metadata.pop("pipeline_context", None)
+
+    # ------------------------------------------------------------------ #
+    # Forkable: resume the pipeline from the stage owning a step
+    # ------------------------------------------------------------------ #
+    def _segment_stages(self, trace: Any) -> tuple[dict[str, int], dict[int, Any]]:
+        """Map each step_id → pipeline stage index, and stage index → its first
+        step, by grouping the trace's steps on agent-name transitions.
+
+        Note: this assumes consecutive stages use different agents (the usual
+        pipeline shape). Two consecutive stages backed by the *same* agent would
+        merge into one segment.
+        """
+        step_stage: dict[str, int] = {}
+        stage_first: dict[int, Any] = {}
+        stage = -1
+        prev_agent: str | None = None
+        for s in trace.steps:
+            if s.agent_name != prev_agent:
+                stage += 1
+                prev_agent = s.agent_name
+                stage_first[stage] = s
+            step_stage[s.step_id] = stage
+        return step_stage, stage_first
+
+    async def resume_from(
+        self,
+        *,
+        parent_trace: Any,
+        from_step: str,
+        override: dict[str, Any] | None,
+        runner: AgentRunner,
+        context: RunContext,
+    ) -> AgentResponse:
+        """Re-run the pipeline from the stage containing ``from_step``.
+
+        Stages before the resume point are not re-run; the resumed stage's input
+        is recovered from its first step's message checkpoint (or replaced via
+        ``override={"replace_last_user": ...}``). The parent run is never mutated;
+        the new run records its lineage.
+        """
+        from orchestrator.agent.trace.fork import apply_override
+
+        step_stage, stage_first = self._segment_stages(parent_trace)
+        stage_idx = step_stage.get(from_step)
+        if stage_idx is None:
+            raise ValueError(f"resume_from: step '{from_step}' not found in trace")
+        stage_idx = min(stage_idx, len(self.agents) - 1)
+
+        # Recover the resumed stage's input: the last user message in its first
+        # step's checkpoint, with the override applied; fall back to the run query.
+        resumed_input: str | None = None
+        snap = getattr(stage_first.get(stage_idx), "messages_snapshot", None) or []
+        edited = apply_override(snap, override)
+        for m in reversed(edited):
+            if m.get("role") == "user":
+                resumed_input = str(m.get("content", ""))
+                break
+        if resumed_input is None:
+            resumed_input = parent_trace.user_query
+
+        # New trace rooted at this workflow, linked back to the parent.
+        created = runner.ensure_recorder(context, self.name, parent_trace.user_query)
+        if created and context.recorder is not None:
+            context.recorder.trace.parent_run_id = parent_trace.run_id
+            context.recorder.trace.forked_from_step = from_step
+            context.recorder.trace.edit = {"override": override, "stage": stage_idx}
+
+        # Run the remaining stages as a sub-pipeline sharing this recorder.
+        tail = SequentialAgent(
+            name=self.name,
+            agents=self.agents[stage_idx:],
+            sequential_config=self.sequential_config,
+        )
+        result = await tail.execute(resumed_input, runner, context)
+        # Surface the forked run's id (the workflow AgentResponse doesn't set it)
+        # so callers can load the persisted trace by run_id.
+        result.run_id = context.run_id
+        if created:
+            await runner.persist_decision_trace(context, result)
+        return result
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""

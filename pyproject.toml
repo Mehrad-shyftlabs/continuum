@@ -142,6 +142,9 @@ markers = [
     "e2e: End-to-end tests (require all services)",
     "slow: Tests that take more than 5 seconds",
     "live_mcp: Integration tests that require a live MCP server (set MCP_SERVER_URL)",
+    "redis: Tests that require a live Redis instance",
+    "milvus: Tests that require a live Milvus instance",
+    "temporal: Tests that require a live Temporal cluster",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

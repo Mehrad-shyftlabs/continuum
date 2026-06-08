@@ -233,6 +233,25 @@ class Settings(BaseSettings):
     temporal_activity_retry_max_attempts: int = 3
 
     # -------------------------------------------------------------------------
+    # Decision Trace Configuration (reasoning traceability)
+    # -------------------------------------------------------------------------
+    # Capture an ordered decision trace per run, attach it to the response, and
+    # persist it (keyed by run_id). When disabled, no recorder is created and the
+    # execution path is byte-for-byte unchanged.
+    decision_trace_enabled: bool = False  # DECISION_TRACE_ENABLED
+    # How much of the trace is attached to the response (the full trace is always
+    # persisted): 'off' (persist only), 'summary' (steps + decisions, blobs
+    # shrunk), 'full' (everything inlined).
+    decision_trace_detail: Literal["off", "summary", "full"] = "summary"
+    # Persistence backend: 'redis' (durable, reuses session Redis), 'memory'
+    # (process-local), 'null' (don't persist).
+    decision_trace_store: Literal["redis", "memory", "null"] = "redis"
+    decision_trace_ttl_days: int = 14  # Redis TTL for persisted traces
+    # Snapshot the LLM message array at each turn so a run can be forked/replayed
+    # from any step (the "what-if"). Heavier (stores prompts); off by default.
+    decision_trace_checkpoint: bool = False
+
+    # -------------------------------------------------------------------------
     # Lifecycle Configuration (Shutdown Behavior)
     # -------------------------------------------------------------------------
     shared_services_enabled: bool = (

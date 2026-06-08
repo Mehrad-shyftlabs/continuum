@@ -233,6 +233,10 @@ class HandoffExecutor(IHandoffExecutor):
                 max_turns=max(1, context.max_turns - run_state.turn_count),
                 is_handoff=True,
                 data_labels=context.data_labels.copy(),
+                # Share the decision-trace recorder so the target agent's own
+                # LLM/tool steps are captured into the one DecisionTrace for this
+                # run (the recorder is intentionally shared across handoffs).
+                recorder=context.recorder,
             )
 
             # Log target agent details (mirrors message_builder output for top-level runs)
