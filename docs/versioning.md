@@ -63,6 +63,41 @@ copy entirely, so a forgotten edit is impossible.
 are **immutable** — a number can never be re-uploaded — so each release needs a
 fresh version.
 
+### Automated release (recommended)
+
+Publishing is automated with **GitHub Actions + PyPI Trusted Publishing**
+([`.github/workflows/release.yml`](../.github/workflows/release.yml)). No API
+token is stored anywhere — GitHub mints a short-lived OIDC token at publish time.
+
+**One-time setup** (PyPI → project → *Settings* → *Publishing* → *Add a trusted
+publisher*):
+
+| Field | Value |
+|-------|-------|
+| Owner | `shyftlabs` |
+| Repository | `continuum` |
+| Workflow name | `release.yml` |
+| Environment | `pypi` |
+
+**Each release:**
+
+1. Land the version bump + CHANGELOG on `dev` via PR (steps 1–3 below).
+2. Create a GitHub Release with a tag matching the version, e.g. `v0.2.2`:
+   ```bash
+   git switch dev && git pull
+   git tag v0.2.2 && git push origin v0.2.2
+   ```
+   then publish a Release from that tag in the GitHub UI (or `gh release create v0.2.2 --generate-notes`).
+3. The workflow runs automatically: it **verifies the tag matches `pyproject.toml`**,
+   builds, runs `twine check`, and publishes to PyPI via OIDC.
+
+The version guard means a `v0.2.3` tag on code still at `0.2.2` fails the build
+instead of publishing a mismatched release.
+
+### Manual release (fallback)
+
+If you publish by hand instead of via the workflow:
+
 1. **Bump** `version` in `pyproject.toml` (only this one place).
 2. **Add a CHANGELOG entry** under a new `## [x.y.z]` heading in
    [`CHANGELOG.md`](../CHANGELOG.md).
