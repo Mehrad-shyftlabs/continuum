@@ -19,6 +19,21 @@ and Continuum adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Changed
 - _Nothing yet._
 
+---
+
+## [0.2.1] — 2026-06
+
+### Changed
+- Renamed the importable package from `orchestrator` to `continuum`. The
+  distribution is unchanged (`pip install shyftlabs-continuum`); imports are now
+  `import continuum` / `from continuum.… import …`. Runtime config keys
+  (Temporal task queue, memory collection defaults, session key prefix,
+  Prometheus metric names) and the `initialize_orchestrator`/`shutdown_orchestrator`
+  functions are unchanged.
+
+### Added
+- `continuum/py.typed` marker so consumers receive the package's type hints (PEP 561).
+
 ### Deprecated
 - _Nothing yet._
 
@@ -37,5 +52,6 @@ and Continuum adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 Initial public release. See the repository history for details prior to this changelog being introduced.
 
-[Unreleased]: https://github.com/shyftlabs/continuum/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/shyftlabs/continuum/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/shyftlabs/continuum/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/shyftlabs/continuum/releases/tag/v0.2.0
