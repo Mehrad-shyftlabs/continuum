@@ -246,7 +246,15 @@ from continuum.session import (
     initialize_global_session_client,
 )
 
-__version__ = "0.2.0"
+# Version is the single source of truth in pyproject.toml; read it back from the
+# installed package metadata so __version__ can never drift from the published
+# distribution. Falls back when running from a source tree that isn't installed.
+try:
+    from importlib.metadata import version as _pkg_version
+
+    __version__ = _pkg_version("shyftlabs-continuum")
+except Exception:  # pragma: no cover - source checkout without install
+    __version__ = "0.0.0+unknown"
 
 __all__ = [
     # Version

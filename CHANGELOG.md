@@ -21,6 +21,16 @@ and Continuum adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ---
 
+## [0.2.2] — 2026-06
+
+### Fixed
+- `continuum.__version__` is now derived from the installed package metadata via
+  `importlib.metadata` instead of a hardcoded string, so it always matches the
+  distribution version. In `0.2.1` the attribute incorrectly reported `0.2.0`
+  because the literal was never bumped. See [docs/versioning.md](docs/versioning.md).
+
+---
+
 ## [0.2.1] — 2026-06
 
 ### Changed
