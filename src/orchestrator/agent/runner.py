@@ -606,6 +606,7 @@ class AgentRunner:
         orchestrator = agent or self._agent_registry.get(parent.root_agent)
         if isinstance(orchestrator, Forkable):
             resume_ctx = create_run_context(max_turns=orchestrator.config.max_turns)
+            resume_ctx.disable_memory_writes = True  # a fork is a hypothetical replay
             return await orchestrator.resume_from(
                 parent_trace=parent,
                 from_step=from_step,
@@ -613,6 +614,31 @@ class AgentRunner:
                 runner=self,
                 context=resume_ctx,
             )
+
+        # Guard: forking a step inside a return-to-parent handoff is unsupported.
+        # Resuming the child wouldn't reconstruct the parent's continuation (the
+        # parent synthesizes the final answer after the child returns), so we'd
+        # silently hand back the child's partial answer. Fail clearly instead.
+        from orchestrator.agent.trace.types import StepKind
+
+        _path = set(step.agent_stack or [])
+        if step.agent_name:
+            _path.add(step.agent_name)
+        _path.discard(parent.root_agent)  # the root isn't reached via a handoff
+        if _path:
+            for s in parent.steps:
+                if (
+                    s.kind == StepKind.HANDOFF
+                    and isinstance(s.decision, dict)
+                    and s.decision.get("return_to_parent")
+                    and s.decision.get("handoff_to") in _path
+                ):
+                    raise ValueError(
+                        f"fork: step '{from_step}' is inside a return-to-parent handoff "
+                        f"(to '{s.decision.get('handoff_to')}'), which is not forkable yet — "
+                        "resuming the child can't reconstruct the parent's final answer. "
+                        "Use return_to_parent=False for handoffs you intend to fork."
+                    )
 
         if step.messages_snapshot is None:
             raise ValueError(
@@ -651,6 +677,7 @@ class AgentRunner:
         messages = apply_override(step.messages_snapshot, override)
 
         ctx = create_run_context(max_turns=target.config.max_turns)
+        ctx.disable_memory_writes = True  # a fork is a hypothetical replay
         ctx.recorder = TraceRecorder(
             ctx.run_id, target.name, parent.user_query, checkpoint=checkpoint_enabled()
         )
@@ -704,9 +731,7 @@ class AgentRunner:
         )
         return True
 
-    async def persist_decision_trace(
-        self, context: RunContext, response: AgentResponse
-    ) -> None:
+    async def persist_decision_trace(self, context: RunContext, response: AgentResponse) -> None:
         """Build, persist, and attach the decision trace for a workflow run.
 
         Bypasses the suppress-session-log guard (workflow sub-runs are

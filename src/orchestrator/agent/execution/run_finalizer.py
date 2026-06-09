@@ -116,9 +116,7 @@ class RunFinalizer:
         await self._lifecycle.report_metrics(context, metrics)
         await self._lifecycle.end_trace(agent, context, response)
 
-    async def _finalize_decision_trace(
-        self, context: RunContext, response: AgentResponse
-    ) -> None:
+    async def _finalize_decision_trace(self, context: RunContext, response: AgentResponse) -> None:
         """Build, persist, and (per detail level) attach the decision trace.
 
         Best-effort: a failure here never affects the response. Only the top-level
@@ -130,9 +128,7 @@ class RunFinalizer:
             return
         await self.persist_decision_trace(context, response)
 
-    async def persist_decision_trace(
-        self, context: RunContext, response: AgentResponse
-    ) -> None:
+    async def persist_decision_trace(self, context: RunContext, response: AgentResponse) -> None:
         """Build + persist + (per detail) attach the trace, ignoring the
         suppress-session-log guard. Workflow orchestrators call this once at the
         top level (their sub-runs are suppressed, so normal finalization skips
@@ -273,6 +269,7 @@ class RunFinalizer:
                 trace_id=context.trace_id,
                 tool_execution_summary=context.metadata.get("tool_execution_summary"),
                 run_id=context.run_id,
+                disable_memory=context.disable_memory_writes,
             )
         except Exception as e:
             logger.warning(f"Failed to save messages to session: {e}")

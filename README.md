@@ -50,7 +50,14 @@ Build, run, and deploy reliable AI agents at enterprise scale — multi-LLM rout
 ```bash
 git clone https://github.com/shyftlabs/continuum.git
 cd continuum
+```
+or if you want to install the package
+```bash
+pip install shyftlabs-continuum
+```
 
+
+```bash
 python3.13 -m venv .venv && source .venv/bin/activate
 pip install -e .
 

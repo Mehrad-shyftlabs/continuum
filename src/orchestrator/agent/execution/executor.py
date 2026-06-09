@@ -6,6 +6,7 @@ Extracted from AgentRunner to provide clean separation of concerns.
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING, Any
 
 from orchestrator.agent.exceptions import MaxTurnsExceededError
@@ -41,6 +42,7 @@ def _record_tool_steps(
     tool_calls: list[Any],
     tool_results: list[dict[str, Any]],
     parent_id: str | None,
+    agent_stack: list[str] | None = None,
 ) -> None:
     """Record one TOOL_CALL decision step per executed tool, pairing each call
     with its result by ``tool_call_id`` (best-effort)."""
@@ -66,7 +68,13 @@ def _record_tool_steps(
             args = raw_args
         tc_id = tc.id if hasattr(tc, "id") else tc.get("id", "")
         recorder.record_tool_call(
-            agent_name, turn, name, args, results_by_id.get(tc_id), parent_id=parent_id
+            agent_name,
+            turn,
+            name,
+            args,
+            results_by_id.get(tc_id),
+            parent_id=parent_id,
+            agent_stack=agent_stack,
         )
 
 
@@ -142,13 +150,6 @@ class Executor(IExecutor):
         turn = 0
         total_usage = TokenUsage()
         metrics = get_metrics_collector()
-
-        # Decision trace: stamp recorded steps with this agent's handoff stack
-        # (root → … → this agent) so fork() can resume the right agent in a
-        # multi-agent run. Set per loop entry; each handed-off agent's loop sets
-        # its own stack on the shared recorder.
-        if context.recorder is not None:
-            context.recorder.current_agent_stack = run_state.get_agent_stack_snapshot()
 
         # Collect tool execution summaries for session storage.
         # Capped to max_turns to prevent unbounded growth in long-running agents.
@@ -326,8 +327,18 @@ class Executor(IExecutor):
                 # snapshot would also contain this turn's own answer and fork()
                 # would replay an already-finished conversation.)
                 recorder = context.recorder
+                # This agent's handoff stack (root → … → this agent), read from
+                # its OWN run_state per turn and passed into each record() call —
+                # never a shared recorder field — so concurrent agents can't
+                # clobber each other's stack. Recomputed each turn, so it's also
+                # correct after a return-to-parent handoff pops the child.
+                _agent_stack = run_state.get_agent_stack_snapshot()
+                # deepcopy so the snapshot is fully independent of the live message
+                # list — message_to_dict returns dicts by reference, so without this
+                # any later in-place edit of a message would corrupt this stored
+                # snapshot (and thus a fork replayed from it).
                 _snapshot = (
-                    [message_to_dict(m) for m in llm_messages]
+                    copy.deepcopy([message_to_dict(m) for m in llm_messages])
                     if recorder is not None and recorder.checkpoint
                     else None
                 )
@@ -358,6 +369,7 @@ class Executor(IExecutor):
                         completion_tokens=(_u.completion_tokens or 0) if _u else 0,
                         total_tokens=(_u.total_tokens or 0) if _u else 0,
                         messages_snapshot=_snapshot,
+                        agent_stack=_agent_stack,
                     )
 
                 # Log LLM response details
@@ -447,7 +459,11 @@ class Executor(IExecutor):
                         logger.info(f"💭 Agent thought: {thought}")
                         if recorder is not None:
                             recorder.record_reasoning(
-                                agent.name, turn, thought, parent_id=llm_step_id
+                                agent.name,
+                                turn,
+                                thought,
+                                parent_id=llm_step_id,
+                                agent_stack=_agent_stack,
                             )
                         messages.append(
                             {
@@ -478,6 +494,7 @@ class Executor(IExecutor):
                                 regular_tool_calls,
                                 tool_results,
                                 parent_id=llm_step_id,
+                                agent_stack=_agent_stack,
                             )
 
                         # Store the summary if tools were executed (capped to prevent leak)
@@ -496,8 +513,14 @@ class Executor(IExecutor):
                     if handoff_calls and self._handoff_executor:
                         for tc, target in handoff_calls:
                             if recorder is not None:
+                                _hc = agent.get_handoff(target)
                                 recorder.record_handoff(
-                                    agent.name, target, turn, parent_id=llm_step_id
+                                    agent.name,
+                                    target,
+                                    turn,
+                                    parent_id=llm_step_id,
+                                    agent_stack=_agent_stack,
+                                    return_to_parent=bool(_hc and _hc.return_to_parent),
                                 )
                             handoff_result = await self._handoff_executor.execute_handoff(
                                 agent=agent,
@@ -536,14 +559,9 @@ class Executor(IExecutor):
                                     # to the same target again on the next turn.
                                     run_state.pop_agent()
                                     run_state.current_agent = agent.name
-                                    # Restore the recorder's agent stack to the parent's
-                                    # (the child's loop set it to the deeper stack). Without
-                                    # this, the parent's continuation steps would be
-                                    # mis-stamped with the child's stack.
-                                    if recorder is not None:
-                                        recorder.current_agent_stack = (
-                                            run_state.get_agent_stack_snapshot()
-                                        )
+                                    # (No recorder-stack reset needed: the parent's
+                                    # next turn recomputes _agent_stack from run_state,
+                                    # which is back to the parent's stack after the pop.)
                                     turn_span.set_output(
                                         {
                                             "handoff_to": target,

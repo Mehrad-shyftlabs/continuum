@@ -142,6 +142,12 @@ class SequentialAgent(BaseAgent):
                         extra={"run_id": context.run_id, "step": step_num},
                     )
 
+                    # Decision trace: mark the start of this pipeline stage.
+                    if context.recorder is not None:
+                        context.recorder.record_workflow_step(
+                            self.name, stage=i, label=agent.name, agent_stack=[self.name]
+                        )
+
                     # Create a span for each step in the pipeline
                     async with SpanScope(
                         f"workflow.sequential.step.{step_num}",
@@ -279,24 +285,12 @@ class SequentialAgent(BaseAgent):
     # Forkable: resume the pipeline from the stage owning a step
     # ------------------------------------------------------------------ #
     def _segment_stages(self, trace: Any) -> tuple[dict[str, int], dict[int, Any]]:
-        """Map each step_id → pipeline stage index, and stage index → its first
-        step, by grouping the trace's steps on agent-name transitions.
+        """Map each step_id → pipeline stage index and stage index → its first
+        (snapshot-bearing) step. Delegates to the shared marker-based segmenter
+        (``_forkable.segment_by_markers``) used by every Forkable orchestrator."""
+        from orchestrator.agent.workflow._forkable import segment_by_markers
 
-        Note: this assumes consecutive stages use different agents (the usual
-        pipeline shape). Two consecutive stages backed by the *same* agent would
-        merge into one segment.
-        """
-        step_stage: dict[str, int] = {}
-        stage_first: dict[int, Any] = {}
-        stage = -1
-        prev_agent: str | None = None
-        for s in trace.steps:
-            if s.agent_name != prev_agent:
-                stage += 1
-                prev_agent = s.agent_name
-                stage_first[stage] = s
-            step_stage[s.step_id] = stage
-        return step_stage, stage_first
+        return segment_by_markers(trace)
 
     async def resume_from(
         self,
@@ -314,7 +308,7 @@ class SequentialAgent(BaseAgent):
         ``override={"replace_last_user": ...}``). The parent run is never mutated;
         the new run records its lineage.
         """
-        from orchestrator.agent.trace.fork import apply_override
+        from orchestrator.agent.workflow._forkable import link_lineage, resumed_input
 
         step_stage, stage_first = self._segment_stages(parent_trace)
         stage_idx = step_stage.get(from_step)
@@ -322,24 +316,14 @@ class SequentialAgent(BaseAgent):
             raise ValueError(f"resume_from: step '{from_step}' not found in trace")
         stage_idx = min(stage_idx, len(self.agents) - 1)
 
-        # Recover the resumed stage's input: the last user message in its first
-        # step's checkpoint, with the override applied; fall back to the run query.
-        resumed_input: str | None = None
-        snap = getattr(stage_first.get(stage_idx), "messages_snapshot", None) or []
-        edited = apply_override(snap, override)
-        for m in reversed(edited):
-            if m.get("role") == "user":
-                resumed_input = str(m.get("content", ""))
-                break
-        if resumed_input is None:
-            resumed_input = parent_trace.user_query
+        # Recover the resumed stage's input (last user message in its first step's
+        # checkpoint, with the override applied; falls back to the run query).
+        stage_input = resumed_input(stage_first.get(stage_idx), override, parent_trace.user_query)
 
         # New trace rooted at this workflow, linked back to the parent.
         created = runner.ensure_recorder(context, self.name, parent_trace.user_query)
-        if created and context.recorder is not None:
-            context.recorder.trace.parent_run_id = parent_trace.run_id
-            context.recorder.trace.forked_from_step = from_step
-            context.recorder.trace.edit = {"override": override, "stage": stage_idx}
+        if created:
+            link_lineage(context, parent_trace, from_step, override, stage_idx)
 
         # Run the remaining stages as a sub-pipeline sharing this recorder.
         tail = SequentialAgent(
@@ -347,7 +331,7 @@ class SequentialAgent(BaseAgent):
             agents=self.agents[stage_idx:],
             sequential_config=self.sequential_config,
         )
-        result = await tail.execute(resumed_input, runner, context)
+        result = await tail.execute(stage_input, runner, context)
         # Surface the forked run's id (the workflow AgentResponse doesn't set it)
         # so callers can load the persisted trace by run_id.
         result.run_id = context.run_id

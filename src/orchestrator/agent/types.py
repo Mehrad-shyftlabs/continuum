@@ -931,6 +931,11 @@ class RunContext:
     # own copy and cannot stomp on each other.
     suppress_session_log: bool = False
 
+    # Set by fork(): a forked run is a hypothetical ("what-if") replay, so it must
+    # never persist facts to long-term memory (that would pollute real memory with
+    # things that never happened). Honored in the session/memory save path.
+    disable_memory_writes: bool = False
+
     # Data sensitivity labels carried from Orla-style taint tracking.
     # Labels propagate through handoffs so downstream agents know what
     # sensitive categories (e.g. "pii", "phi") are in scope for this run.

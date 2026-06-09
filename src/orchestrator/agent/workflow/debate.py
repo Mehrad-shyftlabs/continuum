@@ -113,6 +113,34 @@ class DebateAgent(BaseAgent):
     judge_agent: BaseAgent | None = None
     debate_config: DebateConfig = field(default_factory=DebateConfig)
 
+    # Ordered-capture stage scheme (Phase 6).
+    #
+    # The debate is a grid of ``rounds × debaters`` followed by a single judge.
+    # Today the control flow runs exactly one round of two debaters (pro, con)
+    # concurrently, then the judge — so ``_NUM_ROUNDS == 1`` and
+    # ``_NUM_DEBATERS == 2``. Each debater turn is assigned a deterministic flat
+    # stage index with the 2D→1D scheme::
+    #
+    #     stage = round_index * _NUM_DEBATERS + debater_index
+    #         pro (round 0, debater 0) -> stage 0
+    #         con (round 0, debater 1) -> stage 1
+    #
+    # and the judge gets the final stage index::
+    #
+    #     judge_stage = _NUM_ROUNDS * _NUM_DEBATERS  ->  stage 2
+    #
+    # Even though the two debaters could run sequentially, they are isolated into
+    # per-branch recorders and ``absorb``-ed back in debater-index order so the
+    # merged trace is stage-indexed, contiguous and forkable regardless of the
+    # real wall-clock interleaving.
+    _NUM_ROUNDS: int = field(default=1, init=False, repr=False)
+    _NUM_DEBATERS: int = field(default=2, init=False, repr=False)
+
+    @property
+    def _judge_stage(self) -> int:
+        """Flat stage index assigned to the judge (after all debater turns)."""
+        return self._NUM_ROUNDS * self._NUM_DEBATERS
+
     def __post_init__(self) -> None:
         if not self.name:
             from orchestrator.agent.exceptions import AgentConfigurationError
@@ -144,6 +172,8 @@ class DebateAgent(BaseAgent):
             The raw arguments are stored in context.metadata under
             "debate_pro" and "debate_con" keys.
         """
+        # Own the one decision trace spanning all debater turns + the judge.
+        created = runner.ensure_recorder(context, self.name, input_text)
         context.suppress_session_log = True
         result = await self._execute_inner(input_text, runner, context)
         if context.session_id:
@@ -153,6 +183,9 @@ class DebateAgent(BaseAgent):
                 assistant_message=result.content or "",
                 agent=None,
             )
+        if created:
+            await runner.persist_decision_trace(context, result)
+        result.run_id = context.run_id
         return result
 
     async def _execute_inner(
@@ -173,86 +206,20 @@ class DebateAgent(BaseAgent):
                 "judge_agent": self.judge_agent.name,
             },
         ) as workflow_span:
-            # Step 1 — run pro and con concurrently
-            logger.info(
-                f"DebateAgent '{self.name}': running '{self.pro_agent.name}' "
-                f"and '{self.con_agent.name}' in parallel"
+            # Step 1 — run the debater round (pro + con) with ordered capture.
+            pro_content, con_content, debater_usage = await self._run_debaters(
+                input_text, runner, context
             )
-
-            pro_task = asyncio.create_task(
-                runner.run(agent=self.pro_agent, input=input_text, context=context)
-            )
-            con_task = asyncio.create_task(
-                runner.run(agent=self.con_agent, input=input_text, context=context)
-            )
-
-            pro_response, con_response = await asyncio.gather(
-                pro_task, con_task, return_exceptions=True
-            )
-
-            # Handle failures in either side
-            if isinstance(pro_response, Exception):
-                logger.error(f"DebateAgent: pro_agent failed: {pro_response}")
-                pro_content = f"[Pro argument unavailable: {pro_response}]"
-                pro_usage = TokenUsage()
-            else:
-                pro_content = pro_response.content or ""
-                pro_usage = pro_response.usage
-                total_usage = total_usage.add(pro_usage)
-
-            if isinstance(con_response, Exception):
-                logger.error(f"DebateAgent: con_agent failed: {con_response}")
-                con_content = f"[Con argument unavailable: {con_response}]"
-                con_usage = TokenUsage()
-            else:
-                con_content = con_response.content or ""
-                con_usage = con_response.usage
-                total_usage = total_usage.add(con_usage)
-
-            logger.info(
-                f"DebateAgent '{self.name}': both sides complete — "
-                f"pro={len(pro_content)} chars, con={len(con_content)} chars"
-            )
+            total_usage = total_usage.add(debater_usage)
 
             workflow_span.add_metadata("pro_preview", pro_content[:200])
             workflow_span.add_metadata("con_preview", con_content[:200])
 
-            # Step 2 — prepare excerpts for the judge
-            # Option A (summarise_arguments=True): each side compresses its own
-            #   argument into bullet points — preserves important content.
-            # Option B (default): hard character truncation as a safety net.
-            pro_excerpt, con_excerpt, summarise_usage = await self._prepare_excerpts(
-                pro_content=pro_content,
-                con_content=con_content,
+            # Step 2 — judge synthesises both arguments.
+            synthesis, judge_usage = await self._run_judge(
+                input_text, pro_content, con_content, runner, context
             )
-            total_usage = total_usage.add(summarise_usage)
-
-            judge_input = (
-                f"Topic / Question:\n{input_text}\n\n"
-                f"--- Argument FOR ({self.pro_agent.name}) ---\n"
-                f"{pro_excerpt}\n\n"
-                f"--- Argument AGAINST ({self.con_agent.name}) ---\n"
-                f"{con_excerpt}\n\n"
-                f"Based on both arguments above, provide a balanced, actionable synthesis."
-            )
-
-            logger.info(f"DebateAgent '{self.name}': running judge '{self.judge_agent.name}'")
-
-            try:
-                judge_response = await runner.run(
-                    agent=self.judge_agent,
-                    input=judge_input,
-                    context=context,
-                )
-                total_usage = total_usage.add(judge_response.usage)
-                synthesis = judge_response.content or ""
-            except Exception as e:
-                logger.error(f"DebateAgent: judge_agent failed: {e}")
-                synthesis = (
-                    f"Judge synthesis unavailable ({e}).\n\n"
-                    f"Pro argument:\n{pro_content}\n\n"
-                    f"Con argument:\n{con_content}"
-                )
+            total_usage = total_usage.add(judge_usage)
 
             # Store individual arguments in context metadata for caller access
             context.metadata["debate_pro"] = pro_content
@@ -278,6 +245,259 @@ class DebateAgent(BaseAgent):
                     self.judge_agent.name,
                 ],
             )
+
+    async def _run_debaters(
+        self,
+        input_text: str,
+        runner: AgentRunner,
+        context: RunContext,
+    ) -> tuple[str, str, TokenUsage]:
+        """Run the debater round (pro + con) and merge their traces in order.
+
+        Each debater runs against an isolated per-branch recorder so their steps
+        cannot interleave in the shared trace. After both finish they are
+        ``absorb``-ed back in debater-index order (pro=stage 0, con=stage 1) so
+        the merged trace is deterministic and stage-indexed regardless of the
+        real concurrent interleaving.
+        """
+        from orchestrator.agent.workflow._forkable import branch_recorder_context
+
+        logger.info(
+            f"DebateAgent '{self.name}': running '{self.pro_agent.name}' "
+            f"and '{self.con_agent.name}' in parallel"
+        )
+
+        # round_index is 0 here; stage = round_index * _NUM_DEBATERS + debater_index.
+        pro_stage = 0 * self._NUM_DEBATERS + 0
+        con_stage = 0 * self._NUM_DEBATERS + 1
+
+        pro_ctx, pro_rec = branch_recorder_context(context, index=pro_stage)
+        con_ctx, con_rec = branch_recorder_context(context, index=con_stage)
+
+        pro_task = asyncio.create_task(
+            runner.run(agent=self.pro_agent, input=input_text, context=pro_ctx)
+        )
+        con_task = asyncio.create_task(
+            runner.run(agent=self.con_agent, input=input_text, context=con_ctx)
+        )
+        pro_response, con_response = await asyncio.gather(
+            pro_task, con_task, return_exceptions=True
+        )
+
+        total_usage = TokenUsage()
+
+        if isinstance(pro_response, Exception):
+            logger.error(f"DebateAgent: pro_agent failed: {pro_response}")
+            pro_content = f"[Pro argument unavailable: {pro_response}]"
+        else:
+            pro_content = pro_response.content or ""
+            total_usage = total_usage.add(pro_response.usage)
+
+        if isinstance(con_response, Exception):
+            logger.error(f"DebateAgent: con_agent failed: {con_response}")
+            con_content = f"[Con argument unavailable: {con_response}]"
+        else:
+            con_content = con_response.content or ""
+            total_usage = total_usage.add(con_response.usage)
+
+        # Ordered capture: absorb in deterministic debater-index order.
+        if context.recorder is not None:
+            if pro_rec is not None:
+                context.recorder.absorb(
+                    pro_rec.trace.steps,
+                    stage=pro_stage,
+                    label=f"{self.pro_agent.name} (round 0)",
+                    orchestrator_name=self.name,
+                )
+            if con_rec is not None:
+                context.recorder.absorb(
+                    con_rec.trace.steps,
+                    stage=con_stage,
+                    label=f"{self.con_agent.name} (round 0)",
+                    orchestrator_name=self.name,
+                )
+
+        logger.info(
+            f"DebateAgent '{self.name}': both sides complete — "
+            f"pro={len(pro_content)} chars, con={len(con_content)} chars"
+        )
+        return pro_content, con_content, total_usage
+
+    async def _run_judge(
+        self,
+        input_text: str,
+        pro_content: str,
+        con_content: str,
+        runner: AgentRunner,
+        context: RunContext,
+    ) -> tuple[str, TokenUsage]:
+        """Prepare excerpts, assemble the judge prompt, and run the judge."""
+        # Step 2 — prepare excerpts for the judge
+        # Option A (summarise_arguments=True): each side compresses its own
+        #   argument into bullet points — preserves important content.
+        # Option B (default): hard character truncation as a safety net.
+        pro_excerpt, con_excerpt, total_usage = await self._prepare_excerpts(
+            pro_content=pro_content,
+            con_content=con_content,
+        )
+        judge_input = self._build_judge_input(input_text, pro_excerpt, con_excerpt)
+        synthesis, judge_usage = await self._invoke_judge(
+            judge_input, pro_content, con_content, runner, context
+        )
+        return synthesis, total_usage.add(judge_usage)
+
+    def _build_judge_input(self, input_text: str, pro_excerpt: str, con_excerpt: str) -> str:
+        """Assemble the judge prompt from the topic and both side excerpts."""
+        return (
+            f"Topic / Question:\n{input_text}\n\n"
+            f"--- Argument FOR ({self.pro_agent.name}) ---\n"
+            f"{pro_excerpt}\n\n"
+            f"--- Argument AGAINST ({self.con_agent.name}) ---\n"
+            f"{con_excerpt}\n\n"
+            f"Based on both arguments above, provide a balanced, actionable synthesis."
+        )
+
+    async def _invoke_judge(
+        self,
+        judge_input: str,
+        pro_content: str,
+        con_content: str,
+        runner: AgentRunner,
+        context: RunContext,
+    ) -> tuple[str, TokenUsage]:
+        """Run the judge against an isolated recorder and merge it as the final
+        stage so the synthesis occupies its own contiguous segment."""
+        from orchestrator.agent.workflow._forkable import branch_recorder_context
+
+        logger.info(f"DebateAgent '{self.name}': running judge '{self.judge_agent.name}'")
+
+        total_usage = TokenUsage()
+        judge_ctx, judge_rec = branch_recorder_context(context, index=self._judge_stage)
+        try:
+            judge_response = await runner.run(
+                agent=self.judge_agent,
+                input=judge_input,
+                context=judge_ctx,
+            )
+            total_usage = total_usage.add(judge_response.usage)
+            synthesis = judge_response.content or ""
+        except Exception as e:
+            logger.error(f"DebateAgent: judge_agent failed: {e}")
+            synthesis = (
+                f"Judge synthesis unavailable ({e}).\n\n"
+                f"Pro argument:\n{pro_content}\n\n"
+                f"Con argument:\n{con_content}"
+            )
+
+        if context.recorder is not None and judge_rec is not None:
+            context.recorder.absorb(
+                judge_rec.trace.steps,
+                stage=self._judge_stage,
+                label=self.judge_agent.name,
+                orchestrator_name=self.name,
+            )
+
+        return synthesis, total_usage
+
+    async def resume_from(
+        self,
+        *,
+        parent_trace: Any,
+        from_step: str,
+        override: dict[str, Any] | None,
+        runner: AgentRunner,
+        context: RunContext,
+    ) -> AgentResponse:
+        """Re-run the debate forward from the stage containing ``from_step``.
+
+        Supported granularity (documented):
+
+        * **Round-level** — when ``from_step`` lands inside a *debater* turn
+          (stage ``0..N-1``), the whole debate round is re-run forward: both
+          debaters re-run with the ``override`` applied to the recovered round
+          input, then the judge. There is only one round today, so a debater
+          fork is necessarily a whole-round re-run; re-running a single debater
+          in isolation would leave the judge reading a stale sibling argument, so
+          round granularity is the correct, bounded choice.
+        * **Judge-level** — when ``from_step`` lands inside the *judge* stage
+          (``_judge_stage``), only the judge is re-run. The debaters' arguments
+          are recovered from the parent trace via ``branch_outputs_from_trace``
+          (no debater re-run), and the ``override`` is applied to the judge's
+          recovered input.
+
+        Any other stage index raises ``ValueError`` rather than misbehaving.
+        """
+        from orchestrator.agent.workflow._forkable import (
+            branch_outputs_from_trace,
+            link_lineage,
+            resumed_input,
+            segment_by_markers,
+        )
+
+        step_stage, stage_first = segment_by_markers(parent_trace)
+        stage_idx = step_stage.get(from_step)
+        if stage_idx is None:
+            raise ValueError(f"resume_from: step '{from_step}' not found in trace")
+        if stage_idx < 0 or stage_idx > self._judge_stage:
+            raise ValueError(
+                f"resume_from: stage {stage_idx} is out of range for debate "
+                f"(0..{self._judge_stage})"
+            )
+
+        created = runner.ensure_recorder(context, self.name, parent_trace.user_query)
+        if created:
+            link_lineage(context, parent_trace, from_step, override, stage_idx)
+        context.suppress_session_log = True
+
+        total_usage = TokenUsage()
+        if stage_idx < self._judge_stage:
+            # Round-level resume: re-run both debaters (with the edit applied to
+            # the recovered round input) and then the judge.
+            new_input = resumed_input(
+                stage_first.get(stage_idx), override, parent_trace.user_query
+            )
+            pro_content, con_content, debater_usage = await self._run_debaters(
+                new_input, runner, context
+            )
+            total_usage = total_usage.add(debater_usage)
+            synthesis, judge_usage = await self._run_judge(
+                new_input, pro_content, con_content, runner, context
+            )
+            total_usage = total_usage.add(judge_usage)
+        else:
+            # Judge-level resume: reuse the debaters' arguments from the parent
+            # trace; re-run only the judge with the edit applied to its already
+            # assembled input (recovered from the judge stage's checkpoint).
+            outputs = branch_outputs_from_trace(parent_trace)
+            pro_content = outputs.get(0, "")
+            con_content = outputs.get(1, "")
+            judge_input = resumed_input(
+                stage_first.get(stage_idx), override, parent_trace.user_query
+            )
+            synthesis, judge_usage = await self._invoke_judge(
+                judge_input, pro_content, con_content, runner, context
+            )
+            total_usage = total_usage.add(judge_usage)
+
+        context.metadata["debate_pro"] = pro_content
+        context.metadata["debate_con"] = con_content
+
+        result = AgentResponse(
+            content=synthesis,
+            agent_name=self.name,
+            status=ResponseStatus.SUCCESS,
+            usage=total_usage,
+            turn_count=3,
+            agents_used=[
+                self.pro_agent.name,
+                self.con_agent.name,
+                self.judge_agent.name,
+            ],
+        )
+        result.run_id = context.run_id
+        if created:
+            await runner.persist_decision_trace(context, result)
+        return result
 
     async def _prepare_excerpts(
         self,

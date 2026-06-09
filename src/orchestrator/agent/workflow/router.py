@@ -182,6 +182,7 @@ If the request doesn't clearly fit any specialist, respond with "none".
             context.recorder.record(
                 StepKind.ROUTING,
                 self.name,
+                agent_stack=[self.name],
                 input=input_text,
                 decision={"route": target_name, "forced": forced_route is not None},
                 rationale=f"routed to {target_name}",
@@ -242,11 +243,11 @@ If the request doesn't clearly fit any specialist, respond with "none".
         input_text = override.get("replace_last_user") or parent_trace.user_query
         forced_route = override.get("route")
 
+        from orchestrator.agent.workflow._forkable import link_lineage
+
         created = runner.ensure_recorder(context, self.name, parent_trace.user_query)
-        if created and context.recorder is not None:
-            context.recorder.trace.parent_run_id = parent_trace.run_id
-            context.recorder.trace.forked_from_step = from_step
-            context.recorder.trace.edit = {"override": override}
+        if created:
+            link_lineage(context, parent_trace, from_step, override, stage=0)
 
         result = await self._route_and_run(input_text, runner, context, forced_route=forced_route)
         result.run_id = context.run_id

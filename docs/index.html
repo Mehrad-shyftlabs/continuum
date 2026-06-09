@@ -641,6 +641,13 @@
     <a class="sidebar-link sidebar-link-sub" onclick="scrollToAnchor('run-session-multi')">Multi-agent Pattern</a>
     <a class="sidebar-link sidebar-link-sub" onclick="scrollToAnchor('run-final')">Deciding Final Response</a>
     <a class="sidebar-link" onclick="scrollToAnchor('run-context')">Context Management</a>
+    <a class="sidebar-link" onclick="scrollToAnchor('run-trace')"> Time-Travel (Decision Trace)</a>
+    <a class="sidebar-link sidebar-link-sub" onclick="scrollToAnchor('run-trace-enable')">Enable &amp; configure</a>
+    <a class="sidebar-link sidebar-link-sub" onclick="scrollToAnchor('run-trace-inspect')">Inspect a trace</a>
+    <a class="sidebar-link sidebar-link-sub" onclick="scrollToAnchor('run-trace-fork')">Fork &amp; rewind</a>
+    <a class="sidebar-link sidebar-link-sub" onclick="scrollToAnchor('run-trace-branch')">Branch &amp; diff</a>
+    <a class="sidebar-link sidebar-link-sub" onclick="scrollToAnchor('run-trace-store')">Storage backends</a>
+    <a class="sidebar-link sidebar-link-sub" onclick="scrollToAnchor('run-trace-limits')">Limitations</a>
     <div class="sidebar-group-label">Deployment</div>
     <a class="sidebar-link" onclick="scrollToAnchor('run-lifecycle')">App Lifecycle</a>
     <a class="sidebar-link" onclick="scrollToAnchor('run-fastapi')">FastAPI Server</a>
@@ -1617,6 +1624,122 @@ agent = <span class="cls">BaseAgent</span>(
 
   <div class="callout callout-tip">
     <strong>Tip:</strong> Set <code>CONTEXT_COMPRESSION_THRESHOLD=0.8</code> (default) to trigger compression at 80% of the model's context window. <code>CONTEXT_KEEP_RECENT_MESSAGES=10</code> ensures the last 10 messages are never truncated.
+  </div>
+
+  <a class="anchor" id="run-trace"></a>
+  <h2>⏪ Time-Travel (Decision Trace)</h2>
+  <p>Continuum can record every decision in a run — each LLM call, tool call, handoff, and workflow step — as a structured, replayable <em>ledger</em>. Once recorded, you can rewind to any step, edit it, and re-execute only what's downstream; everything upstream replays from the saved checkpoint. <em>git rebase, for an agent run.</em></p>
+  <div class="callout callout-info">
+    <strong>Two halves:</strong> <b>record</b> (the trace — what happened) and <b>what-if</b> (fork — rewind, change one input, replay). The feature is off by default and costs one boolean check per turn when disabled.
+  </div>
+  <div class="callout callout-tip">
+    <strong>Worked example:</strong> <a href="https://github.com/shyftlabs/continuum/tree/main/playground/local/glassbox" target="_blank"><code>playground/local/glassbox</code></a> — a six-agent month-end close you can rewind. Lower a materiality threshold and watch the verdict flip <code>CONTROL_ISSUE → CLEAN</code>, with a before/after diff and a count of the steps replayed from cache.
+  </div>
+
+  <a class="anchor" id="run-trace-enable"></a>
+  <h3>Enable &amp; configure</h3>
+  <p>Disabled by default. Opt in with environment variables (or set the same fields on <code>settings</code> programmatically). Recording is independent of <em>forkability</em>: turn on <code>CHECKPOINT</code> only when you want to rewind, since it stores per-step message snapshots.</p>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># .env — everything off unless you opt in</span>
+DECISION_TRACE_ENABLED=true
+DECISION_TRACE_DETAIL=full         <span class="cm"># off | summary | full</span>
+DECISION_TRACE_STORE=redis         <span class="cm"># redis | memory | null</span>
+DECISION_TRACE_CHECKPOINT=true     <span class="cm"># per-step snapshots → enables fork/rewind</span>
+DECISION_TRACE_TTL_DAYS=14         <span class="cm"># auto-expiry of persisted traces</span></pre></div>
+  <table>
+    <thead><tr><th>Setting</th><th>Default</th><th>Controls</th></tr></thead>
+    <tbody>
+      <tr><td><code>DECISION_TRACE_ENABLED</code></td><td><code>false</code></td><td>Master switch. When off, no recorder is created and capture is skipped entirely.</td></tr>
+      <tr><td><code>DECISION_TRACE_DETAIL</code></td><td><code>summary</code></td><td>How much to capture: <code>off</code>, <code>summary</code>, or <code>full</code>.</td></tr>
+      <tr><td><code>DECISION_TRACE_STORE</code></td><td><code>redis</code></td><td>Where traces persist: <code>redis</code>, <code>memory</code>, or <code>null</code>.</td></tr>
+      <tr><td><code>DECISION_TRACE_CHECKPOINT</code></td><td><code>false</code></td><td>Store per-step message snapshots. Required for <code>fork()</code>.</td></tr>
+      <tr><td><code>DECISION_TRACE_TTL_DAYS</code></td><td><code>14</code></td><td>Redis TTL for persisted traces.</td></tr>
+    </tbody>
+  </table>
+
+  <a class="anchor" id="run-trace-inspect"></a>
+  <h3>Inspect a trace</h3>
+  <p>When enabled, the trace is attached to the response. You can also reload any past run by id from the configured store.</p>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>response = <span class="kw">await</span> runner.run(agent, <span class="str">"Run the month-end close."</span>)
+
+<span class="cm"># Attached to the response (when tracing is enabled)</span>
+trace = response.decision_trace        <span class="cm"># dict: steps, metrics, final_response…</span>
+
+<span class="cm"># …or reload any past run by id from the configured store</span>
+<span class="kw">from</span> orchestrator.agent.trace.config <span class="kw">import</span> get_trace_store
+<span class="kw">from</span> orchestrator.agent.trace.types <span class="kw">import</span> <span class="cls">TraceDetail</span>
+
+stored = <span class="kw">await</span> get_trace_store().<span class="fn">get</span>(response.run_id)
+data = stored.<span class="fn">to_dict</span>(<span class="cls">TraceDetail</span>.FULL)   <span class="cm"># steps with message checkpoints</span></pre></div>
+
+  <a class="anchor" id="run-trace-fork"></a>
+  <h2>Fork &amp; rewind</h2>
+  <p><code>runner.fork()</code> resumes a past run at <code>from_step</code>: steps before it replay from the saved checkpoint (no LLM or tool calls), an optional <code>override</code> edits that step, and the loop re-executes forward. The parent run is never mutated — the fork is a new run that records its lineage.</p>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># Rewind run X to a step, change one input, re-run only what's downstream</span>
+forked = <span class="kw">await</span> runner.fork(
+    run_id,
+    from_step=<span class="str">"s11"</span>,                      <span class="cm"># the step to resume at</span>
+    override={<span class="str">"set_tool_result"</span>: {          <span class="cm"># "what if the tool had returned X?"</span>
+        <span class="str">"tool_call_id"</span>: <span class="str">"call_abc"</span>,
+        <span class="str">"content"</span>: <span class="str">'{"materiality_threshold_usd": 1000000}'</span>,
+    }},
+    label=<span class="str">"threshold $1M"</span>,
+)
+<span class="fn">print</span>(forked.content)                    <span class="cm"># the new downstream outcome</span>
+<span class="fn">print</span>(forked.decision_trace[<span class="str">"parent_run_id"</span>])   <span class="cm"># lineage back to the original</span></pre></div>
+  <div class="callout callout-info">
+    <strong>Requires checkpoints.</strong> <code>fork()</code> needs the parent run to have been recorded with <code>DECISION_TRACE_CHECKPOINT=true</code> and a persisting store (<code>redis</code> or <code>memory</code>). Without a checkpoint at <code>from_step</code> it raises a clear error.
+  </div>
+  <p>The <code>override</code> applies a small, well-defined edit to the restored messages before the loop re-runs:</p>
+  <table class="param-table">
+    <tbody>
+      <tr><td>system</td><td>str</td><td>Replace (or prepend) the system instruction — a "what-if the policy were…" edit.</td></tr>
+      <tr><td>set_tool_result</td><td>{tool_call_id, content}</td><td>Override a recorded tool result — the "what if the tool had returned X?" knob.</td></tr>
+      <tr><td>replace_last_user</td><td>str</td><td>Replace the most recent user message content.</td></tr>
+      <tr><td>append</td><td>message dict</td><td>Append an extra message (e.g. one more instruction).</td></tr>
+    </tbody>
+  </table>
+  <p>Forking works across multi-agent runs too: it resumes the agent that produced the step and restores the handoff stack. Workflow orchestrators (<code>SequentialAgent</code>, <code>RouterAgent</code>) implement the <code>Forkable</code> protocol and resume from the stage that owns the step.</p>
+
+  <a class="anchor" id="run-trace-branch"></a>
+  <h3>Branch &amp; diff</h3>
+  <p>Because upstream replays from cache, forking the same step at several values is cheap — run them concurrently and compare. <code>diff_traces()</code> reports what changed between two runs.</p>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">import</span> asyncio
+<span class="kw">from</span> orchestrator.agent.trace <span class="kw">import</span> diff_traces
+
+<span class="cm"># Branch the same step at three values, concurrently</span>
+forks = <span class="kw">await</span> asyncio.gather(*[
+    runner.fork(run_id, <span class="str">"s11"</span>, override={<span class="str">"replace_last_user"</span>: edit(v)})
+    <span class="kw">for</span> v <span class="kw">in</span> (<span class="num">5_000_000</span>, <span class="num">2_500_000</span>, <span class="num">1_000_000</span>)
+])
+
+<span class="cm"># Compare a fork against its parent</span>
+parent = <span class="kw">await</span> get_trace_store().<span class="fn">get</span>(run_id)
+child  = <span class="kw">await</span> get_trace_store().<span class="fn">get</span>(forks[-1].run_id)
+delta = <span class="fn">diff_traces</span>(parent, child)   <span class="cm"># final_response before/after, step deltas</span></pre></div>
+
+  <a class="anchor" id="run-trace-store"></a>
+  <h3>Storage backends</h3>
+  <p><code>DECISION_TRACE_STORE</code> chooses where a finished trace is saved so it can be reloaded — and forked — later. A Redis backend that can't connect falls back to <code>null</code> so persistence never breaks a run.</p>
+  <table>
+    <thead><tr><th>Backend</th><th>Where traces live</th><th>Survives restart / multi-process</th><th>Supports fork?</th></tr></thead>
+    <tbody>
+      <tr><td><code>redis</code> (default)</td><td>External Redis server</td><td>Yes / Yes — needs Redis running</td><td>Yes</td></tr>
+      <tr><td><code>memory</code></td><td>A dict inside the running process</td><td>No / No — zero setup</td><td>Yes, in the same process</td></tr>
+      <tr><td><code>null</code></td><td>Discarded (no-op)</td><td>— not persisted</td><td>No — nothing to reload</td></tr>
+    </tbody>
+  </table>
+  <div class="callout callout-info">
+    Decision Trace is an <em>execution ledger</em> the runtime reads back to resume runs — separate from <a onclick="showSection('integrations'); scrollToAnchor('int-langfuse')">Langfuse</a>, the human-facing observability sink, which keeps running in parallel.
+  </div>
+
+  <a class="anchor" id="run-trace-limits"></a>
+  <h3>Limitations</h3>
+  <div class="callout callout-warn">
+    <ul style="margin:0; padding-left:18px;">
+      <li><strong>Return-to-parent handoffs aren't forkable yet.</strong> Resuming the child can't reconstruct the parent's final answer, so forking a step inside one raises a clear error — use <code>return_to_parent=False</code> for handoffs you intend to fork.</li>
+      <li><strong>Some workflow patterns are record-only for now.</strong> Sequential and Router workflows support fork/resume today; Loop, Reflection, Supervised, Planner, Parallel, Scatter, and Debate are captured in the trace but resume support is still rolling out.</li>
+      <li><strong>LLM nondeterminism.</strong> Re-executed steps are fresh model calls, so their <em>wording</em> can differ between runs even where your edit had no effect — a diff may show cosmetic text changes. Keep outcome-determining logic in tools and use <code>temperature=0</code> so verdicts and numbers stay stable; treat narrative diffs as informational.</li>
+    </ul>
   </div>
 
   <a class="anchor" id="run-lifecycle"></a>

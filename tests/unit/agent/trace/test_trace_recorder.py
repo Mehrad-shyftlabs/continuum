@@ -49,7 +49,7 @@ def test_handoff_appends_to_chain() -> None:
     trace = rec.build_trace()
     assert trace.handoff_chain == ["billing"]
     assert trace.steps[0].kind is StepKind.HANDOFF
-    assert trace.steps[0].decision == {"handoff_to": "billing"}
+    assert trace.steps[0].decision == {"handoff_to": "billing", "return_to_parent": False}
 
 
 def test_span_id_stamped_from_context(monkeypatch) -> None:
@@ -72,3 +72,29 @@ def test_last_step_id_helper() -> None:
     assert rec.last_step_id() is None
     sid = rec.record_llm_call("a", 1)
     assert rec.last_step_id() == sid
+
+
+def test_new_step_kinds_and_recorders() -> None:
+    """MEMORY_WRITE / GUARDRAIL / WORKFLOW_STEP kinds exist and their recorder
+    helpers produce steps of the right kind that round-trip."""
+    from orchestrator.agent.trace.types import DecisionTrace
+
+    rec = TraceRecorder(run_id="run_k", root_agent="wf")
+
+    mw = rec.record_memory_write("agent-a", ["user likes dark mode"])
+    gr = rec.record_guardrail("agent-a", "pii_scanner", blocked=False, modified=True)
+    ws = rec.record_workflow_step("pipeline", stage=2, label="assessor")
+
+    by_id = {s.step_id: s for s in rec.trace.steps}
+    assert by_id[mw].kind is StepKind.MEMORY_WRITE
+    assert by_id[gr].kind is StepKind.GUARDRAIL
+    assert by_id[gr].decision["modified"] is True
+    assert by_id[ws].kind is StepKind.WORKFLOW_STEP
+    assert by_id[ws].decision == {"stage": 2, "label": "assessor"}
+
+    # round-trip through dict (persistence) preserves the new kinds
+    restored = DecisionTrace.from_dict(rec.trace.to_dict())
+    kinds = {s.step_id: s.kind for s in restored.steps}
+    assert kinds[mw] is StepKind.MEMORY_WRITE
+    assert kinds[gr] is StepKind.GUARDRAIL
+    assert kinds[ws] is StepKind.WORKFLOW_STEP

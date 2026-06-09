@@ -30,10 +30,6 @@ class TraceRecorder:
         self._trace = DecisionTrace(run_id=run_id, root_agent=root_agent, user_query=user_query)
         self._counter = 0
         self.checkpoint = checkpoint
-        # The handoff stack of the currently-executing agent (root → … → current).
-        # The executor sets this at each loop entry so every recorded step is
-        # stamped with the agent path that produced it (used by fork()).
-        self.current_agent_stack: list[str] = []
 
     # -- recording --------------------------------------------------------- #
     def record(
@@ -43,6 +39,7 @@ class TraceRecorder:
         *,
         turn: int = 0,
         parent_id: str | None = None,
+        agent_stack: list[str] | None = None,
         input: Any = None,
         decision: Any = None,
         rationale: str | None = None,
@@ -55,7 +52,13 @@ class TraceRecorder:
         error: str | None = None,
         messages_snapshot: list[Any] | None = None,
     ) -> str:
-        """Append a step and return its id (so callers can nest children under it)."""
+        """Append a step and return its id (so callers can nest children under it).
+
+        ``agent_stack`` is the caller's handoff stack (root → … → current agent)
+        at the moment of recording. It is passed in per call — never read from a
+        shared field — so concurrent agents (Parallel/Scatter) can't clobber each
+        other's stack.
+        """
         self._counter += 1
         step = DecisionStep(
             step_id=f"s{self._counter}",
@@ -63,7 +66,7 @@ class TraceRecorder:
             agent_name=agent_name,
             turn=turn,
             parent_id=parent_id,
-            agent_stack=list(self.current_agent_stack),
+            agent_stack=list(agent_stack) if agent_stack else [],
             input=input,
             decision=decision,
             rationale=rationale,
@@ -94,12 +97,14 @@ class TraceRecorder:
         latency_ms: int = 0,
         decision: Any = None,
         messages_snapshot: list[Any] | None = None,
+        agent_stack: list[str] | None = None,
     ) -> str:
         return self.record(
             StepKind.LLM_CALL,
             agent_name,
             turn=turn,
             parent_id=parent_id,
+            agent_stack=agent_stack,
             output=output,
             decision=decision,
             prompt_tokens=prompt_tokens,
@@ -110,13 +115,20 @@ class TraceRecorder:
         )
 
     def record_reasoning(
-        self, agent_name: str, turn: int, thought: str, *, parent_id: str | None = None
+        self,
+        agent_name: str,
+        turn: int,
+        thought: str,
+        *,
+        parent_id: str | None = None,
+        agent_stack: list[str] | None = None,
     ) -> str:
         return self.record(
             StepKind.REASONING,
             agent_name,
             turn=turn,
             parent_id=parent_id,
+            agent_stack=agent_stack,
             decision="think",
             rationale=thought,
         )
@@ -133,12 +145,14 @@ class TraceRecorder:
         latency_ms: int = 0,
         status: str = "ok",
         error: str | None = None,
+        agent_stack: list[str] | None = None,
     ) -> str:
         return self.record(
             StepKind.TOOL_CALL,
             agent_name,
             turn=turn,
             parent_id=parent_id,
+            agent_stack=agent_stack,
             input={"tool": tool_name, "args": args},
             decision=f"call {tool_name}",
             output=output,
@@ -155,6 +169,8 @@ class TraceRecorder:
         reason: str = "",
         *,
         parent_id: str | None = None,
+        agent_stack: list[str] | None = None,
+        return_to_parent: bool = False,
     ) -> str:
         self._trace.handoff_chain.append(to_agent)
         return self.record(
@@ -162,9 +178,115 @@ class TraceRecorder:
             from_agent,
             turn=turn,
             parent_id=parent_id,
-            decision={"handoff_to": to_agent},
+            agent_stack=agent_stack,
+            # return_to_parent is recorded so fork() can refuse to resume a step
+            # inside a return-to-parent child (it can't reconstruct the parent's
+            # synthesis) instead of silently returning the child's partial answer.
+            decision={"handoff_to": to_agent, "return_to_parent": return_to_parent},
             rationale=reason,
         )
+
+    def record_memory_write(
+        self,
+        agent_name: str,
+        facts: Any,
+        *,
+        turn: int = 0,
+        parent_id: str | None = None,
+        agent_stack: list[str] | None = None,
+    ) -> str:
+        """Record that facts were written to long-term memory (the write side of
+        MEMORY_RETRIEVAL)."""
+        return self.record(
+            StepKind.MEMORY_WRITE,
+            agent_name,
+            turn=turn,
+            parent_id=parent_id,
+            agent_stack=agent_stack,
+            decision="memory_write",
+            output=facts,
+        )
+
+    def record_guardrail(
+        self,
+        agent_name: str,
+        scanner: str,
+        *,
+        turn: int = 0,
+        parent_id: str | None = None,
+        blocked: bool = False,
+        modified: bool = False,
+        detail: Any = None,
+        agent_stack: list[str] | None = None,
+    ) -> str:
+        """Record that an input/output guardrail/scanner ran (PII, injection, …)
+        and whether it blocked or modified the content."""
+        return self.record(
+            StepKind.GUARDRAIL,
+            agent_name,
+            turn=turn,
+            parent_id=parent_id,
+            agent_stack=agent_stack,
+            decision={"scanner": scanner, "blocked": blocked, "modified": modified},
+            output=detail,
+            status="error" if blocked else "ok",
+        )
+
+    def record_workflow_step(
+        self,
+        workflow_name: str,
+        *,
+        stage: int,
+        label: str = "",
+        turn: int = 0,
+        parent_id: str | None = None,
+        agent_stack: list[str] | None = None,
+    ) -> str:
+        """Record a workflow stage / iteration boundary (e.g. Sequential stage N,
+        Loop iteration N). Purely structural — marks where a stage begins."""
+        return self.record(
+            StepKind.WORKFLOW_STEP,
+            workflow_name,
+            turn=turn,
+            parent_id=parent_id,
+            agent_stack=agent_stack,
+            decision={"stage": stage, "label": label},
+        )
+
+    def absorb(
+        self,
+        steps: list[Any],
+        *,
+        stage: int,
+        label: str,
+        orchestrator_name: str,
+    ) -> None:
+        """Merge a concurrent branch's recorded steps into this trace as one
+        ordered, contiguous segment (Phase 6 — ordered capture).
+
+        Concurrent branches (Parallel/Scatter/Debate) each record into their own
+        isolated recorder so their steps don't interleave. After they finish, the
+        orchestrator calls this once per branch, in a deterministic order: it
+        records a ``WORKFLOW_STEP`` marker carrying the branch's ``stage`` index,
+        then appends the branch's steps with fresh ids (remapping ``parent_id``)
+        and ``orchestrator_name`` prepended to each step's ``agent_stack``. The
+        result is a stable, segmentable trace regardless of real wall-clock
+        interleaving.
+        """
+        self.record_workflow_step(
+            orchestrator_name, stage=stage, label=label, agent_stack=[orchestrator_name]
+        )
+        id_map: dict[str, str] = {}
+        for st in steps:
+            old_id = st.step_id
+            self._counter += 1
+            st.step_id = f"s{self._counter}"
+            id_map[old_id] = st.step_id
+            if st.parent_id is not None and st.parent_id in id_map:
+                st.parent_id = id_map[st.parent_id]
+            if orchestrator_name not in (st.agent_stack or []):
+                st.agent_stack = [orchestrator_name, *(st.agent_stack or [])]
+            self._trace.add(st)
 
     # -- assembly ---------------------------------------------------------- #
     def build_trace(

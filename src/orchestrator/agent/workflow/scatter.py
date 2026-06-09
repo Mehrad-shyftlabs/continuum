@@ -40,6 +40,7 @@ from typing import TYPE_CHECKING, Any
 
 from orchestrator.agent.base import BaseAgent
 from orchestrator.agent.exceptions import ParallelWorkflowError
+from orchestrator.agent.trace.types import StepKind
 from orchestrator.agent.types import (
     AgentResponse,
     FailStrategy,
@@ -47,6 +48,13 @@ from orchestrator.agent.types import (
     ResponseStatus,
     RunContext,
     TokenUsage,
+)
+from orchestrator.agent.workflow._forkable import (
+    branch_outputs_from_trace,
+    branch_recorder_context,
+    link_lineage,
+    resumed_input,
+    segment_by_markers,
 )
 from orchestrator.config import settings
 from orchestrator.logging import get_logger
@@ -150,6 +158,8 @@ class ScatterAgent(BaseAgent):
         if llm_client is None:
             llm_client = self._get_llm()
 
+        # Own the one decision trace spanning scatter branches + the gather stage.
+        created = runner.ensure_recorder(context, self.name, input_text)
         context.suppress_session_log = True
         async with SpanScope(
             f"workflow.scatter.{self.name}",
@@ -168,41 +178,9 @@ class ScatterAgent(BaseAgent):
             )
             workflow_span.add_metadata("slices_preview", [s[:100] for s in slices])
 
-            # Step 2 — launch all agents concurrently with their slices
-            tasks = [
-                asyncio.create_task(
-                    self._run_agent_safe(agent, slice_input, runner, context.branch_copy())
-                )
-                for agent, slice_input in zip(self.agents, slices, strict=False)
-            ]
-
-            try:
-                done, pending = await asyncio.wait(
-                    tasks,
-                    timeout=self.scatter_config.timeout,
-                    return_when=asyncio.ALL_COMPLETED,
-                )
-                for task in pending:
-                    task.cancel()
-            except Exception as e:
-                raise ParallelWorkflowError(
-                    f"Scatter execution failed: {e}",
-                    run_id=context.run_id,
-                    original_error=e,
-                ) from e
-
-            # Step 3 — collect results
-            successful: dict[str, AgentResponse] = {}
-            failed: dict[str, str] = {}
-
-            for agent, task in zip(self.agents, tasks, strict=False):
-                if task.done():
-                    try:
-                        successful[agent.name] = task.result()
-                    except Exception as e:
-                        failed[agent.name] = str(e)
-                else:
-                    failed[agent.name] = "Timed out"
+            # Step 2 — scatter: run all branches concurrently into ISOLATED
+            # recorders so their steps don't interleave in the shared trace.
+            successful, failed = await self._scatter(slices, runner, context)
 
             if failed:
                 logger.warning(f"ScatterAgent: failed branches: {list(failed.keys())}")
@@ -227,8 +205,9 @@ class ScatterAgent(BaseAgent):
                     error="; ".join(f"{k}: {v}" for k, v in failed.items()),
                 )
 
-            # Step 4 — merge
-            merged = await self._merge_results(successful, input_text, llm_client)
+            # Step 3 — gather/merge (stage n_branches; recorded explicitly because
+            # _merge_results calls the LLM directly, not via runner.run).
+            merged = await self._gather(successful, input_text, llm_client, context)
             total_usage = TokenUsage()
             for resp in successful.values():
                 total_usage = total_usage.add(resp.usage)
@@ -258,6 +237,175 @@ class ScatterAgent(BaseAgent):
                 agent=None,
             )
 
+        result.run_id = context.run_id
+        if created:
+            await runner.persist_decision_trace(context, result)
+        return result
+
+    async def _scatter(
+        self,
+        slices: list[str],
+        runner: AgentRunner,
+        context: RunContext,
+    ) -> tuple[dict[str, AgentResponse], dict[str, str]]:
+        """Run every branch concurrently into its own isolated recorder, then
+        absorb each branch's steps back into the shared trace IN BRANCH ORDER.
+
+        Returns ``(successful, failed)`` keyed by agent name. The absorb pass runs
+        in deterministic ``self.agents`` order so the merged trace is segmentable
+        (one ``WORKFLOW_STEP`` marker per branch, contiguous stage-indexed steps)
+        regardless of wall-clock interleaving.
+        """
+        branch_recs: list[Any] = []
+        tasks = []
+        for i, (agent, slice_input) in enumerate(zip(self.agents, slices, strict=False)):
+            branch_ctx, branch_rec = branch_recorder_context(context, index=i)
+            branch_recs.append(branch_rec)
+            tasks.append(
+                asyncio.create_task(
+                    self._run_agent_safe(agent, slice_input, runner, branch_ctx)
+                )
+            )
+
+        try:
+            _done, pending = await asyncio.wait(
+                tasks,
+                timeout=self.scatter_config.timeout,
+                return_when=asyncio.ALL_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+        except Exception as e:
+            raise ParallelWorkflowError(
+                f"Scatter execution failed: {e}",
+                run_id=context.run_id,
+                original_error=e,
+            ) from e
+
+        successful: dict[str, AgentResponse] = {}
+        failed: dict[str, str] = {}
+        for i, (agent, task) in enumerate(zip(self.agents, tasks, strict=False)):
+            if task.done():
+                try:
+                    successful[agent.name] = task.result()
+                except Exception as e:
+                    failed[agent.name] = str(e)
+            else:
+                failed[agent.name] = "Timed out"
+
+            # Ordered capture: merge this branch's isolated trace at stage i.
+            branch_rec = branch_recs[i]
+            if context.recorder is not None and branch_rec is not None:
+                context.recorder.absorb(
+                    branch_rec.trace.steps,
+                    stage=i,
+                    label=agent.name,
+                    orchestrator_name=self.name,
+                )
+
+        return successful, failed
+
+    async def _gather(
+        self,
+        successful: dict[str, AgentResponse],
+        original_input: str,
+        llm_client: Any | None,
+        context: RunContext,
+    ) -> str:
+        """Merge branch results (the gather stage) and record it at stage
+        ``len(self.agents)``. The merge LLM call doesn't go through ``runner.run``,
+        so the marker + output are recorded directly on the shared recorder."""
+        merged = await self._merge_results(successful, original_input, llm_client)
+        if context.recorder is not None:
+            gather_stage = len(self.agents)
+            context.recorder.record_workflow_step(
+                self.name, stage=gather_stage, label="gather", agent_stack=[self.name]
+            )
+            context.recorder.record(
+                StepKind.LLM_CALL,
+                self.name,
+                turn=0,
+                agent_stack=[self.name],
+                decision={"merge_strategy": self.scatter_config.merge_strategy.value},
+                output=merged,
+            )
+        return merged
+
+    async def resume_from(
+        self,
+        *,
+        parent_trace: Any,
+        from_step: str,
+        override: dict[str, Any] | None,
+        runner: AgentRunner,
+        context: RunContext,
+    ) -> AgentResponse:
+        """Re-run one scattered branch (or the gather stage) and re-gather.
+
+        Forking branch ``k`` re-runs only that branch with ``override`` applied;
+        the sibling branches' outputs are recovered from ``parent_trace`` and the
+        SAME gather/reduce produces the final result. Forking the gather stage
+        (stage ``n``) re-runs the merge over all cached branch outputs.
+        """
+        step_stage, stage_first = segment_by_markers(parent_trace)
+        stage_idx = step_stage.get(from_step)
+        if stage_idx is None:
+            raise ValueError(f"resume_from: step '{from_step}' not found in trace")
+
+        n = len(self.agents)
+        cached = branch_outputs_from_trace(parent_trace)
+
+        created = runner.ensure_recorder(context, self.name, parent_trace.user_query)
+        if created:
+            link_lineage(context, parent_trace, from_step, override, stage_idx)
+        context.suppress_session_log = True
+
+        llm_client = self._get_llm()
+
+        # Recover every sibling branch's cached output as an AgentResponse.
+        successful: dict[str, AgentResponse] = {}
+        for i, agent in enumerate(self.agents):
+            if i in cached:
+                successful[agent.name] = AgentResponse(
+                    content=cached[i],
+                    agent_name=agent.name,
+                    status=ResponseStatus.SUCCESS,
+                )
+
+        if stage_idx < n:
+            # Re-run only the forked branch into an isolated recorder, absorb at
+            # its stage index, and replace its cached entry.
+            agent = self.agents[stage_idx]
+            new_input = resumed_input(
+                stage_first.get(stage_idx), override, parent_trace.user_query
+            )
+            branch_ctx, branch_rec = branch_recorder_context(context, index=stage_idx)
+            resp = await self._run_agent_safe(agent, new_input, runner, branch_ctx)
+            successful[agent.name] = resp
+            if context.recorder is not None and branch_rec is not None:
+                context.recorder.absorb(
+                    branch_rec.trace.steps,
+                    stage=stage_idx,
+                    label=agent.name,
+                    orchestrator_name=self.name,
+                )
+
+        # Re-gather over the (possibly re-run) branch outputs.
+        merged = await self._gather(successful, parent_trace.user_query, llm_client, context)
+        total_usage = TokenUsage()
+        for resp in successful.values():
+            total_usage = total_usage.add(resp.usage)
+
+        result = AgentResponse(
+            content=merged,
+            agent_name=self.name,
+            status=ResponseStatus.SUCCESS,
+            usage=total_usage,
+            agents_used=list(successful.keys()),
+        )
+        result.run_id = context.run_id
+        if created:
+            await runner.persist_decision_trace(context, result)
         return result
 
     async def _get_slices(

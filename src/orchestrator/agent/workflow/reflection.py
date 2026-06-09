@@ -85,81 +85,172 @@ class ReflectionAgent(BaseAgent):
         Returns:
             Final AgentResponse (either passing or last attempt)
         """
+        # Own the one decision trace spanning all reflection attempts (rooted at
+        # this workflow). Sub-runs share this recorder but are suppressed, so we
+        # persist it ourselves at the end.
+        created = runner.ensure_recorder(context, self.name, input_text)
         context.suppress_session_log = True
         _orig_hist = self.agent.config.session_history_turns
         try:
-            total_usage = TokenUsage()
-
-            # Resolve LLM client for critique calls
-            if llm_client is None:
-                from orchestrator.core.container import get_container
-
-                llm_client = get_container().llm_client
-
-            current_input = input_text
-            response: AgentResponse | None = None
-
-            for attempt in range(self.reflection_config.max_reflections + 1):
-                logger.info(
-                    f"ReflectionAgent '{self.name}': attempt {attempt + 1} / "
-                    f"{self.reflection_config.max_reflections + 1}"
-                )
-
-                response = await runner.run(
-                    agent=self.agent,
-                    input=current_input,
-                    context=context,
-                )
-                total_usage = total_usage.add(response.usage)
-
-                # History only needed on attempt 1 — it doesn't change between
-                # retries (writes are blocked), so skip it from attempt 2 onwards.
-                if attempt == 0:
-                    self.agent.config.session_history_turns = 0
-
-                # On the last allowed attempt, skip the critique and return
-                if attempt == self.reflection_config.max_reflections:
-                    break
-
-                critique = await self._critique(
-                    response_content=response.content,
-                    llm_client=llm_client,
-                )
-                total_usage = total_usage.add(critique["usage"])
-
-                if critique["verdict"].startswith("PASS"):
-                    logger.info(
-                        f"ReflectionAgent '{self.name}': critique passed on attempt {attempt + 1}"
-                    )
-                    break
-
-                logger.info(
-                    f"ReflectionAgent '{self.name}': critique says NEEDS IMPROVEMENT — retrying. "
-                    f"Reason: {critique['verdict']}"
-                )
-                current_input = (
-                    f"{input_text}\n\nPrevious attempt:\n{response.content}\n\n"
-                    f"Feedback: {critique['verdict']}"
-                )
-
-            assert response is not None  # at least one iteration always runs
+            result = await self._drive(
+                input_text,
+                runner,
+                context,
+                start_attempt=0,
+                original_input=input_text,
+                llm_client=llm_client,
+            )
 
             if context.session_id:
                 await runner.save_turn(
                     session_id=context.session_id,
                     user_message=input_text,
-                    assistant_message=response.content or "",
+                    assistant_message=result.content or "",
                     agent=None,
                 )
 
-            return AgentResponse(
-                content=response.content,
-                structured_output=response.structured_output,
-                agent_name=self.name,
-                status=ResponseStatus.SUCCESS,
-                usage=total_usage,
-                turn_count=response.turn_count,
+            if created:
+                await runner.persist_decision_trace(context, result)
+            return result
+        finally:
+            self.agent.config.session_history_turns = _orig_hist
+
+    async def _drive(
+        self,
+        current_input: str,
+        runner: AgentRunner,
+        context: RunContext,
+        *,
+        start_attempt: int,
+        original_input: str,
+        llm_client: Any | None,
+    ) -> AgentResponse:
+        """Run reflection attempts ``start_attempt..max`` and assemble the result.
+
+        A "stage" is one reflection attempt (the generate + critique cycle).
+        ``start_attempt`` is the 0-based attempt index to begin at — 0 for a fresh
+        run, ``k`` when resuming a fork from attempt ``k`` so the new trace's stage
+        markers stay aligned with the parent's. Refinement inputs are built from
+        ``original_input`` (the user query) just as a fresh run would.
+        """
+        total_usage = TokenUsage()
+
+        # Resolve LLM client for critique calls
+        if llm_client is None:
+            from orchestrator.core.container import get_container
+
+            llm_client = get_container().llm_client
+
+        response: AgentResponse | None = None
+
+        for attempt in range(start_attempt, self.reflection_config.max_reflections + 1):
+            logger.info(
+                f"ReflectionAgent '{self.name}': attempt {attempt + 1} / "
+                f"{self.reflection_config.max_reflections + 1}"
             )
+
+            # Decision trace: mark the start of this reflection attempt (0-based stage).
+            if context.recorder is not None:
+                context.recorder.record_workflow_step(
+                    self.name, stage=attempt, label=self.agent.name, agent_stack=[self.name]
+                )
+
+            response = await runner.run(
+                agent=self.agent,
+                input=current_input,
+                context=context,
+            )
+            total_usage = total_usage.add(response.usage)
+
+            # History only needed on the first executed attempt — it doesn't change
+            # between retries (writes are blocked), so skip it after.
+            if attempt == start_attempt:
+                self.agent.config.session_history_turns = 0
+
+            # On the last allowed attempt, skip the critique and return
+            if attempt == self.reflection_config.max_reflections:
+                break
+
+            critique = await self._critique(
+                response_content=response.content,
+                llm_client=llm_client,
+            )
+            total_usage = total_usage.add(critique["usage"])
+
+            if critique["verdict"].startswith("PASS"):
+                logger.info(
+                    f"ReflectionAgent '{self.name}': critique passed on attempt {attempt + 1}"
+                )
+                break
+
+            logger.info(
+                f"ReflectionAgent '{self.name}': critique says NEEDS IMPROVEMENT — retrying. "
+                f"Reason: {critique['verdict']}"
+            )
+            current_input = (
+                f"{original_input}\n\nPrevious attempt:\n{response.content}\n\n"
+                f"Feedback: {critique['verdict']}"
+            )
+
+        assert response is not None  # at least one iteration always runs
+
+        result = AgentResponse(
+            content=response.content,
+            structured_output=response.structured_output,
+            agent_name=self.name,
+            status=ResponseStatus.SUCCESS,
+            usage=total_usage,
+            turn_count=response.turn_count,
+        )
+        result.run_id = context.run_id
+        return result
+
+    async def resume_from(
+        self,
+        *,
+        parent_trace: Any,
+        from_step: str,
+        override: dict[str, Any] | None,
+        runner: AgentRunner,
+        context: RunContext,
+    ) -> AgentResponse:
+        """Re-run reflection from the attempt containing ``from_step``.
+
+        Attempts before it are not re-run; the resumed attempt's input is
+        recovered from its first step's checkpoint (with ``override`` applied),
+        then reflection runs forward with its normal critique / termination logic.
+        """
+        from orchestrator.agent.workflow._forkable import (
+            link_lineage,
+            resumed_input,
+            segment_by_markers,
+        )
+
+        step_stage, stage_first = segment_by_markers(parent_trace)
+        stage_idx = step_stage.get(from_step)
+        if stage_idx is None:
+            raise ValueError(f"resume_from: step '{from_step}' not found in trace")
+        stage_idx = max(0, min(stage_idx, self.reflection_config.max_reflections))
+
+        new_input = resumed_input(stage_first.get(stage_idx), override, parent_trace.user_query)
+
+        created = runner.ensure_recorder(context, self.name, parent_trace.user_query)
+        if created:
+            link_lineage(context, parent_trace, from_step, override, stage_idx)
+        context.suppress_session_log = True
+        _orig_hist = self.agent.config.session_history_turns
+        try:
+            result = await self._drive(
+                new_input,
+                runner,
+                context,
+                start_attempt=stage_idx,
+                original_input=parent_trace.user_query,
+                llm_client=None,
+            )
+            if created:
+                await runner.persist_decision_trace(context, result)
+            return result
         finally:
             self.agent.config.session_history_turns = _orig_hist
 

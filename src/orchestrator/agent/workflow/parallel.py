@@ -23,6 +23,13 @@ from orchestrator.agent.types import (
     RunContext,
     TokenUsage,
 )
+from orchestrator.agent.workflow._forkable import (
+    branch_outputs_from_trace,
+    branch_recorder_context,
+    link_lineage,
+    resumed_input,
+    segment_by_markers,
+)
 from orchestrator.logging import get_logger
 
 if TYPE_CHECKING:
@@ -112,21 +119,25 @@ class ParallelAgent(BaseAgent):
         Returns:
             Merged AgentResponse
         """
+        # Own the one decision trace spanning all branches (rooted at this agent).
+        created = runner.ensure_recorder(context, self.name, input_text)
         context.suppress_session_log = True
-        # Create tasks for all agents
-        tasks = []
-        for agent in self.agents:
+        # ORDERED CAPTURE: give each branch its OWN recorder so concurrent runs
+        # don't interleave into the shared trace; merge them back in order after.
+        tasks: list[tuple[BaseAgent, Any, asyncio.Task[AgentResponse]]] = []
+        for i, agent in enumerate(self.agents):
+            branch_ctx, branch_rec = branch_recorder_context(context, index=i)
             task = asyncio.create_task(
-                self._run_agent_safe(agent, input_text, runner, context.branch_copy())
+                self._run_agent_safe(agent, input_text, runner, branch_ctx)
             )
-            tasks.append((agent.name, task))
+            tasks.append((agent, branch_rec, task))
 
         # Wait for all tasks with timeout
         results: dict[str, AgentResponse | Exception] = {}
 
         try:
             done, pending = await asyncio.wait(
-                [t for _, t in tasks],
+                [t for _, _, t in tasks],
                 timeout=self.parallel_config.timeout,
                 return_when=asyncio.ALL_COMPLETED,
             )
@@ -136,14 +147,14 @@ class ParallelAgent(BaseAgent):
                 task.cancel()
 
             # Collect results
-            for agent_name, task in tasks:
+            for agent, _branch_rec, task in tasks:
                 if task.done():
                     try:
-                        results[agent_name] = task.result()
+                        results[agent.name] = task.result()
                     except Exception as e:
-                        results[agent_name] = e
+                        results[agent.name] = e
                 else:
-                    results[agent_name] = TimeoutError("Task timed out")
+                    results[agent.name] = TimeoutError("Task timed out")
 
         except Exception as e:
             logger.error(f"Parallel execution failed: {e}")
@@ -162,6 +173,19 @@ class ParallelAgent(BaseAgent):
                 successful[agent_name] = result
             else:
                 failed[agent_name] = str(result)
+
+        # ORDERED CAPTURE: merge each successful branch's steps back into the owned
+        # trace in agent order, so the concurrent branches land as deterministic,
+        # contiguous, stage-indexed segments regardless of wall-clock interleaving.
+        if context.recorder is not None:
+            for i, (agent, branch_rec, _task) in enumerate(tasks):
+                if branch_rec is not None and agent.name in successful:
+                    context.recorder.absorb(
+                        branch_rec.trace.steps,
+                        stage=i,
+                        label=agent.name,
+                        orchestrator_name=self.name,
+                    )
 
         # Handle failures based on strategy
         if failed:
@@ -205,6 +229,7 @@ class ParallelAgent(BaseAgent):
             usage=total_usage,
             agents_used=list(successful.keys()),
         )
+        result.run_id = context.run_id
 
         if context.session_id:
             await runner.save_turn(
@@ -214,6 +239,89 @@ class ParallelAgent(BaseAgent):
                 agent=None,
             )
 
+        if created:
+            await runner.persist_decision_trace(context, result)
+        return result
+
+    async def resume_from(
+        self,
+        *,
+        parent_trace: Any,
+        from_step: str,
+        override: dict[str, Any] | None,
+        runner: AgentRunner,
+        context: RunContext,
+    ) -> AgentResponse:
+        """Re-run only the branch that owned ``from_step``, then re-merge.
+
+        Forking a parallel run answers "what if branch X had a different input?".
+        The other branches are not re-run — their cached outputs are recovered
+        from the parent trace and merged with the re-run branch using the same
+        merge strategy.
+        """
+        step_stage, stage_first = segment_by_markers(parent_trace)
+        stage_idx = step_stage.get(from_step)
+        if stage_idx is None:
+            raise ValueError(f"resume_from: step '{from_step}' not found in trace")
+        if stage_idx < 0 or stage_idx >= len(self.agents):
+            raise ValueError(f"resume_from: branch index {stage_idx} out of range")
+
+        branch_input = resumed_input(
+            stage_first.get(stage_idx), override, parent_trace.user_query
+        )
+
+        created = runner.ensure_recorder(context, self.name, parent_trace.user_query)
+        if created:
+            link_lineage(context, parent_trace, from_step, override, stage_idx)
+        context.suppress_session_log = True
+
+        # Re-run only the forked branch, capturing it into its own recorder.
+        agent = self.agents[stage_idx]
+        branch_ctx, branch_rec = branch_recorder_context(context, index=stage_idx)
+        rerun = await self._run_agent_safe(agent, branch_input, runner, branch_ctx)
+        if context.recorder is not None and branch_rec is not None:
+            context.recorder.absorb(
+                branch_rec.trace.steps,
+                stage=stage_idx,
+                label=agent.name,
+                orchestrator_name=self.name,
+            )
+
+        # Recover the OTHER branches' cached outputs and replace the forked one.
+        siblings = branch_outputs_from_trace(parent_trace)
+        siblings[stage_idx] = rerun.content or ""
+
+        # Rebuild a {agent_name: AgentResponse} map in agent order for merging.
+        merged_inputs: dict[str, AgentResponse] = {}
+        for i, a in enumerate(self.agents):
+            if i not in siblings:
+                continue
+            if i == stage_idx:
+                merged_inputs[a.name] = rerun
+            else:
+                merged_inputs[a.name] = AgentResponse(
+                    content=siblings[i],
+                    agent_name=a.name,
+                    status=ResponseStatus.SUCCESS,
+                )
+
+        merged = await self._merge_results(merged_inputs, branch_input, None)
+
+        total_usage = TokenUsage()
+        for resp in merged_inputs.values():
+            total_usage = total_usage.add(resp.usage)
+
+        result = AgentResponse(
+            content=merged,
+            agent_name=self.name,
+            status=ResponseStatus.SUCCESS,
+            usage=total_usage,
+            agents_used=list(merged_inputs.keys()),
+        )
+        result.run_id = context.run_id
+
+        if created:
+            await runner.persist_decision_trace(context, result)
         return result
 
     async def _run_agent_safe(

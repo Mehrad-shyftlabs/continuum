@@ -178,12 +178,12 @@ async def test_agent_stack_stamped_on_steps() -> None:
 
 async def test_return_to_parent_restores_parent_stack() -> None:
     """After A hands off to B with return_to_parent=True and B returns, A's
-    continuation steps must be stamped with A's stack — not B's. Regression for
-    the stack mis-stamping bug (the executor must reset the recorder's stack
-    after popping the child)."""
+    continuation steps must be stamped with A's stack — not B's. The executor
+    recomputes the stack from run_state each turn (and passes it per record
+    call), so once B is popped the parent's steps carry the parent's stack."""
     from orchestrator.agent.config import AgentMemoryConfig
-    from orchestrator.agent.types import Handoff, HandoffResult, ResponseStatus
     from orchestrator.agent.types import AgentResponse as _AR
+    from orchestrator.agent.types import Handoff, HandoffResult, ResponseStatus
 
     agent_a = BaseAgent(
         name="agent-a",
@@ -205,21 +205,25 @@ async def test_return_to_parent_restores_parent_stack() -> None:
     )
 
     class _StubHandoff:
-        """Simulates entering B: pushes B and stamps the recorder with the deeper
-        stack (as B's real loop would), then returns a successful response."""
+        """Simulates entering B: pushes B onto the stack (as the real handoff
+        does) and returns a successful response. The executor pops B on
+        return-to-parent; the parent's next turn recomputes its stack from
+        run_state — so the parent's steps must carry the parent's stack."""
 
         _executor = None
 
-        async def execute_handoff(self, *, agent, target_name, tool_call, messages, context, run_state):
+        async def execute_handoff(
+            self, *, agent, target_name, tool_call, messages, context, run_state
+        ):
             run_state.push_agent(target_name)
-            if context.recorder is not None:
-                context.recorder.current_agent_stack = run_state.get_agent_stack_snapshot()
             return HandoffResult(
                 handoff_id="h1",
                 from_agent=agent.name,
                 to_agent=target_name,
                 success=True,
-                response=_AR(content="B result", agent_name=target_name, status=ResponseStatus.SUCCESS),
+                response=_AR(
+                    content="B result", agent_name=target_name, status=ResponseStatus.SUCCESS
+                ),
             )
 
     ex = Executor(llm_client=llm, handoff_executor=_StubHandoff())
@@ -233,6 +237,24 @@ async def test_return_to_parent_restores_parent_stack() -> None:
     # A's final LLM step (its turn-2 continuation after B returned) carries A's stack.
     final = [s for s in ctx.recorder.trace.steps if s.kind is StepKind.LLM_CALL][-1]
     assert final.agent_stack == ["agent-a"], f"parent continuation mis-stamped: {final.agent_stack}"
+
+
+async def test_checkpoint_snapshot_is_deep_copied() -> None:
+    """The stored snapshot is independent of the live message dicts: mutating an
+    original message afterward must not change the captured snapshot (deep copy)."""
+    llm = SimpleNamespace(chat=AsyncMock(return_value=_llm_response("hi")))
+    ex = Executor(llm_client=llm)
+    ctx = RunContext(run_id="run_dc")
+    ctx.recorder = TraceRecorder("run_dc", "support_agent", "q", checkpoint=True)
+    user_msg = {"role": "user", "content": "original"}
+
+    await ex.execute_loop(_agent(), [user_msg], ctx, _run_state())
+
+    user_msg["content"] = "MUTATED"  # mutate the original dict in place
+    snap = ctx.recorder.trace.steps[0].messages_snapshot
+    assert snap is not None
+    assert any(m.get("content") == "original" for m in snap)
+    assert all(m.get("content") != "MUTATED" for m in snap)
 
 
 async def test_no_recorder_is_a_noop() -> None:

@@ -237,6 +237,9 @@ class HandoffExecutor(IHandoffExecutor):
                 # LLM/tool steps are captured into the one DecisionTrace for this
                 # run (the recorder is intentionally shared across handoffs).
                 recorder=context.recorder,
+                # Propagate the fork guard so handed-off sub-agents of a forked
+                # (what-if) run also never write to long-term memory.
+                disable_memory_writes=context.disable_memory_writes,
             )
 
             # Log target agent details (mirrors message_builder output for top-level runs)

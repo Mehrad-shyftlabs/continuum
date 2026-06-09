@@ -54,6 +54,7 @@ class SessionService(ISessionService):
         trace_id: str | None = None,
         tool_execution_summary: dict[str, Any] | None = None,
         run_id: str | None = None,
+        disable_memory: bool = False,
     ) -> None:
         """
         Save new messages to session after run completion.
@@ -112,6 +113,7 @@ class SessionService(ISessionService):
 
                 should_store = bool(
                     content
+                    and not disable_memory
                     and hasattr(agent, "memory_config")
                     and agent.memory_config
                     and agent.memory_config.store_memories

@@ -130,206 +130,297 @@ class SupervisedSequentialAgent(BaseAgent):
         Returns:
             Final AgentResponse from the last step
         """
+        # Own the one decision trace spanning all pipeline sub-agents (rooted at
+        # this workflow). Sub-runs share this recorder but are suppressed, so we
+        # persist it ourselves at the end.
+        created = runner.ensure_recorder(context, self.name, input_text)
         context.suppress_session_log = True
         try:
-            llm_client = self._get_llm()
-            current_input = input_text
-            all_responses: list[AgentResponse] = []
-            total_usage = TokenUsage()
-            agents_used: list[str] = []
-            pipeline_history: list[str] = []
+            result = await self._drive(
+                input_text,
+                runner,
+                context,
+                start_stage=0,
+                original_input=input_text,
+            )
 
-            async with SpanScope(
-                f"workflow.supervised.{self.name}",
-                input={
-                    "input_preview": input_text[:500],
-                    "agent_count": len(self.agents),
-                    "agents": [a.name for a in self.agents],
-                    "quality_threshold": self.supervised_config.quality_threshold,
-                },
-                metadata={"workflow_type": "supervised_sequential"},
-            ) as workflow_span:
-                for i, agent in enumerate(self.agents):
-                    step_num = i + 1
-                    best_response: AgentResponse | None = None
-                    best_score: float = 0.0
-
-                    async with SpanScope(
-                        f"workflow.supervised.step.{step_num}",
-                        input={"step": step_num, "agent_name": agent.name},
-                        metadata={"total_steps": len(self.agents)},
-                    ) as step_span:
-                        # Inject prior steps as system context for the LLM.
-                        # Skip when pass_full_history=True — user message already contains all prior steps.
-                        if pipeline_history and not self.supervised_config.pass_full_history:
-                            context.metadata["pipeline_context"] = (
-                                "Prior pipeline steps in this request:\n"
-                                + "\n".join(pipeline_history)
-                            )
-
-                        attempt_input = current_input
-
-                        for attempt in range(self.supervised_config.max_retries + 1):
-                            logger.info(
-                                f"SupervisedSequential step {step_num}/{len(self.agents)} "
-                                f"'{agent.name}' — attempt {attempt + 1}"
-                            )
-
-                            try:
-                                response = await runner.run(
-                                    agent=agent,
-                                    input=attempt_input,
-                                    context=context,
-                                )
-                                total_usage = total_usage.add(response.usage)
-
-                                # Score the output
-                                score, feedback, score_usage = await self._score_output(
-                                    step_num=step_num,
-                                    agent_name=agent.name,
-                                    original_input=current_input,
-                                    output=response.content or "",
-                                    llm_client=llm_client,
-                                )
-                                total_usage = total_usage.add(score_usage)
-
-                                logger.info(
-                                    f"SupervisedSequential step {step_num} '{agent.name}' "
-                                    f"score={score:.2f} (threshold={self.supervised_config.quality_threshold})"
-                                )
-
-                                if score > best_score:
-                                    best_score = score
-                                    best_response = response
-
-                                if score >= self.supervised_config.quality_threshold:
-                                    logger.info(
-                                        f"SupervisedSequential step {step_num} passed "
-                                        f"(score={score:.2f})"
-                                    )
-                                    step_span.set_output(
-                                        {
-                                            "success": True,
-                                            "score": score,
-                                            "attempts": attempt + 1,
-                                        }
-                                    )
-                                    break
-
-                                # Score too low — prepare retry with feedback
-                                if attempt < self.supervised_config.max_retries:
-                                    logger.info(
-                                        f"SupervisedSequential step {step_num} below threshold "
-                                        f"(score={score:.2f}) — retrying with feedback"
-                                    )
-                                    attempt_input = (
-                                        f"{current_input}\n\n"
-                                        f"Previous attempt output:\n{response.content}\n\n"
-                                        f"Quality feedback: {feedback}\n\n"
-                                        f"Please improve your response based on this feedback."
-                                    )
-                                else:
-                                    logger.warning(
-                                        f"SupervisedSequential step {step_num} exhausted retries "
-                                        f"(best score={best_score:.2f})"
-                                    )
-                                    step_span.set_output(
-                                        {
-                                            "success": False,
-                                            "best_score": best_score,
-                                            "attempts": attempt + 1,
-                                        }
-                                    )
-
-                            except Exception as e:
-                                logger.error(f"SupervisedSequential step {step_num} failed: {e}")
-                                step_span.set_error(str(e))
-
-                                if self.supervised_config.fail_strategy == FailStrategy.FAIL_FAST:
-                                    workflow_span.set_error(f"Step {step_num} failed: {e}")
-                                    raise SequentialWorkflowError(
-                                        f"Step {step_num} ({agent.name}) failed: {e}",
-                                        failed_agent=agent.name,
-                                        step=step_num,
-                                        run_id=context.run_id,
-                                        original_error=e,
-                                    ) from e
-
-                                current_input = (
-                                    f"Previous step failed: {e}. Please handle this gracefully."
-                                )
-                                break
-
-                        # Handle case where all retries were exhausted below threshold
-                        if best_response is None:
-                            if self.supervised_config.fail_strategy == FailStrategy.FAIL_FAST:
-                                raise SequentialWorkflowError(
-                                    f"Step {step_num} ({agent.name}) produced no valid output",
-                                    failed_agent=agent.name,
-                                    step=step_num,
-                                    run_id=context.run_id,
-                                )
-                            current_input = (
-                                "Previous step produced no output. Please handle gracefully."
-                            )
-                            continue
-
-                        all_responses.append(best_response)
-                        agents_used.append(agent.name)
-                        max_chars = self.supervised_config.pipeline_context_max_chars
-                        content = best_response.content or ""
-                        pipeline_history.append(
-                            f"{agent.name}: {content[:max_chars] if max_chars is not None else content}"
-                        )
-
-                        # Prepare input for next step
-                        if self.supervised_config.pass_full_history:
-                            history_parts = [f"Original request: {input_text}"]
-                            for j, resp in enumerate(all_responses):
-                                history_parts.append(
-                                    f"Step {j + 1} ({self.agents[j].name}): {resp.content}"
-                                )
-                            current_input = "\n\n".join(history_parts)
-                        else:
-                            current_input = best_response.content or ""
-
-                final = (
-                    all_responses[-1]
-                    if all_responses
-                    else AgentResponse(
-                        content="No agents executed",
-                        status=ResponseStatus.ERROR,
-                    )
-                )
-
-                workflow_span.set_output(
-                    {
-                        "success": True,
-                        "steps_executed": len(all_responses),
-                        "agents_used": agents_used,
-                        "total_tokens": total_usage.total_tokens,
-                    }
-                )
-
-                result = AgentResponse(
-                    content=final.content,
-                    structured_output=final.structured_output,
-                    agent_name=self.name,
-                    status=ResponseStatus.SUCCESS,
-                    usage=total_usage,
-                    turn_count=sum(r.turn_count for r in all_responses),
-                    agents_used=agents_used,
-                    messages=final.messages,
-                )
-
-            if context.session_id and all_responses:
+            if context.session_id and result.turn_count:
                 await runner.save_turn(
                     session_id=context.session_id,
                     user_message=input_text,
-                    assistant_message=final.content or "",
+                    assistant_message=result.content or "",
                     agent=None,
                 )
 
+            if created:
+                await runner.persist_decision_trace(context, result)
+            return result
+        finally:
+            context.metadata.pop("pipeline_context", None)
+
+    async def _drive(
+        self,
+        current_input: str,
+        runner: AgentRunner,
+        context: RunContext,
+        *,
+        start_stage: int,
+        original_input: str,
+    ) -> AgentResponse:
+        """Run pipeline stages ``start_stage..end`` and assemble the result.
+
+        ``start_stage`` is the 0-based pipeline-step index to begin at — 0 for a
+        fresh run, ``k`` when resuming a fork from step ``k`` so the new trace's
+        stage markers stay aligned with the parent's. A "stage" is one
+        worker→supervisor pipeline step: the inner retry/scoring loop runs in full
+        for each stage, exactly as in a fresh run.
+        """
+        llm_client = self._get_llm()
+        all_responses: list[AgentResponse] = []
+        total_usage = TokenUsage()
+        agents_used: list[str] = []
+        pipeline_history: list[str] = []
+
+        async with SpanScope(
+            f"workflow.supervised.{self.name}",
+            input={
+                "input_preview": original_input[:500],
+                "agent_count": len(self.agents),
+                "agents": [a.name for a in self.agents],
+                "quality_threshold": self.supervised_config.quality_threshold,
+            },
+            metadata={"workflow_type": "supervised_sequential"},
+        ) as workflow_span:
+            for i in range(start_stage, len(self.agents)):
+                agent = self.agents[i]
+                step_num = i + 1
+                best_response: AgentResponse | None = None
+                best_score: float = 0.0
+
+                # Decision trace: mark the start of this pipeline stage (0-based).
+                if context.recorder is not None:
+                    context.recorder.record_workflow_step(
+                        self.name, stage=i, label=agent.name, agent_stack=[self.name]
+                    )
+
+                async with SpanScope(
+                    f"workflow.supervised.step.{step_num}",
+                    input={"step": step_num, "agent_name": agent.name},
+                    metadata={"total_steps": len(self.agents)},
+                ) as step_span:
+                    # Inject prior steps as system context for the LLM.
+                    # Skip when pass_full_history=True — user message already contains all prior steps.
+                    if pipeline_history and not self.supervised_config.pass_full_history:
+                        context.metadata["pipeline_context"] = (
+                            "Prior pipeline steps in this request:\n" + "\n".join(pipeline_history)
+                        )
+
+                    attempt_input = current_input
+
+                    for attempt in range(self.supervised_config.max_retries + 1):
+                        logger.info(
+                            f"SupervisedSequential step {step_num}/{len(self.agents)} "
+                            f"'{agent.name}' — attempt {attempt + 1}"
+                        )
+
+                        try:
+                            response = await runner.run(
+                                agent=agent,
+                                input=attempt_input,
+                                context=context,
+                            )
+                            total_usage = total_usage.add(response.usage)
+
+                            # Score the output
+                            score, feedback, score_usage = await self._score_output(
+                                step_num=step_num,
+                                agent_name=agent.name,
+                                original_input=current_input,
+                                output=response.content or "",
+                                llm_client=llm_client,
+                            )
+                            total_usage = total_usage.add(score_usage)
+
+                            logger.info(
+                                f"SupervisedSequential step {step_num} '{agent.name}' "
+                                f"score={score:.2f} (threshold={self.supervised_config.quality_threshold})"
+                            )
+
+                            if score > best_score:
+                                best_score = score
+                                best_response = response
+
+                            if score >= self.supervised_config.quality_threshold:
+                                logger.info(
+                                    f"SupervisedSequential step {step_num} passed "
+                                    f"(score={score:.2f})"
+                                )
+                                step_span.set_output(
+                                    {
+                                        "success": True,
+                                        "score": score,
+                                        "attempts": attempt + 1,
+                                    }
+                                )
+                                break
+
+                            # Score too low — prepare retry with feedback
+                            if attempt < self.supervised_config.max_retries:
+                                logger.info(
+                                    f"SupervisedSequential step {step_num} below threshold "
+                                    f"(score={score:.2f}) — retrying with feedback"
+                                )
+                                attempt_input = (
+                                    f"{current_input}\n\n"
+                                    f"Previous attempt output:\n{response.content}\n\n"
+                                    f"Quality feedback: {feedback}\n\n"
+                                    f"Please improve your response based on this feedback."
+                                )
+                            else:
+                                logger.warning(
+                                    f"SupervisedSequential step {step_num} exhausted retries "
+                                    f"(best score={best_score:.2f})"
+                                )
+                                step_span.set_output(
+                                    {
+                                        "success": False,
+                                        "best_score": best_score,
+                                        "attempts": attempt + 1,
+                                    }
+                                )
+
+                        except Exception as e:
+                            logger.error(f"SupervisedSequential step {step_num} failed: {e}")
+                            step_span.set_error(str(e))
+
+                            if self.supervised_config.fail_strategy == FailStrategy.FAIL_FAST:
+                                workflow_span.set_error(f"Step {step_num} failed: {e}")
+                                raise SequentialWorkflowError(
+                                    f"Step {step_num} ({agent.name}) failed: {e}",
+                                    failed_agent=agent.name,
+                                    step=step_num,
+                                    run_id=context.run_id,
+                                    original_error=e,
+                                ) from e
+
+                            current_input = (
+                                f"Previous step failed: {e}. Please handle this gracefully."
+                            )
+                            break
+
+                    # Handle case where all retries were exhausted below threshold
+                    if best_response is None:
+                        if self.supervised_config.fail_strategy == FailStrategy.FAIL_FAST:
+                            raise SequentialWorkflowError(
+                                f"Step {step_num} ({agent.name}) produced no valid output",
+                                failed_agent=agent.name,
+                                step=step_num,
+                                run_id=context.run_id,
+                            )
+                        current_input = (
+                            "Previous step produced no output. Please handle gracefully."
+                        )
+                        continue
+
+                    all_responses.append(best_response)
+                    agents_used.append(agent.name)
+                    max_chars = self.supervised_config.pipeline_context_max_chars
+                    content = best_response.content or ""
+                    pipeline_history.append(
+                        f"{agent.name}: {content[:max_chars] if max_chars is not None else content}"
+                    )
+
+                    # Prepare input for next step
+                    if self.supervised_config.pass_full_history:
+                        history_parts = [f"Original request: {original_input}"]
+                        for j, resp in enumerate(all_responses):
+                            history_parts.append(
+                                f"Step {start_stage + j + 1} "
+                                f"({self.agents[start_stage + j].name}): {resp.content}"
+                            )
+                        current_input = "\n\n".join(history_parts)
+                    else:
+                        current_input = best_response.content or ""
+
+            final = (
+                all_responses[-1]
+                if all_responses
+                else AgentResponse(
+                    content="No agents executed",
+                    status=ResponseStatus.ERROR,
+                )
+            )
+
+            workflow_span.set_output(
+                {
+                    "success": True,
+                    "steps_executed": len(all_responses),
+                    "agents_used": agents_used,
+                    "total_tokens": total_usage.total_tokens,
+                }
+            )
+
+            result = AgentResponse(
+                content=final.content,
+                structured_output=final.structured_output,
+                agent_name=self.name,
+                status=ResponseStatus.SUCCESS,
+                usage=total_usage,
+                turn_count=sum(r.turn_count for r in all_responses),
+                agents_used=agents_used,
+                messages=final.messages,
+            )
+        result.run_id = context.run_id
+        return result
+
+    # ------------------------------------------------------------------ #
+    # Forkable: resume the pipeline from the stage owning a step
+    # ------------------------------------------------------------------ #
+    async def resume_from(
+        self,
+        *,
+        parent_trace: Any,
+        from_step: str,
+        override: dict[str, Any] | None,
+        runner: AgentRunner,
+        context: RunContext,
+    ) -> AgentResponse:
+        """Re-run the pipeline from the stage containing ``from_step``.
+
+        Stages before the resume point are not re-run; the resumed stage's input
+        is recovered from its first step's message checkpoint (with ``override``
+        applied), then the pipeline runs forward with its normal supervisor
+        approval logic. The parent run is never mutated; the new run records its
+        lineage.
+        """
+        from orchestrator.agent.workflow._forkable import (
+            link_lineage,
+            resumed_input,
+            segment_by_markers,
+        )
+
+        step_stage, stage_first = segment_by_markers(parent_trace)
+        stage_idx = step_stage.get(from_step)
+        if stage_idx is None:
+            raise ValueError(f"resume_from: step '{from_step}' not found in trace")
+        stage_idx = max(0, min(stage_idx, len(self.agents) - 1))
+
+        new_input = resumed_input(stage_first.get(stage_idx), override, parent_trace.user_query)
+
+        created = runner.ensure_recorder(context, self.name, parent_trace.user_query)
+        if created:
+            link_lineage(context, parent_trace, from_step, override, stage_idx)
+        context.suppress_session_log = True
+        try:
+            result = await self._drive(
+                new_input,
+                runner,
+                context,
+                start_stage=stage_idx,
+                original_input=parent_trace.user_query,
+            )
+            if created:
+                await runner.persist_decision_trace(context, result)
             return result
         finally:
             context.metadata.pop("pipeline_context", None)

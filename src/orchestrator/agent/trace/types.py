@@ -30,7 +30,10 @@ class StepKind(str, Enum):
     TOOL_CALL = "tool_call"  # a tool was invoked
     HANDOFF = "handoff"  # control transferred to another agent
     MEMORY_RETRIEVAL = "memory_retrieval"  # long-term memories were pulled in
+    MEMORY_WRITE = "memory_write"  # facts were written to long-term memory
     ROUTING = "routing"  # smart-layer model-tier / route decision
+    GUARDRAIL = "guardrail"  # an input/output scanner ran (PII, injection, …)
+    WORKFLOW_STEP = "workflow_step"  # a workflow stage / iteration boundary
 
 
 class TraceDetail(str, Enum):
