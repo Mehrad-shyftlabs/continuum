@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from config import ShopConfig, default_config
 
-from orchestrator import (
+from continuum import (
     AgentConfig,
     AgentMemoryConfig,
     AgentMemoryScope,
@@ -26,11 +26,11 @@ from orchestrator import (
     ToolExecutor,
     get_logger,
 )
-from orchestrator.agent.types import EventType
-from orchestrator.core.container import Container, get_container
-from orchestrator.core.lifecycle import OrchestratorLifecycle, get_lifecycle_manager
-from orchestrator.tools.tool_attention.config import ToolAttentionConfig
-from orchestrator.tools.types import ToolContextConfig, ToolContextVariable
+from continuum.agent.types import EventType
+from continuum.core.container import Container, get_container
+from continuum.core.lifecycle import OrchestratorLifecycle, get_lifecycle_manager
+from continuum.tools.tool_attention.config import ToolAttentionConfig
+from continuum.tools.types import ToolContextConfig, ToolContextVariable
 
 logger = get_logger(__name__)
 

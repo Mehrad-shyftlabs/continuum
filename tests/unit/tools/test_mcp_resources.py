@@ -15,8 +15,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic import AnyUrl
 
-from orchestrator.tools.exceptions import MCPError
-from orchestrator.tools.mcp import MCPServerFunction, MCPServerStreamableHttp, function_tool
+from continuum.tools.exceptions import MCPError
+from continuum.tools.mcp import MCPServerFunction, MCPServerStreamableHttp, function_tool
 
 # ---------------------------------------------------------------------------
 # MCPServerFunction stubs

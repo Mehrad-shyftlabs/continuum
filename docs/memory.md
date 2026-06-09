@@ -17,7 +17,7 @@ This doc covers:
 ## 1 · Quick start
 
 ```python
-from orchestrator.memory import MemoryClient, MemoryConfig
+from continuum.memory import MemoryClient, MemoryConfig
 
 client = MemoryClient(config=MemoryConfig())     # uses env defaults
 
@@ -39,7 +39,7 @@ for entry in result.results:
 In an agent:
 
 ```python
-from orchestrator.agent import BaseAgent, AgentMemoryConfig, MemoryScope
+from continuum.agent import BaseAgent, AgentMemoryConfig, MemoryScope
 
 agent = BaseAgent(
     name="assistant",
@@ -63,7 +63,7 @@ facts back.
 
 ## 2 · `MemoryClient`
 
-`from orchestrator.memory import MemoryClient`
+`from continuum.memory import MemoryClient`
 
 ```python
 MemoryClient(
@@ -107,10 +107,10 @@ async with MemoryClient() as client:
 ### Global helpers
 
 ```python
-from orchestrator.memory import (
+from continuum.memory import (
     initialize_global_memory, get_global_memory_client,
 )
-from orchestrator.memory.client import reset_global_memory
+from continuum.memory.client import reset_global_memory
 
 initialize_global_memory()                  # uses env defaults; returns bool
 client = get_global_memory_client()         # auto-inits on first call
@@ -121,7 +121,7 @@ reset_global_memory()                       # for tests
 
 ## 3 · `MemoryConfig`
 
-`from orchestrator.memory import MemoryConfig`
+`from continuum.memory import MemoryConfig`
 
 A Pydantic model. Fields with their defaults sourced from `Settings`.
 
@@ -165,7 +165,7 @@ There are **two distinct things called `MemoryScope`** in the codebase
 
 ### 4.1 The enum used by agents
 
-`from orchestrator.agent import MemoryScope`
+`from continuum.agent import MemoryScope`
 
 ```python
 class MemoryScope(str, Enum):
@@ -186,7 +186,7 @@ This is what you pass to `AgentMemoryConfig(search_scope=MemoryScope.USER)`.
 
 ### 4.2 The dataclass used at the memory layer
 
-`from orchestrator.memory import MemoryScope, MemoryIsolationLevel`
+`from continuum.memory import MemoryScope, MemoryIsolationLevel`
 
 The memory module's `MemoryScope` is a **dataclass** carrying real
 identifiers, not an enum.
@@ -226,7 +226,7 @@ Conversions:
 ### Custom scope registry
 
 ```python
-from orchestrator.memory import (
+from continuum.memory import (
     register_scope, get_scope_definition, list_scopes, is_scope_registered,
 )
 
@@ -242,7 +242,7 @@ register_scope(
 
 ## 5 · Types
 
-`from orchestrator.memory import (
+`from continuum.memory import (
     MemoryEntry, MemorySearchResult, MemoryAddResult, MemoryMetadata, MemoryFilter,
 )`
 
@@ -280,7 +280,7 @@ For `search(filters=...)`: `user_id`, `agent_id`, `run_id`, `category`,
 
 ## 6 · Intelligent memory layer
 
-`from orchestrator.memory import IntelligentMemoryClient, IntelligenceConfig`
+`from continuum.memory import IntelligentMemoryClient, IntelligenceConfig`
 
 Adds four behaviours on top of mem0:
 
@@ -324,7 +324,7 @@ client = IntelligentMemoryClient(
 You can wire it into the container in place of the default `MemoryClient`:
 
 ```python
-from orchestrator.core.container import get_container
+from continuum.core.container import get_container
 get_container().set_memory_client(IntelligentMemoryClient())
 ```
 
@@ -332,7 +332,7 @@ get_container().set_memory_client(IntelligentMemoryClient())
 
 ## 7 · Provider system
 
-`from orchestrator.memory import (
+`from continuum.memory import (
     BaseMemoryProvider, register_provider, get_provider_class,
     create_provider, list_providers,
 )`
@@ -363,7 +363,7 @@ custom provider can be natively async.
 
 ## 8 · Exceptions
 
-`from orchestrator.memory import (
+`from continuum.memory import (
     MemoryError, MemoryConfigurationError, MemoryNotEnabledError,
     MemoryConnectionError, MemorySearchError, MemoryAddError,
     MemoryDeleteError, MemoryUpdateError, MemoryIdentifierError,
@@ -388,7 +388,7 @@ MEMORY_ENABLED=false
 ```
 
 ```python
-from orchestrator.core.container import Container, ContainerConfig
+from continuum.core.container import Container, ContainerConfig
 container = Container(ContainerConfig(enable_memory=False))
 runner = AgentRunner(container=container)
 ```

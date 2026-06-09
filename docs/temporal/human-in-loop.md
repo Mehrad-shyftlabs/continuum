@@ -4,7 +4,7 @@ Approval gates pause a workflow until a human submits an
 `ApprovalDecision`. The framework provides a high-level
 `HumanInLoopManager` so you don't have to wrangle signals manually.
 
-`from orchestrator.temporal import (
+`from continuum.temporal import (
     HumanInLoopManager, ApprovalNotificationConfig,
     ApprovalRequest, ApprovalDecision,
 )`
@@ -38,8 +38,8 @@ The notification handler is responsible for **alerting a human** that
 an approval is pending. You set it on the agent registry:
 
 ```python
-from orchestrator.temporal import get_agent_registry
-from orchestrator.temporal.types import NotificationParams
+from continuum.temporal import get_agent_registry
+from continuum.temporal.types import NotificationParams
 
 async def notify_slack(params: NotificationParams) -> None:
     if params.type == "approval_required":
@@ -61,7 +61,7 @@ up.
 ## 3 · Use `HumanInLoopManager`
 
 ```python
-from orchestrator.temporal import HumanInLoopManager, ApprovalNotificationConfig
+from continuum.temporal import HumanInLoopManager, ApprovalNotificationConfig
 
 config = ApprovalNotificationConfig(
     handler=notify_slack,                        # also wire here for legacy reasons
@@ -210,7 +210,7 @@ Use sparingly — auto-approvals defeat the point of an approval gate.
 
 ## 7 · Exceptions
 
-`from orchestrator.temporal import ApprovalTimeoutError, WorkflowCancelledError`
+`from continuum.temporal import ApprovalTimeoutError, WorkflowCancelledError`
 
 `ApprovalTimeoutError(message, *, request_id=None, timeout_seconds=None, **kwargs)` carries those fields in its context dict.
 `WorkflowCancelledError(message, *, workflow_id=None, **kwargs)` likewise.

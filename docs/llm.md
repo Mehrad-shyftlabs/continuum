@@ -22,7 +22,7 @@ What this module gives you:
 
 ## 1 · Provider routing
 
-`from orchestrator.llm.providers import get_provider`
+`from continuum.llm.providers import get_provider`
 
 The router picks a provider purely from the **model string prefix**, in
 this order:
@@ -57,7 +57,7 @@ class BaseProvider(ABC):
 
 ## 2 · `LLMClient`
 
-`from orchestrator.llm import LLMClient`
+`from continuum.llm import LLMClient`
 
 ```python
 client = LLMClient(
@@ -127,7 +127,7 @@ Set `auto_session=False` to opt out of this for a specific call.
 
 ## 3 · `LLMConfig`
 
-`from orchestrator.llm import LLMConfig`
+`from continuum.llm import LLMConfig`
 
 A Pydantic model with full provider-agnostic settings.
 
@@ -177,7 +177,7 @@ respecting tier limits without trial-and-error 429s.
 
 ## 4 · Types
 
-`from orchestrator.llm import ChatMessage, LLMResponse, StreamChunk, Usage,
+`from continuum.llm import ChatMessage, LLMResponse, StreamChunk, Usage,
                               FunctionCall, FunctionDefinition,
                               ToolCall, ToolDefinition`
 
@@ -259,7 +259,7 @@ When using `BaseAgent`, `output_schema=Result` is the equivalent —
 ### Capability checks
 
 ```python
-from orchestrator.llm.utils import (
+from continuum.llm.utils import (
     check_response_format_support, check_json_schema_support,
     supports_tools_with_json_mode,
 )
@@ -273,7 +273,7 @@ from orchestrator.llm.utils import (
 
 ## 6 · Context window management
 
-`from orchestrator.llm import (
+`from continuum.llm import (
     ContextWindowManager, ModelLimits, TruncationStrategy,
     get_context_window_manager,
 )`
@@ -300,7 +300,7 @@ Gemini 2.5 family (1M), older Gemini Pro (32K), GPT-3.5 (16K), GPT-4
 
 ### Proactive compression — `ProgressiveContextManager`
 
-`from orchestrator.llm import (
+`from continuum.llm import (
     ContextManagementConfig, ProgressiveContextManager,
     CompressionStrategy, CompressionResult,
     get_progressive_context_manager,
@@ -310,7 +310,7 @@ The agent runner automatically calls `compress_if_needed()` before each
 LLM call when context approaches the threshold.
 
 ```python
-from orchestrator.llm.context_management import ContextManagementConfig
+from continuum.llm.context_management import ContextManagementConfig
 
 cfg = ContextManagementConfig(
     enabled=True,
@@ -339,7 +339,7 @@ To override per-agent: set `agent.config.context_management = cfg`.
 
 ## 7 · Tracing & callbacks
 
-`from orchestrator.llm.callbacks import (
+`from continuum.llm.callbacks import (
     setup_langfuse, get_langfuse_callback, get_langfuse_metadata,
     trace_context, set_trace_context, get_trace_context, clear_trace_context,
     flush_langfuse, shutdown_langfuse,
@@ -351,7 +351,7 @@ automatically nests under any active span. To explicitly scope a series
 of calls to a single trace:
 
 ```python
-from orchestrator.llm.callbacks import trace_context
+from continuum.llm.callbacks import trace_context
 
 with trace_context(trace_id="my-trace-id"):
     a = await client.chat(messages_a)
@@ -375,7 +375,7 @@ manage observability outside the lifecycle manager.
 
 ## 8 · Exception hierarchy
 
-`from orchestrator.llm import (
+`from continuum.llm import (
     LLMError, LLMAuthenticationError, LLMRateLimitError,
     LLMTimeoutError, LLMContextLengthError, LLMInvalidRequestError,
     LLMServiceUnavailableError, LLMFallbackExhaustedError,
@@ -393,7 +393,7 @@ error-handling code is provider-agnostic.
 
 ```python
 import asyncio
-from orchestrator.llm import LLMClient, LLMConfig, ChatMessage
+from continuum.llm import LLMClient, LLMConfig, ChatMessage
 
 async def main():
     client = LLMClient()

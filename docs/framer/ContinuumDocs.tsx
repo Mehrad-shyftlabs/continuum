@@ -790,8 +790,8 @@ TOKENIZERS_PARALLELISM=false</pre></div>
     <li>
       <strong>Create and run your first agent</strong>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">import</span> asyncio
-<span class="kw">from</span> orchestrator.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>
-<span class="kw">from</span> orchestrator.agent.runner <span class="kw">import</span> <span class="cls">AgentRunner</span>
+<span class="kw">from</span> continuum.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>
+<span class="kw">from</span> continuum.agent.runner <span class="kw">import</span> <span class="cls">AgentRunner</span>
 
 agent = <span class="cls">BaseAgent</span>(
     name=<span class="str">"assistant"</span>,
@@ -813,14 +813,14 @@ asyncio.<span class="fn">run</span>(main())</pre></div>
   <p>Continuum is structured as layered modules, each independently usable:</p>
   <table>
     <tr><th>Module</th><th>Import path</th><th>Purpose</th></tr>
-    <tr><td><code>agent</code></td><td><code>orchestrator.agent</code></td><td>BaseAgent, AgentRunner, 9 workflow patterns, handoffs</td></tr>
-    <tr><td><code>llm</code></td><td><code>orchestrator.llm</code></td><td>LLMClient, provider routing, structured output, context compression</td></tr>
-    <tr><td><code>memory</code></td><td><code>orchestrator.memory</code></td><td>mem0 + Qdrant/Milvus long-term memory</td></tr>
-    <tr><td><code>session</code></td><td><code>orchestrator.session</code></td><td>Redis-backed conversation history</td></tr>
-    <tr><td><code>tools</code></td><td><code>orchestrator.tools</code></td><td>MCP servers, ToolExecutor, run artifacts</td></tr>
-    <tr><td><code>observability</code></td><td><code>orchestrator.observability</code></td><td>Langfuse tracing, metrics, error reporting</td></tr>
-    <tr><td><code>temporal</code></td><td><code>orchestrator.temporal</code></td><td>Durable workflows, approval gates</td></tr>
-    <tr><td><code>core</code></td><td><code>orchestrator.core</code></td><td>DI Container, lifecycle, health checks</td></tr>
+    <tr><td><code>agent</code></td><td><code>continuum.agent</code></td><td>BaseAgent, AgentRunner, 9 workflow patterns, handoffs</td></tr>
+    <tr><td><code>llm</code></td><td><code>continuum.llm</code></td><td>LLMClient, provider routing, structured output, context compression</td></tr>
+    <tr><td><code>memory</code></td><td><code>continuum.memory</code></td><td>mem0 + Qdrant/Milvus long-term memory</td></tr>
+    <tr><td><code>session</code></td><td><code>continuum.session</code></td><td>Redis-backed conversation history</td></tr>
+    <tr><td><code>tools</code></td><td><code>continuum.tools</code></td><td>MCP servers, ToolExecutor, run artifacts</td></tr>
+    <tr><td><code>observability</code></td><td><code>continuum.observability</code></td><td>Langfuse tracing, metrics, error reporting</td></tr>
+    <tr><td><code>temporal</code></td><td><code>continuum.temporal</code></td><td>Durable workflows, approval gates</td></tr>
+    <tr><td><code>core</code></td><td><code>continuum.core</code></td><td>DI Container, lifecycle, health checks</td></tr>
   </table>
 
   <a class="anchor" id="home-docs"></a>
@@ -862,7 +862,7 @@ asyncio.<span class="fn">run</span>(main())</pre></div>
 
   <a class="anchor" id="build-baseagent"></a>
   <h2>Base Agent</h2>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>
 
 agent = <span class="cls">BaseAgent</span>(
     name=<span class="str">"support-bot"</span>,
@@ -1069,7 +1069,7 @@ review: <span class="cls">Review</span> = response.structured_output
 
   <h4>Sequential Workflow</h4>
   <p>Executes agents as a pipeline — each agent receives the previous agent's output.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent.workflow <span class="kw">import</span> <span class="cls">SequentialAgent</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.workflow <span class="kw">import</span> <span class="cls">SequentialAgent</span>
 
 pipeline = <span class="cls">SequentialAgent</span>(
     name=<span class="str">"research-pipeline"</span>,
@@ -1078,7 +1078,7 @@ pipeline = <span class="cls">SequentialAgent</span>(
 )</pre></div>
 
   <p>Or use the factory shorthand:</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>, <span class="cls">AgentRunner</span>, create_sequential_agent
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>, <span class="cls">AgentRunner</span>, create_sequential_agent
 
 researcher = <span class="cls">BaseAgent</span>(name=<span class="str">"researcher"</span>, instructions=<span class="str">"Research the topic. Output key facts."</span>, model=<span class="str">"gpt-4o-mini"</span>)
 writer     = <span class="cls">BaseAgent</span>(name=<span class="str">"writer"</span>,     instructions=<span class="str">"Write a short report from the facts."</span>,  model=<span class="str">"gpt-4o-mini"</span>)
@@ -1094,8 +1094,8 @@ response = <span class="kw">await</span> <span class="cls">AgentRunner</span>().
   <a class="anchor" id="build-parallel"></a>
   <h4>Parallel Workflow</h4>
   <p>All agents receive the same input and run concurrently. Results are merged by strategy.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent.workflow <span class="kw">import</span> <span class="cls">ParallelAgent</span>
-<span class="kw">from</span> orchestrator.agent.config <span class="kw">import</span> <span class="cls">ParallelConfig</span>, <span class="cls">MergeStrategy</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.workflow <span class="kw">import</span> <span class="cls">ParallelAgent</span>
+<span class="kw">from</span> continuum.agent.config <span class="kw">import</span> <span class="cls">ParallelConfig</span>, <span class="cls">MergeStrategy</span>
 
 fan_out = <span class="cls">ParallelAgent</span>(
     name=<span class="str">"multi-analyst"</span>,
@@ -1115,8 +1115,8 @@ fan_out = <span class="cls">ParallelAgent</span>(
   </table>
 
   <p>Factory shorthand:</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent <span class="kw">import</span> create_parallel_agent
-<span class="kw">from</span> orchestrator.agent.types <span class="kw">import</span> <span class="cls">MergeStrategy</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent <span class="kw">import</span> create_parallel_agent
+<span class="kw">from</span> continuum.agent.types <span class="kw">import</span> <span class="cls">MergeStrategy</span>
 
 parallel = <span class="fn">create_parallel_agent</span>(
     name=<span class="str">"parallel-analysts"</span>,
@@ -1127,8 +1127,8 @@ parallel = <span class="fn">create_parallel_agent</span>(
   <a class="anchor" id="build-loop"></a>
   <h4>Loop Workflow</h4>
   <p>Iterates an agent until a termination condition is satisfied.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent.workflow <span class="kw">import</span> <span class="cls">LoopAgent</span>
-<span class="kw">from</span> orchestrator.agent.config <span class="kw">import</span> <span class="cls">TerminationConfig</span>, <span class="cls">TerminationType</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.workflow <span class="kw">import</span> <span class="cls">LoopAgent</span>
+<span class="kw">from</span> continuum.agent.config <span class="kw">import</span> <span class="cls">TerminationConfig</span>, <span class="cls">TerminationType</span>
 
 loop = <span class="cls">LoopAgent</span>(
     name=<span class="str">"refinement-loop"</span>,
@@ -1150,8 +1150,8 @@ loop = <span class="cls">LoopAgent</span>(
   </table>
 
   <p>Factory shorthand with <code>OUTPUT_MATCH</code>:</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent <span class="kw">import</span> create_loop_agent
-<span class="kw">from</span> orchestrator.agent.types <span class="kw">import</span> <span class="cls">TerminationType</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent <span class="kw">import</span> create_loop_agent
+<span class="kw">from</span> continuum.agent.types <span class="kw">import</span> <span class="cls">TerminationType</span>
 
 loop = <span class="fn">create_loop_agent</span>(
     name=<span class="str">"refinement-loop"</span>,
@@ -1164,8 +1164,8 @@ loop = <span class="fn">create_loop_agent</span>(
   <a class="anchor" id="build-reflection"></a>
   <h4>Reflection Workflow</h4>
   <p>The agent runs, a critic evaluates the output, and the agent retries if the critique is <code>NEEDS IMPROVEMENT</code>.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent.workflow <span class="kw">import</span> <span class="cls">ReflectionAgent</span>
-<span class="kw">from</span> orchestrator.agent.config <span class="kw">import</span> <span class="cls">ReflectionConfig</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.workflow <span class="kw">import</span> <span class="cls">ReflectionAgent</span>
+<span class="kw">from</span> continuum.agent.config <span class="kw">import</span> <span class="cls">ReflectionConfig</span>
 
 reflective = <span class="cls">ReflectionAgent</span>(
     name=<span class="str">"quality-writer"</span>,
@@ -1180,7 +1180,7 @@ reflective = <span class="cls">ReflectionAgent</span>(
   <a class="anchor" id="build-router"></a>
   <h4>Router Workflow</h4>
   <p>Routes requests to specialist agents based on content. Three strategies: LLM, rule-based, or hybrid.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent.workflow <span class="kw">import</span> <span class="cls">RouterAgent</span>, <span class="cls">Route</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.workflow <span class="kw">import</span> <span class="cls">RouterAgent</span>, <span class="cls">Route</span>
 
 router = <span class="cls">RouterAgent</span>(
     name=<span class="str">"triage"</span>,
@@ -1194,7 +1194,7 @@ router = <span class="cls">RouterAgent</span>(
 )</pre></div>
 
   <p>Or use the factory with tuple-based routes (recommended — the old <code>Route(target=...)</code> API is removed):</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>, <span class="cls">AgentRunner</span>, create_router_agent
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>, <span class="cls">AgentRunner</span>, create_router_agent
 
 billing   = <span class="cls">BaseAgent</span>(name=<span class="str">"billing-agent"</span>,   instructions=<span class="str">"Handle billing questions."</span>)
 technical = <span class="cls">BaseAgent</span>(name=<span class="str">"technical-agent"</span>, instructions=<span class="str">"Handle technical support."</span>)
@@ -1218,8 +1218,8 @@ response = <span class="kw">await</span> runner.run(router, <span class="str">"M
   <a class="anchor" id="build-planner"></a>
   <h4>Planner Workflow</h4>
   <p>Decomposes a goal into sub-tasks and executes them — either with a single agent or by routing each step to a specialist from a pool.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent.workflow <span class="kw">import</span> <span class="cls">PlannerAgent</span>
-<span class="kw">from</span> orchestrator.agent.config <span class="kw">import</span> <span class="cls">PlanningConfig</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.workflow <span class="kw">import</span> <span class="cls">PlannerAgent</span>
+<span class="kw">from</span> continuum.agent.config <span class="kw">import</span> <span class="cls">PlanningConfig</span>
 
 <span class="cm"># Agent-pool mode: LLM routes each step to a specialist</span>
 planner = <span class="cls">PlannerAgent</span>(
@@ -1256,7 +1256,7 @@ planner = <span class="cls">PlannerAgent</span>(
   <a class="anchor" id="build-handoffs"></a>
   <h3>Handoffs</h3>
   <p>An agent can delegate to another agent mid-conversation. Handoffs appear to the LLM as callable tools.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent.handoff <span class="kw">import</span> <span class="cls">Handoff</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.handoff <span class="kw">import</span> <span class="cls">Handoff</span>
 
 triage = <span class="cls">BaseAgent</span>(
     name=<span class="str">"triage"</span>,
@@ -1284,7 +1284,7 @@ triage = <span class="cls">BaseAgent</span>(
     <tr><td><code>RECENT_N</code></td><td>Last N turns only</td><td>When only recent context matters</td></tr>
     <tr><td><code>HYBRID</code></td><td>Summary of older messages + full recent N turns</td><td>Best of both — default recommendation</td></tr>
   </table>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent.handoff <span class="kw">import</span> <span class="cls">Handoff</span>, <span class="cls">HistorySummarizationMode</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.handoff <span class="kw">import</span> <span class="cls">Handoff</span>, <span class="cls">HistorySummarizationMode</span>
 
 <span class="cls">Handoff</span>(
     target_agent=<span class="str">"specialist"</span>,
@@ -1315,8 +1315,8 @@ triage = <span class="cls">BaseAgent</span>(
   <a class="anchor" id="run-runner"></a>
   <h2>AgentRunner</h2>
   <p>Create one <code>AgentRunner</code> instance per application. It manages internal service clients and can be shared across concurrent runs.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent.runner <span class="kw">import</span> <span class="cls">AgentRunner</span>
-<span class="kw">from</span> orchestrator.agent.config <span class="kw">import</span> <span class="cls">RunnerConfig</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.runner <span class="kw">import</span> <span class="cls">AgentRunner</span>
+<span class="kw">from</span> continuum.agent.config <span class="kw">import</span> <span class="cls">RunnerConfig</span>
 
 runner = <span class="cls">AgentRunner</span>(
     config=<span class="cls">RunnerConfig</span>(
@@ -1349,7 +1349,7 @@ runner = <span class="cls">AgentRunner</span>(
   <a class="anchor" id="run-stream"></a>
   <h2>Streaming</h2>
   <p>Use <code>run_stream()</code> to yield tokens and events as they occur. Ideal for WebSocket or SSE endpoints.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent.types <span class="kw">import</span> <span class="cls">EventType</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.types <span class="kw">import</span> <span class="cls">EventType</span>
 
 <span class="kw">async for</span> event <span class="kw">in</span> runner.run_stream(agent, <span class="str">"Explain quantum entanglement."</span>, user_id=<span class="str">"u-1"</span>):
     <span class="kw">if</span> event.type == <span class="cls">EventType</span>.CONTENT_DELTA:
@@ -1465,7 +1465,7 @@ response = <span class="kw">await</span> runner.run(
   <a class="anchor" id="run-context"></a>
   <h2>Context Management</h2>
   <p>When a conversation approaches the model's context window, Continuum automatically compresses older messages.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator <span class="kw">import</span> <span class="cls">AgentConfig</span>, <span class="cls">ContextManagementConfig</span>, <span class="cls">CompressionStrategy</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum <span class="kw">import</span> <span class="cls">AgentConfig</span>, <span class="cls">ContextManagementConfig</span>, <span class="cls">CompressionStrategy</span>
 
 agent = <span class="cls">BaseAgent</span>(
     name=<span class="str">"long-conv"</span>,
@@ -1484,7 +1484,7 @@ agent = <span class="cls">BaseAgent</span>(
   <a class="anchor" id="run-lifecycle"></a>
   <h2>App Lifecycle</h2>
   <p>Use <code>OrchestratorLifecycle</code> to initialise and cleanly shut down all shared services (Redis, Langfuse, vector store). Use <code>Container</code> to inject custom clients — useful in tests and multi-tenant setups.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.core <span class="kw">import</span> <span class="cls">OrchestratorLifecycle</span>, <span class="cls">Container</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.core <span class="kw">import</span> <span class="cls">OrchestratorLifecycle</span>, <span class="cls">Container</span>
 
 lifecycle = <span class="cls">OrchestratorLifecycle</span>()
 <span class="kw">await</span> lifecycle.startup()   <span class="cm"># connects Redis, Langfuse, vector store</span>
@@ -1496,7 +1496,7 @@ health = <span class="kw">await</span> lifecycle.health_check()
 <span class="kw">await</span> lifecycle.shutdown()  <span class="cm"># flushes Langfuse, closes Redis connections</span></pre></div>
 
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># Inject custom clients (e.g. in tests or multi-tenant setups)</span>
-<span class="kw">from</span> orchestrator.core <span class="kw">import</span> <span class="cls">Container</span>
+<span class="kw">from</span> continuum.core <span class="kw">import</span> <span class="cls">Container</span>
 
 container = <span class="cls">Container</span>()
 container.<span class="fn">set_llm_client</span>(my_llm_client)
@@ -1508,8 +1508,8 @@ runner = <span class="cls">AgentRunner</span>(container=container)</pre></div>
   <a class="anchor" id="run-fastapi"></a>
   <h2>FastAPI Server</h2>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> fastapi <span class="kw">import</span> <span class="cls">FastAPI</span>
-<span class="kw">from</span> orchestrator.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>
-<span class="kw">from</span> orchestrator.agent.runner <span class="kw">import</span> <span class="cls">AgentRunner</span>
+<span class="kw">from</span> continuum.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>
+<span class="kw">from</span> continuum.agent.runner <span class="kw">import</span> <span class="cls">AgentRunner</span>
 
 app = <span class="cls">FastAPI</span>()
 runner = <span class="cls">AgentRunner</span>()
@@ -1527,7 +1527,7 @@ agent = <span class="cls">BaseAgent</span>(name=<span class="str">"api-agent"</s
 
   <a class="anchor" id="run-temporal-deploy"></a>
   <h2>Temporal Workers</h2>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.temporal <span class="kw">import</span> <span class="cls">WorkerManager</span>, <span class="cls">AgentRegistry</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.temporal <span class="kw">import</span> <span class="cls">WorkerManager</span>, <span class="cls">AgentRegistry</span>
 
 registry = <span class="cls">AgentRegistry</span>()
 registry.register(my_agent)
@@ -1560,7 +1560,7 @@ agent = <span class="cls">BaseAgent</span>(
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># conftest.py</span>
 <span class="kw">import</span> pytest
 <span class="kw">import</span> fakeredis.aioredis <span class="kw">as</span> fakeredis
-<span class="kw">from</span> orchestrator.core <span class="kw">import</span> <span class="cls">Container</span>
+<span class="kw">from</span> continuum.core <span class="kw">import</span> <span class="cls">Container</span>
 
 <span class="op">@</span>pytest.fixture
 <span class="kw">async def</span> <span class="fn">container</span>():
@@ -1591,7 +1591,7 @@ agent = <span class="cls">BaseAgent</span>(
   <a class="anchor" id="comp-mcp"></a>
   <h2>MCP Servers</h2>
   <p>Every tool is exposed via the Model Context Protocol. Three transport types are supported:</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.tools <span class="kw">import</span> <span class="cls">MCPServerStdio</span>, <span class="cls">MCPServerSse</span>, <span class="cls">MCPServerStreamableHttp</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.tools <span class="kw">import</span> <span class="cls">MCPServerStdio</span>, <span class="cls">MCPServerSse</span>, <span class="cls">MCPServerStreamableHttp</span>
 
 <span class="cm"># Spawn a subprocess (local Python script or shell command)</span>
 fs_server = <span class="cls">MCPServerStdio</span>(command=<span class="str">"python"</span>, args=[<span class="str">"-m"</span>, <span class="str">"mcp_filesystem"</span>])
@@ -1610,7 +1610,7 @@ agent = <span class="cls">BaseAgent</span>(
 
   <h3>Passing tools explicitly with MCPUtil</h3>
   <p>If you need the tool definitions as Python objects (e.g. to inspect, filter, or pass them manually), use <code>MCPUtil.get_function_tools()</code>:</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.tools <span class="kw">import</span> <span class="cls">MCPUtil</span>, <span class="cls">ToolExecutor</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.tools <span class="kw">import</span> <span class="cls">MCPUtil</span>, <span class="cls">ToolExecutor</span>
 
 <span class="cm"># Get tool definitions from a connected server</span>
 tool_defs = <span class="kw">await</span> <span class="cls">MCPUtil</span>.<span class="fn">get_function_tools</span>(server)
@@ -1629,7 +1629,7 @@ agent = <span class="cls">BaseAgent</span>(
   <a class="anchor" id="comp-tool-filtering"></a>
   <h2>Tool Filtering</h2>
   <p>When you have many MCP tools, semantic tool filtering sends only the relevant subset to the LLM each turn — reducing token cost and noise.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent.config <span class="kw">import</span> <span class="cls">AgentConfig</span>, <span class="cls">ToolAttentionConfig</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.config <span class="kw">import</span> <span class="cls">AgentConfig</span>, <span class="cls">ToolAttentionConfig</span>
 
 agent = <span class="cls">BaseAgent</span>(
     name=<span class="str">"commerce-agent"</span>,
@@ -1646,7 +1646,7 @@ agent = <span class="cls">BaseAgent</span>(
   <a class="anchor" id="comp-tool-context"></a>
   <h2>Tool Context Injection</h2>
   <p>Some tools return a value (e.g. <code>session_id</code>, <code>cart_token</code>) that subsequent tool calls need as input. <code>ToolContextState</code> captures these values automatically and injects them into later calls — no agent prompt changes required.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.tools <span class="kw">import</span> <span class="cls">MCPServerStreamableHttp</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.tools <span class="kw">import</span> <span class="cls">MCPServerStreamableHttp</span>
 
 <span class="cm"># Capture session_id from the login tool result, inject into every subsequent call</span>
 shop_server = <span class="cls">MCPServerStreamableHttp</span>(
@@ -1671,8 +1671,8 @@ shop_server = <span class="cls">MCPServerStreamableHttp</span>(
   <a class="anchor" id="comp-memory"></a>
   <h2>Long-term Memory</h2>
   <p>Continuum uses <a href="#int-langfuse">mem0</a> + Milvus(default) or Qdrant  for persistent semantic memory. Facts are automatically extracted from conversations and stored as embeddings.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent.config <span class="kw">import</span> <span class="cls">AgentMemoryConfig</span>
-<span class="kw">from</span> orchestrator.memory.scopes <span class="kw">import</span> <span class="cls">MemoryScope</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.config <span class="kw">import</span> <span class="cls">AgentMemoryConfig</span>
+<span class="kw">from</span> continuum.memory.scopes <span class="kw">import</span> <span class="cls">MemoryScope</span>
 
 agent = <span class="cls">BaseAgent</span>(
     name=<span class="str">"memory-agent"</span>,
@@ -1705,7 +1705,7 @@ agent = <span class="cls">BaseAgent</span>(
 <span class="cls">AgentMemoryConfig</span>(store_memories=<span class="cls">True</span>, pre_store_filter=remove_pii)</pre></div>
 
   <h3>Memory management API</h3>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.core.container <span class="kw">import</span> get_container
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.core.container <span class="kw">import</span> get_container
 
 memory_client = <span class="fn">get_container</span>().memory_client
 
@@ -1740,7 +1740,7 @@ results = <span class="kw">await</span> memory_client.search(<span class="str">"
   <a class="anchor" id="comp-intelligent-memory"></a>
   <h2>IntelligentMemoryClient</h2>
   <p>A drop-in replacement for <code>MemoryClient</code> that adds <strong>importance scoring</strong>, <strong>time-based decay</strong>, entity extraction, and user profiles. Low-relevance or stale memories are down-weighted before being injected into the prompt.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.memory <span class="kw">import</span> <span class="cls">IntelligentMemoryClient</span>, <span class="cls">IntelligenceConfig</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.memory <span class="kw">import</span> <span class="cls">IntelligentMemoryClient</span>, <span class="cls">IntelligenceConfig</span>
 
 memory = <span class="cls">IntelligentMemoryClient</span>(
     intelligence_config=<span class="cls">IntelligenceConfig</span>(
@@ -1765,7 +1765,7 @@ results = <span class="kw">await</span> memory.search(<span class="str">"user pr
   <a class="anchor" id="comp-session"></a>
   <h2>Sessions (Redis)</h2>
   <p>Short-term conversation history stored in Redis. <code>AgentRunner</code> handles loading and saving automatically — you only use <code>SessionClient</code> directly when you need to manage sessions outside a run (e.g. building a chat history UI, clearing history, debugging).</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.session <span class="kw">import</span> <span class="cls">SessionClient</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.session <span class="kw">import</span> <span class="cls">SessionClient</span>
 
 session = <span class="cls">SessionClient</span>()
 
@@ -1784,9 +1784,9 @@ messages = <span class="kw">await</span> session.get_conversation_history(sessio
   <a class="anchor" id="comp-temporal"></a>
   <h2>Temporal Integration</h2>
   <p>Build durable workflows that survive process restarts, with automatic retries and audit trails.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.temporal <span class="kw">import</span> <span class="cls">TemporalClient</span>
-<span class="kw">from</span> orchestrator.temporal.workflows <span class="kw">import</span> <span class="cls">AgentWorkflow</span>
-<span class="kw">from</span> orchestrator.temporal.types <span class="kw">import</span> <span class="cls">AgentStep</span>, <span class="cls">ApprovalStep</span>, <span class="cls">ParallelStep</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.temporal <span class="kw">import</span> <span class="cls">TemporalClient</span>
+<span class="kw">from</span> continuum.temporal.workflows <span class="kw">import</span> <span class="cls">AgentWorkflow</span>
+<span class="kw">from</span> continuum.temporal.types <span class="kw">import</span> <span class="cls">AgentStep</span>, <span class="cls">ApprovalStep</span>, <span class="cls">ParallelStep</span>
 
 steps = [
     <span class="cls">AgentStep</span>(agent_name=<span class="str">"researcher"</span>, input=<span class="str">"Analyze market trends"</span>),
@@ -1814,7 +1814,7 @@ handle = <span class="kw">await</span> client.execute_workflow(<span class="cls"
   <a class="anchor" id="comp-loop-workflow"></a>
   <h2>Loop Workflow (Temporal)</h2>
   <p>For iterative agentic work that must survive restarts, use <code>LoopAgentWorkflow</code>. The loop runs on Temporal and persists state between iterations.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.temporal.workflows <span class="kw">import</span> <span class="cls">LoopAgentWorkflow</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.temporal.workflows <span class="kw">import</span> <span class="cls">LoopAgentWorkflow</span>
 
 handle = <span class="kw">await</span> client.execute_workflow(
     <span class="cls">LoopAgentWorkflow</span>,
@@ -1895,8 +1895,8 @@ handle = <span class="kw">await</span> client.execute_workflow(
 
   <a class="anchor" id="int-azure"></a>
   <h2>Azure OpenAI</h2>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>
-<span class="kw">from</span> orchestrator.llm <span class="kw">import</span> <span class="cls">LLMConfig</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>
+<span class="kw">from</span> continuum.llm <span class="kw">import</span> <span class="cls">LLMConfig</span>
 <span class="kw">import</span> os
 
 config = <span class="cls">LLMConfig</span>(
@@ -1929,17 +1929,17 @@ LANGFUSE_HOST=http://localhost:3000</pre></div>
 
   <a class="anchor" id="int-observe"></a>
   <h2>Tracing Decorators</h2>
-  <p>Three decorators create Langfuse spans for custom functions — all imported from <code>orchestrator.observability</code>.</p>
+  <p>Three decorators create Langfuse spans for custom functions — all imported from <code>continuum.observability</code>.</p>
   <h3>@observe — generic span</h3>
   <p>Add custom spans to any async function:</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.observability <span class="kw">import</span> observe
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.observability <span class="kw">import</span> observe
 
 <span class="op">@</span><span class="fn">observe</span>(<span class="str">"preprocess_input"</span>)
 <span class="kw">async def</span> <span class="fn">preprocess</span>(text: <span class="fn">str</span>) -> <span class="fn">str</span>:
     <span class="kw">return</span> text.strip().lower()</pre></div>
 
   <h3>@trace_tool — for tool / API functions</h3>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.observability <span class="kw">import</span> trace_tool
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.observability <span class="kw">import</span> trace_tool
 
 <span class="op">@</span><span class="fn">trace_tool</span>(<span class="str">"search_products"</span>)
 <span class="kw">async def</span> <span class="fn">search_products</span>(query: <span class="fn">str</span>):
@@ -1947,7 +1947,7 @@ LANGFUSE_HOST=http://localhost:3000</pre></div>
     <span class="kw">return</span> <span class="kw">await</span> db.<span class="fn">search</span>(query)</pre></div>
 
   <h3>@trace_agent — for custom agent wrappers</h3>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.observability <span class="kw">import</span> trace_agent
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.observability <span class="kw">import</span> trace_agent
 
 <span class="op">@</span><span class="fn">trace_agent</span>(<span class="str">"my-specialist"</span>)
 <span class="kw">async def</span> <span class="fn">run_specialist</span>(input: <span class="fn">str</span>):
@@ -2088,7 +2088,7 @@ SMART_GATEWAY_DEFAULT_MODE=modest              <span class="cm"># strict | modes
   <a class="anchor" id="smart-code"></a>
   <h2>Agent code</h2>
   <p>From the agent's perspective, nothing changes. Set <code>agent_model</code> to a routing intent and optionally pick a mode.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>, <span class="cls">AgentRunner</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>, <span class="cls">AgentRunner</span>
 
 <span class="cm"># Auto-routing — gateway picks the model per turn.</span>
 agent = <span class="cls">BaseAgent</span>(
@@ -2190,7 +2190,7 @@ specialist = <span class="cls">BaseAgent</span>(name=<span class="str">"speciali
     <tr><td>NEED_TOOL fallback</td><td>—</td><td>auto</td><td>If the LLM signals a missing tool, expand the candidate set and retry</td></tr>
   </table>
 
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.tools.tool_attention.config <span class="kw">import</span> <span class="cls">ToolAttentionConfig</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.tools.tool_attention.config <span class="kw">import</span> <span class="cls">ToolAttentionConfig</span>
 
 agent = <span class="cls">BaseAgent</span>(
     name=<span class="str">"ops"</span>,
@@ -2290,7 +2290,7 @@ agent = <span class="cls">BaseAgent</span>(
   <a class="anchor" id="rs-pii"></a>
   <h2>PII filtering on memory writes</h2>
   <p>Before a memory is stored, Continuum can run it through a PII scrubber that redacts emails, phone numbers, SSNs, and credit cards. Configure via the memory client:</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.memory <span class="kw">import</span> <span class="cls">MemoryClient</span>, <span class="cls">PIIPolicy</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.memory <span class="kw">import</span> <span class="cls">MemoryClient</span>, <span class="cls">PIIPolicy</span>
 
 memory = <span class="cls">MemoryClient</span>(pii_policy=<span class="cls">PIIPolicy</span>.REDACT)</pre></div>
 
@@ -2313,8 +2313,8 @@ memory = <span class="cls">MemoryClient</span>(pii_policy=<span class="cls">PIIP
 
   <a class="anchor" id="rs-golden"></a>
   <h2>Golden datasets from Langfuse</h2>
-  <p>Build regression test sets directly from production traces. The <code>orchestrator.evaluation.golden</code> module pulls traces matching a filter (e.g. tagged <code>good_response</code> in the Langfuse UI) and materialises them as a pytest dataset.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> orchestrator.evaluation <span class="kw">import</span> <span class="fn">build_golden_dataset</span>
+  <p>Build regression test sets directly from production traces. The <code>continuum.evaluation.golden</code> module pulls traces matching a filter (e.g. tagged <code>good_response</code> in the Langfuse UI) and materialises them as a pytest dataset.</p>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.evaluation <span class="kw">import</span> <span class="fn">build_golden_dataset</span>
 
 dataset = <span class="kw">await</span> <span class="fn">build_golden_dataset</span>(
     project=<span class="str">"shop-assistant"</span>,
@@ -2454,10 +2454,10 @@ _carts: <span class="cls">dict</span>[<span class="cls">str</span>, <span class=
   <h2>5 · Agent + config</h2>
   <p>The agent connects to the MCP server, defines memory + session policy, and uses Smart Inference auto-routing.</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># playground/gateway-local-shop/agent.py (excerpt)</span>
-<span class="kw">from</span> orchestrator <span class="kw">import</span> <span class="cls">AgentConfig</span>, <span class="cls">AgentMemoryConfig</span>, <span class="cls">AgentMemoryScope</span>, \\
+<span class="kw">from</span> continuum <span class="kw">import</span> <span class="cls">AgentConfig</span>, <span class="cls">AgentMemoryConfig</span>, <span class="cls">AgentMemoryScope</span>, \\
     <span class="cls">AgentRunner</span>, <span class="cls">BaseAgent</span>, <span class="cls">MCPServerStreamableHttp</span>, <span class="cls">ToolExecutor</span>
-<span class="kw">from</span> orchestrator.tools.tool_attention.config <span class="kw">import</span> <span class="cls">ToolAttentionConfig</span>
-<span class="kw">from</span> orchestrator.tools.types <span class="kw">import</span> <span class="cls">ToolContextConfig</span>, <span class="cls">ToolContextVariable</span>
+<span class="kw">from</span> continuum.tools.tool_attention.config <span class="kw">import</span> <span class="cls">ToolAttentionConfig</span>
+<span class="kw">from</span> continuum.tools.types <span class="kw">import</span> <span class="cls">ToolContextConfig</span>, <span class="cls">ToolContextVariable</span>
 
 mcp_server = <span class="cls">MCPServerStreamableHttp</span>(
     params={<span class="str">"url"</span>: <span class="str">"http://localhost:8888/mcp"</span>},

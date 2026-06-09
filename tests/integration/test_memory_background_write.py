@@ -16,11 +16,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orchestrator.core.container import Container, ContainerConfig
-from orchestrator.llm.types import ChatMessage
-from orchestrator.session.client import SessionClient
-from orchestrator.session.config import SessionConfig
-from orchestrator.session.types import SessionMetadata
+from continuum.core.container import Container, ContainerConfig
+from continuum.llm.types import ChatMessage
+from continuum.session.client import SessionClient
+from continuum.session.config import SessionConfig
+from continuum.session.types import SessionMetadata
 
 pytestmark = pytest.mark.integration
 
@@ -65,7 +65,7 @@ class TestContainerWiring:
         )
         try:
             with patch(
-                "orchestrator.session.providers.create_provider",
+                "continuum.session.providers.create_provider",
                 return_value=_mock_provider(),
             ):
                 session_client = container.session_client

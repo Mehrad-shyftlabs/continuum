@@ -37,11 +37,11 @@ from unittest.mock import AsyncMock, MagicMock
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from orchestrator.core.background_tasks import BackgroundTaskRegistry  # noqa: E402
-from orchestrator.llm.types import ChatMessage  # noqa: E402
-from orchestrator.session.client import SessionClient  # noqa: E402
-from orchestrator.session.config import SessionConfig  # noqa: E402
-from orchestrator.session.types import SessionMetadata  # noqa: E402
+from continuum.core.background_tasks import BackgroundTaskRegistry  # noqa: E402
+from continuum.llm.types import ChatMessage  # noqa: E402
+from continuum.session.client import SessionClient  # noqa: E402
+from continuum.session.config import SessionConfig  # noqa: E402
+from continuum.session.types import SessionMetadata  # noqa: E402
 
 
 def _metadata(session_id: str = "bench-session") -> SessionMetadata:

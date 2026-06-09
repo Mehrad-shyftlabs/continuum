@@ -4,7 +4,7 @@ The Temporal integration ships **one general workflow** (`AgentWorkflow`)
 that interprets a declarative step list, plus three convenience
 workflows for common shapes.
 
-`from orchestrator.temporal import (
+`from continuum.temporal import (
     AgentWorkflow, SequentialAgentWorkflow,
     ParallelAgentWorkflow, LoopAgentWorkflow,
     AgentStep, ApprovalStep, ParallelStep, ConditionalStep, WaitStep,
@@ -164,8 +164,8 @@ Convenience workflow: run a list of agents in sequence, optionally with
 approval gates between steps.
 
 ```python
-from orchestrator.temporal import SequentialAgentWorkflow
-from orchestrator.temporal.workflows.sequential_workflow import SequentialWorkflowInput
+from continuum.temporal import SequentialAgentWorkflow
+from continuum.temporal.workflows.sequential_workflow import SequentialWorkflowInput
 
 input_data = SequentialWorkflowInput(
     agent_names=["researcher", "writer", "editor"],
@@ -188,8 +188,8 @@ Signals: `submit_approval`, `cancel_workflow`. Queries: `get_status`,
 Run a list of agents concurrently against the same input.
 
 ```python
-from orchestrator.temporal import ParallelAgentWorkflow
-from orchestrator.temporal.workflows.parallel_workflow import ParallelWorkflowInput
+from continuum.temporal import ParallelAgentWorkflow
+from continuum.temporal.workflows.parallel_workflow import ParallelWorkflowInput
 
 input_data = ParallelWorkflowInput(
     agent_names=["seo_critic", "legal_critic", "tone_critic"],
@@ -209,8 +209,8 @@ Signal: `cancel_workflow`. Query: `get_status`.
 Run one agent in a loop until it emits a termination phrase.
 
 ```python
-from orchestrator.temporal import LoopAgentWorkflow
-from orchestrator.temporal.workflows.loop_workflow import LoopWorkflowInput
+from continuum.temporal import LoopAgentWorkflow
+from continuum.temporal.workflows.loop_workflow import LoopWorkflowInput
 
 input_data = LoopWorkflowInput(
     agent_name="reviser",

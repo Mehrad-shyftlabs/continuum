@@ -31,8 +31,8 @@ The SDK exposes **two memory layers** that are independently controllable per-ag
 Configured per-agent via `AgentMemoryConfig`:
 
 ```python
-from orchestrator.agent.config import AgentMemoryConfig, AgentConfig
-from orchestrator.agent.types import MemoryScope
+from continuum.agent.config import AgentMemoryConfig, AgentConfig
+from continuum.agent.types import MemoryScope
 
 agent_config = AgentConfig(
     memory=AgentMemoryConfig(

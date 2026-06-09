@@ -8,13 +8,13 @@ from __future__ import annotations
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from orchestrator.agent.types import AgentResponse, ResponseStatus, RunState
-from orchestrator.agent.utils.context_utils import create_run_context
+from continuum.agent.types import AgentResponse, ResponseStatus, RunState
+from continuum.agent.utils.context_utils import create_run_context
 
 
 def _make_agent(name="finalizer-agent", log_to_session=True):
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
 
     return BaseAgent(
         name=name,
@@ -25,10 +25,10 @@ def _make_agent(name="finalizer-agent", log_to_session=True):
 
 
 def _make_finalizer(save_messages_mock=None):
-    from orchestrator.agent.execution.run_finalizer import RunFinalizer
-    from orchestrator.agent.execution.run_lifecycle import RunLifecycle
-    from orchestrator.agent.services.context_service import ContextService
-    from orchestrator.agent.services.session_service import SessionService
+    from continuum.agent.execution.run_finalizer import RunFinalizer
+    from continuum.agent.execution.run_lifecycle import RunLifecycle
+    from continuum.agent.services.context_service import ContextService
+    from continuum.agent.services.session_service import SessionService
 
     sess_svc = MagicMock(spec=SessionService)
     sess_svc.save_messages = save_messages_mock or AsyncMock()
@@ -83,7 +83,7 @@ class TestUserMessageIndexPassthrough:
         ]
 
         with patch(
-            "orchestrator.observability.metrics.get_metrics_collector",
+            "continuum.observability.metrics.get_metrics_collector",
             return_value=MagicMock(
                 record_latency=MagicMock(),
                 track_tokens=MagicMock(),
@@ -104,7 +104,7 @@ class TestUserMessageIndexPassthrough:
         messages = [{"role": "user", "content": "q"}, {"role": "assistant", "content": "a"}]
 
         with patch(
-            "orchestrator.observability.metrics.get_metrics_collector",
+            "continuum.observability.metrics.get_metrics_collector",
             return_value=MagicMock(
                 record_latency=MagicMock(),
                 track_tokens=MagicMock(),
@@ -125,7 +125,7 @@ class TestSaveSessionDataGuards:
         response = _make_response()
 
         with patch(
-            "orchestrator.observability.metrics.get_metrics_collector",
+            "continuum.observability.metrics.get_metrics_collector",
             return_value=MagicMock(
                 record_latency=MagicMock(),
                 track_tokens=MagicMock(),
@@ -143,7 +143,7 @@ class TestSaveSessionDataGuards:
         response = _make_response()
 
         with patch(
-            "orchestrator.observability.metrics.get_metrics_collector",
+            "continuum.observability.metrics.get_metrics_collector",
             return_value=MagicMock(
                 record_latency=MagicMock(),
                 track_tokens=MagicMock(),
@@ -161,7 +161,7 @@ class TestSaveSessionDataGuards:
         response = _make_response()
 
         with patch(
-            "orchestrator.observability.metrics.get_metrics_collector",
+            "continuum.observability.metrics.get_metrics_collector",
             return_value=MagicMock(
                 record_latency=MagicMock(),
                 track_tokens=MagicMock(),

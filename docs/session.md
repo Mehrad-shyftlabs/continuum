@@ -10,8 +10,8 @@ automatically when you pass a `session_id` — most app code never calls
 ## 1 · Quick start
 
 ```python
-from orchestrator.session import SessionClient
-from orchestrator.llm.types import ChatMessage
+from continuum.session import SessionClient
+from continuum.llm.types import ChatMessage
 
 client = SessionClient()                                     # uses env defaults
 sid = await client.get_or_create_session(
@@ -31,7 +31,7 @@ history: list[ChatMessage] = await client.get_conversation_history(sid)
 
 ## 2 · `SessionClient`
 
-`from orchestrator.session import SessionClient`
+`from continuum.session import SessionClient`
 
 ```python
 SessionClient(
@@ -72,10 +72,10 @@ All public methods are async and decorated with `@observe` for tracing.
 ### Global helpers
 
 ```python
-from orchestrator.session import (
+from continuum.session import (
     initialize_global_session_client, get_global_session_client,
 )
-from orchestrator.session.client import reset_global_session
+from continuum.session.client import reset_global_session
 
 initialize_global_session_client()                # bool
 client = get_global_session_client()              # singleton, lazy
@@ -86,7 +86,7 @@ reset_global_session()                            # for tests
 
 ## 3 · `SessionConfig`
 
-`from orchestrator.session import SessionConfig`
+`from continuum.session import SessionConfig`
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -112,7 +112,7 @@ Methods:
 
 ## 4 · Types
 
-`from orchestrator.session import (
+`from continuum.session import (
     Session, SessionMetadata, SessionMessage, generate_session_id,
 )`
 
@@ -163,7 +163,7 @@ Qdrant.
 
 ## 6 · Provider system
 
-`from orchestrator.session import (
+`from continuum.session import (
     BaseSessionProvider, register_provider, create_provider,
     get_provider_class, list_providers,
 )`
@@ -186,7 +186,7 @@ built-in `RedisSessionProvider` implements this with:
 To swap in a custom provider:
 
 ```python
-from orchestrator.session import register_provider, SessionClient, SessionConfig
+from continuum.session import register_provider, SessionClient, SessionConfig
 
 class MyProvider(BaseSessionProvider):
     @property
@@ -203,7 +203,7 @@ client = SessionClient(SessionConfig(provider="my"))
 
 ## 7 · Exceptions
 
-`from orchestrator.session import (
+`from continuum.session import (
     SessionError, SessionConfigurationError, SessionNotEnabledError,
     SessionConnectionError, SessionNotFoundError, SessionMessageLimitError,
 )`
@@ -217,7 +217,7 @@ Constructors share a common shape `(message, session_id=None, original_error=Non
 ### Add a system event without a user message
 
 ```python
-from orchestrator.llm.types import ChatMessage
+from continuum.llm.types import ChatMessage
 await client.add_message(
     sid,
     ChatMessage(role="system", content="User upgraded to Pro tier."),

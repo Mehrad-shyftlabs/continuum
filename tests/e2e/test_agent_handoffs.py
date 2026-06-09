@@ -28,10 +28,10 @@ class TestAgentHandoff:
         """Router agent should hand off to the appropriate specialist."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent, Handoff
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent, Handoff
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         mem_config = AgentMemoryConfig(search_memories=False, store_memories=False)
         base_config = AgentConfig(log_to_session=False, max_turns=5)
@@ -119,10 +119,10 @@ class TestHandoffHistoryTransfer:
         """Specialist agent should have context from the router conversation."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent, Handoff
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent, Handoff
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         mem_config = AgentMemoryConfig(search_memories=False, store_memories=False)
 
@@ -190,10 +190,10 @@ class TestHandoffTracking:
         """agents_used should list all agents that participated."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent, Handoff
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent, Handoff
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         mem_config = AgentMemoryConfig(search_memories=False, store_memories=False)
 

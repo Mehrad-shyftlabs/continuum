@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 
 def _make_service(add_message_mock=None):
-    from orchestrator.agent.services.session_service import SessionService
+    from continuum.agent.services.session_service import SessionService
 
     sc = MagicMock()
     sc.is_enabled = True
@@ -17,8 +17,8 @@ def _make_service(add_message_mock=None):
 
 
 def _make_agent(name="agent-a", store_memories=False):
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
 
     return BaseAgent(
         name=name,
@@ -139,7 +139,7 @@ class TestToolExecutionSummary:
 
 class TestSessionDisabled:
     async def test_noop_when_session_disabled(self):
-        from orchestrator.agent.services.session_service import SessionService
+        from continuum.agent.services.session_service import SessionService
 
         sc = MagicMock()
         sc.is_enabled = False
@@ -151,7 +151,7 @@ class TestSessionDisabled:
         sc.add_message.assert_not_called()
 
     async def test_noop_when_no_session_client(self):
-        from orchestrator.agent.services.session_service import SessionService
+        from continuum.agent.services.session_service import SessionService
 
         svc = SessionService(session_client=None)
         agent = _make_agent()
@@ -161,7 +161,7 @@ class TestSessionDisabled:
 
 class TestHistoryDefaultLimit:
     async def test_get_conversation_history_default_limit_is_20(self):
-        from orchestrator.agent.services.session_service import SessionService
+        from continuum.agent.services.session_service import SessionService
 
         sc = MagicMock()
         sc.is_enabled = True
@@ -172,7 +172,7 @@ class TestHistoryDefaultLimit:
         sc.get_conversation_history.assert_called_once_with("sess-1", limit=20)
 
     async def test_get_conversation_history_custom_limit(self):
-        from orchestrator.agent.services.session_service import SessionService
+        from continuum.agent.services.session_service import SessionService
 
         sc = MagicMock()
         sc.is_enabled = True

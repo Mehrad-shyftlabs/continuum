@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from agent import create_shop_agent
 
-from orchestrator import LogLevel, setup_logging
+from continuum import LogLevel, setup_logging
 
 
 def print_help():

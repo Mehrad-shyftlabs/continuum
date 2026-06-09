@@ -38,13 +38,13 @@ output: NEED_TOOL:<tool_name>
 A semantic search using Milvus embeddings matches the current user query against tool descriptions. The top-k most relevant tools are "promoted" — their full schemas are sent to the LLM as callable tools. The LLM can only make tool calls for promoted tools.
 
 **Files involved:**
-- `src/orchestrator/tools/tool_attention/config.py` — `ToolAttentionConfig` dataclass
-- `src/orchestrator/tools/tool_attention/registry.py` — `ToolSummaryRegistry`, manages Milvus collection, upserts tool embeddings, runs semantic search
-- `src/orchestrator/tools/tool_attention/router.py` — `ToolAttentionRouter`, orchestrates Phase 1 + Phase 2; `apply_tool_attention()` is the public entry point
-- `src/orchestrator/agent/execution/message_builder.py` — calls `apply_tool_attention()`, stores result in `context.metadata["_filtered_tools"]` and Phase 1 summary in `context.metadata["tool_summary_message"]`
-- `src/orchestrator/agent/execution/executor.py` — reads `_filtered_tools` from metadata, passes them to the LLM; detects `NEED_TOOL:` signal and expands tool set on fallback
-- `src/orchestrator/agent/runner.py` — same as executor, for the streaming path
-- `src/orchestrator/agent/services/tool_service.py` — hallucination gate: blocks tool calls for tools not in `promoted_tools` set
+- `src/continuum/tools/tool_attention/config.py` — `ToolAttentionConfig` dataclass
+- `src/continuum/tools/tool_attention/registry.py` — `ToolSummaryRegistry`, manages Milvus collection, upserts tool embeddings, runs semantic search
+- `src/continuum/tools/tool_attention/router.py` — `ToolAttentionRouter`, orchestrates Phase 1 + Phase 2; `apply_tool_attention()` is the public entry point
+- `src/continuum/agent/execution/message_builder.py` — calls `apply_tool_attention()`, stores result in `context.metadata["_filtered_tools"]` and Phase 1 summary in `context.metadata["tool_summary_message"]`
+- `src/continuum/agent/execution/executor.py` — reads `_filtered_tools` from metadata, passes them to the LLM; detects `NEED_TOOL:` signal and expands tool set on fallback
+- `src/continuum/agent/runner.py` — same as executor, for the streaming path
+- `src/continuum/agent/services/tool_service.py` — hallucination gate: blocks tool calls for tools not in `promoted_tools` set
 
 ### NEED_TOOL Fallback
 
@@ -59,8 +59,8 @@ If the LLM needs a tool whose full schema was not promoted (parameters not avail
 Add `tool_attention` to `AgentConfig`:
 
 ```python
-from orchestrator.agent.config import AgentConfig
-from orchestrator.tools.tool_attention.config import ToolAttentionConfig
+from continuum.agent.config import AgentConfig
+from continuum.tools.tool_attention.config import ToolAttentionConfig
 
 agent = BaseAgent(
     ...

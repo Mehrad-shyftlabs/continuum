@@ -13,7 +13,7 @@ What you get:
 - Async-safe context propagation via `contextvars`
 - A provider registry pattern for plugging in additional backends
 
-`from orchestrator.observability import (
+`from continuum.observability import (
     ObservabilityConfig, TracingManager, Trace, Span, GenerationSpan, SpanLevel,
     observe, trace_tool, trace_agent, ObservationContext,
     MetricsCollector, get_metrics_collector,
@@ -35,7 +35,7 @@ run is traced automatically.
 To trace your own functions:
 
 ```python
-from orchestrator.observability import observe
+from continuum.observability import observe
 
 @observe(name="my-pipeline", capture_output=True)
 async def run_pipeline(data):
@@ -49,7 +49,7 @@ tracing call no-ops.
 
 ## 2 · `ObservabilityConfig`
 
-`from orchestrator.observability import ObservabilityConfig`
+`from continuum.observability import ObservabilityConfig`
 
 A pydantic model. Defaults read from the global `Settings`.
 
@@ -116,7 +116,7 @@ with mgr.trace(name="customer-flow",
 
 ## 4 · Decorators
 
-`from orchestrator.observability import observe, trace_tool, trace_agent, ObservationContext`
+`from continuum.observability import observe, trace_tool, trace_agent, ObservationContext`
 
 ### `@observe`
 
@@ -172,7 +172,7 @@ with ObservationContext(name="pipeline.stage-3", metadata={"v": 2}) as obs:
 
 ## 5 · Trace context (async-safe)
 
-`from orchestrator.observability import (
+`from continuum.observability import (
     set_trace_context, restore_trace_context, clear_trace_context,
     get_current_trace_id, get_current_span_id,
     get_current_user_id, get_current_session_id,
@@ -206,7 +206,7 @@ is **10 KB** per field.
 
 ## 6 · Metrics
 
-`from orchestrator.observability import (
+`from continuum.observability import (
     MetricsCollector, get_metrics_collector, get_metrics_summary,
     initialize_metrics_collector, reset_metrics,
 )`
@@ -251,7 +251,7 @@ summary = get_metrics_summary()
 
 ## 7 · Error reporting
 
-`from orchestrator.observability import (
+`from continuum.observability import (
     ErrorReporter, ErrorReportingContext,
     get_error_reporter, report_error, report_exception,
     enable_error_reporting, disable_error_reporting, flush_errors,
@@ -281,7 +281,7 @@ The reporter has a thread-safe queue (`maxlen=1000`) and an
 
 ## 8 · Provider system
 
-`from orchestrator.observability import (
+`from continuum.observability import (
     ObservabilityProvider, ProviderCapabilities, ProviderManager,
     ProviderRegistry, LangfuseProvider,
     get_provider, get_provider_manager, get_provider_registry, register_provider,
@@ -322,7 +322,7 @@ fan out; the first non-None result is returned.
 ### Initialization
 
 ```python
-from orchestrator.observability import initialize_observability, ObservabilityConfig
+from continuum.observability import initialize_observability, ObservabilityConfig
 
 mgr = initialize_observability(ObservabilityConfig(providers=["langfuse"]))
 print(is_initialized())          # True
@@ -363,7 +363,7 @@ with get_metrics_collector().track_latency("rag.retrieve") as m:
 ### Scope a block to specific trace context
 
 ```python
-from orchestrator.observability import set_trace_context, restore_trace_context
+from continuum.observability import set_trace_context, restore_trace_context
 
 token = set_trace_context(trace_id=tid, user_id="u1", session_id="s1")
 try:

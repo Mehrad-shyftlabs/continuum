@@ -12,7 +12,7 @@ The "plumbing" layer. The core module owns:
 - **`ContextManager`** — async-safe execution-context propagation
   via `contextvars`.
 
-`from orchestrator.core import (
+`from continuum.core import (
     Container, ContainerConfig, get_container, reset_container,
     OrchestratorLifecycle, get_lifecycle_manager,
     initialize_orchestrator, shutdown_orchestrator,
@@ -26,7 +26,7 @@ The "plumbing" layer. The core module owns:
 ## 1 · Quick start
 
 ```python
-from orchestrator.core.lifecycle import get_lifecycle_manager
+from continuum.core.lifecycle import get_lifecycle_manager
 
 async def main():
     lifecycle = get_lifecycle_manager()
@@ -49,7 +49,7 @@ async with get_lifecycle_manager() as lifecycle:
 
 ## 2 · `Container` (Dependency Injection)
 
-`from orchestrator.core.container import Container, ContainerConfig, get_container, reset_container`
+`from continuum.core.container import Container, ContainerConfig, get_container, reset_container`
 
 A **thread-safe singleton** that lazily initializes every shared client
 on first access. `AgentRunner()` reaches for it when no container is
@@ -103,7 +103,7 @@ setter accepts the concrete class **or** the matching protocol
 ### Global access
 
 ```python
-from orchestrator.core.container import get_container, reset_container
+from continuum.core.container import get_container, reset_container
 
 container = get_container()                       # default singleton
 container = get_container(config=ContainerConfig(enable_memory=False))   # first call only
@@ -114,7 +114,7 @@ reset_container()                                 # tests
 
 ## 3 · `OrchestratorLifecycle`
 
-`from orchestrator.core.lifecycle import OrchestratorLifecycle, get_lifecycle_manager`
+`from continuum.core.lifecycle import OrchestratorLifecycle, get_lifecycle_manager`
 
 ```python
 lifecycle = OrchestratorLifecycle(
@@ -167,7 +167,7 @@ result = await lifecycle.initialize()
 ### Convenience module-level functions
 
 ```python
-from orchestrator.core.lifecycle import (
+from continuum.core.lifecycle import (
     initialize_orchestrator, shutdown_orchestrator, validate_configuration,
 )
 
@@ -179,13 +179,13 @@ errors, warnings = validate_configuration()       # both list[ConfigurationError
 
 `ConfigurationError` here is a **dataclass** (`field`, `message`,
 `severity`) — distinct from the *exception* of the same name in
-`orchestrator.exceptions`.
+`continuum.exceptions`.
 
 ---
 
 ## 4 · Health checks
 
-`from orchestrator.core.health import (
+`from continuum.core.health import (
     HealthCheck, HealthCheckResult, HealthStatus, OverallHealthResult,
     get_health_checker, check_all_health,
 )`
@@ -239,7 +239,7 @@ get_health_checker().register_check("my_api", check_my_api)
 
 ## 5 · Execution context
 
-`from orchestrator.core.context import (
+`from continuum.core.context import (
     ContextManager, ExecutionContext, ContextScope, ContextToken,
     get_context_manager, get_current_context,
     get_trace_id, get_span_id, get_user_id, get_session_id,
@@ -264,7 +264,7 @@ with mgr.context(trace_id="abc", user_id="u1") as ctx:
 
 ## 6 · Protocols
 
-`from orchestrator.protocols import ILLMClient, IMemoryClient, ISessionClient`
+`from continuum.protocols import ILLMClient, IMemoryClient, ISessionClient`
 
 Runtime-checkable protocols for swapping in mocks or custom clients
 without inheriting from the framework's classes.
@@ -280,7 +280,7 @@ corresponding protocol.
 
 ## 7 · `Settings` & environment
 
-`from orchestrator.config import settings, Settings, get_settings`
+`from continuum.config import settings, Settings, get_settings`
 
 A pydantic-settings `BaseSettings`. See [`installation.md`](installation.md)
 for the full env-var reference.
@@ -293,7 +293,7 @@ for the full env-var reference.
 
 ## 8 · Exception model
 
-`from orchestrator.exceptions import (
+`from continuum.exceptions import (
     OrchestratorError, ConfigurationError, ValidationError,
     ObservabilityError, LangfuseError, TracingError,
     NetworkError, ProviderError,
@@ -336,7 +336,7 @@ runner = AgentRunner(container=container)
 ```python
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from orchestrator.core.lifecycle import OrchestratorLifecycle
+from continuum.core.lifecycle import OrchestratorLifecycle
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -377,6 +377,6 @@ if not result.success:
   `container.shutdown()` does *not* close Redis or flush Langfuse — set
   `False` if your app is the sole owner.
 - **`ConfigurationError`** exists twice: data class in `core.lifecycle`,
-  exception in `orchestrator.exceptions`.
+  exception in `continuum.exceptions`.
 - **`auto_initialize=False`** containers won't connect to anything until
   you call `initialize_all()` or set every client by hand.

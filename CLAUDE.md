@@ -51,7 +51,7 @@ pytest
 ruff check .
 
 # Type-check
-mypy src/orchestrator
+mypy src/continuum
 ```
 
 - ALWAYS run tests after making code changes

@@ -31,13 +31,13 @@ from agents.voice import make_crm_lookup_agent, make_voice_agent
 from config import LeadFlowConfig, default_config
 from tools.mock_twilio import FakeTwilioMCP
 
-from orchestrator import AgentRunner, RunnerConfig
-from orchestrator.temporal.client import TemporalClient
-from orchestrator.temporal.registry import AgentRegistry, get_agent_registry
-from orchestrator.temporal.worker import WorkerManager
+from continuum import AgentRunner, RunnerConfig
+from continuum.temporal.client import TemporalClient
+from continuum.temporal.registry import AgentRegistry, get_agent_registry
+from continuum.temporal.worker import WorkerManager
 
 try:
-    from orchestrator import MCPUtil, ToolExecutor
+    from continuum import MCPUtil, ToolExecutor
 except ImportError:
     MCPUtil = None  # type: ignore
     ToolExecutor = None  # type: ignore

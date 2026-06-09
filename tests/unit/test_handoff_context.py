@@ -8,13 +8,13 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from orchestrator.agent.types import AgentResponse, ResponseStatus, RunState
-from orchestrator.agent.utils.context_utils import create_run_context
+from continuum.agent.types import AgentResponse, ResponseStatus, RunState
+from continuum.agent.utils.context_utils import create_run_context
 
 
 def _make_agent(name="agent-a"):
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
 
     return BaseAgent(
         name=name,
@@ -40,8 +40,8 @@ def _make_run_state(source_agent_name="agent-a"):
 
 def _make_executor(target_agent=None, captured_contexts=None):
     """Build a HandoffExecutor that captures the target RunContext."""
-    from orchestrator.agent.execution.handoff_executor import HandoffExecutor
-    from orchestrator.agent.handoff.manager import HandoffManager
+    from continuum.agent.execution.handoff_executor import HandoffExecutor
+    from continuum.agent.handoff.manager import HandoffManager
 
     hm = MagicMock(spec=HandoffManager)
     hm._max_depth = 10
@@ -88,7 +88,7 @@ class TestHandoffSetsIsHandoffFlag:
         rs = _make_run_state("agent-a")
         tc = _make_tool_call("agent-b")
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             result = await he.execute_handoff(source, "agent-b", tc, [], ctx, rs)
 
         assert result.success is True
@@ -106,7 +106,7 @@ class TestHandoffSetsIsHandoffFlag:
         rs = _make_run_state("agent-a")
         tc = _make_tool_call("agent-b")
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             await he.execute_handoff(source, "agent-b", tc, [], ctx, rs)
 
         # Original context must not be mutated
@@ -123,7 +123,7 @@ class TestHandoffPreservesConversationId:
         rs = _make_run_state("agent-a")
         tc = _make_tool_call("agent-b")
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             await he.execute_handoff(source, "agent-b", tc, [], ctx, rs)
 
         assert captured[0].conversation_id == "conv-999"
@@ -137,7 +137,7 @@ class TestHandoffPreservesConversationId:
         rs = _make_run_state("agent-a")
         tc = _make_tool_call("agent-b")
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             await he.execute_handoff(source, "agent-b", tc, [], ctx, rs)
 
         assert captured[0].conversation_id is None
@@ -151,7 +151,7 @@ class TestHandoffPreservesConversationId:
         rs = _make_run_state("agent-a")
         tc = _make_tool_call("agent-b")
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             await he.execute_handoff(source, "agent-b", tc, [], ctx, rs)
 
         assert captured[0].session_id == "sess-abc"
@@ -159,8 +159,8 @@ class TestHandoffPreservesConversationId:
 
 class TestHandoffFailures:
     async def test_returns_failure_when_target_not_registered(self):
-        from orchestrator.agent.execution.handoff_executor import HandoffExecutor
-        from orchestrator.agent.handoff.manager import HandoffManager
+        from continuum.agent.execution.handoff_executor import HandoffExecutor
+        from continuum.agent.handoff.manager import HandoffManager
 
         hm = MagicMock(spec=HandoffManager)
         hm._max_depth = 10
@@ -175,7 +175,7 @@ class TestHandoffFailures:
         rs = _make_run_state("agent-a")
         tc = _make_tool_call("agent-b")
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             result = await he.execute_handoff(source, "agent-b", tc, [], ctx, rs)
 
         assert result.success is False

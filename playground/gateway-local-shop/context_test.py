@@ -27,7 +27,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
-from orchestrator import (
+from continuum import (
     CompressionStrategy,
     ContextManagementConfig,
     LogLevel,
@@ -56,7 +56,7 @@ class _CompressionCapture(logging.Handler):
             )
 
 
-logging.getLogger("orchestrator.llm.context_management").addHandler(_CompressionCapture())
+logging.getLogger("continuum.llm.context_management").addHandler(_CompressionCapture())
 
 # ── Context management config ───────────────────────────────────────────────────
 

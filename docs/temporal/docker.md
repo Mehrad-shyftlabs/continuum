@@ -87,7 +87,7 @@ use it.
 ## Health check
 
 ```python
-from orchestrator.core.health import check_all_health
+from continuum.core.health import check_all_health
 result = await check_all_health()
 print(result.to_dict()["temporal"])
 ```

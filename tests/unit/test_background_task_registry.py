@@ -11,7 +11,7 @@ import asyncio
 
 
 def _make_registry():
-    from orchestrator.core.background_tasks import BackgroundTaskRegistry
+    from continuum.core.background_tasks import BackgroundTaskRegistry
 
     return BackgroundTaskRegistry(name="test")
 

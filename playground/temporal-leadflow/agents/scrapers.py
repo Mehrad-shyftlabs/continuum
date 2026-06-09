@@ -9,7 +9,7 @@ enable actual browser scraping with no code changes.
 
 from __future__ import annotations
 
-from orchestrator import AgentConfig, AgentMemoryConfig, BaseAgent
+from continuum import AgentConfig, AgentMemoryConfig, BaseAgent
 
 _NO_MEMORY = AgentMemoryConfig(search_memories=False, store_memories=False)
 

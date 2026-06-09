@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from schemas import RankedLeadList
 
-from orchestrator import AgentConfig, AgentMemoryConfig, BaseAgent
+from continuum import AgentConfig, AgentMemoryConfig, BaseAgent
 
 _NO_MEMORY = AgentMemoryConfig(search_memories=False, store_memories=False)
 

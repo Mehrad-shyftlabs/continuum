@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orchestrator.agent.types import AgentResponse, FailStrategy, MergeStrategy, ResponseStatus
-from orchestrator.agent.workflow.dag import DAGAgent, DAGCycleError, DAGStageError, create_dag_agent
+from continuum.agent.types import AgentResponse, FailStrategy, MergeStrategy, ResponseStatus
+from continuum.agent.workflow.dag import DAGAgent, DAGCycleError, DAGStageError, create_dag_agent
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -31,8 +31,8 @@ def _mock_response(content: str) -> AgentResponse:
 
 
 def _make_agent(name: str):
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
 
     return BaseAgent(
         name=name,
@@ -60,11 +60,11 @@ def _patch_span():
     mock_span.set_error = MagicMock()
     mock_span.__aenter__ = AsyncMock(return_value=mock_span)
     mock_span.__aexit__ = AsyncMock(return_value=False)
-    return patch("orchestrator.observability.trace_context.SpanScope", return_value=mock_span)
+    return patch("continuum.observability.trace_context.SpanScope", return_value=mock_span)
 
 
 def _make_context():
-    from orchestrator.agent.types import RunContext
+    from continuum.agent.types import RunContext
 
     return RunContext(run_id="test-run")
 
@@ -101,7 +101,7 @@ class TestDAGConstruction:
             dag._validate_no_cycles()
 
     def test_no_stages_raises_on_execute(self):
-        from orchestrator.agent.exceptions import AgentConfigurationError
+        from continuum.agent.exceptions import AgentConfigurationError
 
         dag = DAGAgent(name="dag")
         runner = MagicMock()

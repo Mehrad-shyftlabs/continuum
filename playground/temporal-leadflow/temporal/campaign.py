@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from config import LeadFlowConfig, default_config
 
-from orchestrator.temporal.types import (
+from continuum.temporal.types import (
     AgentStep,
     ApprovalStep,
     ParallelStep,

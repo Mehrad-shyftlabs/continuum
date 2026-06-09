@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from orchestrator.tools.mcp import FunctionTool, MCPServerFunction, function_tool
+from continuum.tools.mcp import FunctionTool, MCPServerFunction, function_tool
 
 # ---------------------------------------------------------------------------
 # @function_tool decorator — schema generation
@@ -143,7 +143,7 @@ class TestMCPServerFunction:
 
     @pytest.mark.asyncio
     async def test_call_tool_unknown_raises(self, server):
-        from orchestrator.tools.mcp import MCPError
+        from continuum.tools.mcp import MCPError
 
         with pytest.raises(MCPError):
             await server.call_tool("nonexistent", {})

@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orchestrator.llm.client import LLMClient
-from orchestrator.llm.types import ChatMessage, LLMResponse
+from continuum.llm.client import LLMClient
+from continuum.llm.types import ChatMessage, LLMResponse
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class TestLLMClientInit:
 
     def test_custom_config(self):
         logger.info("LLMClientInit: custom config")
-        from orchestrator.llm.config import LLMConfig
+        from continuum.llm.config import LLMConfig
 
         config = LLMConfig(model="gpt-4", temperature=0.5)
         client = LLMClient(config=config)
@@ -82,11 +82,11 @@ def _make_mock_response(content="Hello!", has_tool_calls=False):
 
 class TestLLMClientChat:
     @pytest.mark.asyncio
-    @patch("orchestrator.llm.client.setup_langfuse")
-    @patch("orchestrator.llm.client.get_provider")
+    @patch("continuum.llm.client.setup_langfuse")
+    @patch("continuum.llm.client.get_provider")
     async def test_chat_basic(self, mock_get_provider, mock_setup):
         logger.info("LLMClientChat: chat basic")
-        from orchestrator.llm.types import Usage
+        from continuum.llm.types import Usage
 
         mock_provider = MagicMock()
         mock_provider.acomplete = AsyncMock(
@@ -105,11 +105,11 @@ class TestLLMClientChat:
         assert result.content == "Hello!"
 
     @pytest.mark.asyncio
-    @patch("orchestrator.llm.client.setup_langfuse")
-    @patch("orchestrator.llm.client.get_provider")
+    @patch("continuum.llm.client.setup_langfuse")
+    @patch("continuum.llm.client.get_provider")
     async def test_chat_with_model_override(self, mock_get_provider, mock_setup):
         logger.info("LLMClientChat: chat with model override")
-        from orchestrator.llm.types import Usage
+        from continuum.llm.types import Usage
 
         mock_provider = MagicMock()
         mock_provider.acomplete = AsyncMock(
@@ -127,8 +127,8 @@ class TestLLMClientChat:
         assert result.content == "response"
 
     @pytest.mark.asyncio
-    @patch("orchestrator.llm.client.setup_langfuse")
-    @patch("orchestrator.llm.client.get_provider")
+    @patch("continuum.llm.client.setup_langfuse")
+    @patch("continuum.llm.client.get_provider")
     async def test_chat_exception(self, mock_get_provider, mock_setup):
         logger.info("LLMClientChat: chat exception")
         mock_provider = MagicMock()

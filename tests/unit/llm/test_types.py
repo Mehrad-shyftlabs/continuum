@@ -3,7 +3,7 @@
 import logging
 from unittest.mock import MagicMock
 
-from orchestrator.llm.types import (
+from continuum.llm.types import (
     ChatMessage,
     FunctionCall,
     FunctionDefinition,

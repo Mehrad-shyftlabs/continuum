@@ -80,8 +80,8 @@ caller ──▶ Temporal server ──▶ worker ──▶ AgentRunner ──�
 
 ```python
 import asyncio
-from orchestrator.agent import BaseAgent
-from orchestrator.temporal import (
+from continuum.agent import BaseAgent
+from continuum.temporal import (
     get_temporal_client, get_worker_manager, get_agent_registry,
     WorkflowInput,
 )
@@ -133,7 +133,7 @@ event history.
 ## 6 · Anatomy of `WorkflowInput`
 
 ```python
-from orchestrator.temporal import WorkflowInput
+from continuum.temporal import WorkflowInput
 
 WorkflowInput(
     steps=[                                # list[dict] — parsed via parse_step()
@@ -162,7 +162,7 @@ In production, run the worker as its own process:
 ```python
 # worker_main.py
 import asyncio
-from orchestrator.temporal import (
+from continuum.temporal import (
     get_temporal_client, get_worker_manager, get_agent_registry,
 )
 from my_app.agents import all_agents

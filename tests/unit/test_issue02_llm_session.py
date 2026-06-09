@@ -17,8 +17,8 @@ import time
 
 class TestCountTokensFallback:
     def test_returns_estimate_on_exception(self):
-        from orchestrator.llm.client import LLMClient
-        from orchestrator.llm.config import LLMConfig
+        from continuum.llm.client import LLMClient
+        from continuum.llm.config import LLMConfig
 
         client = LLMClient(
             config=LLMConfig(model="nonexistent-model-xyz"),
@@ -30,8 +30,8 @@ class TestCountTokensFallback:
         assert count > 0
 
     def test_estimate_is_positive_for_long_content(self):
-        from orchestrator.llm.client import LLMClient
-        from orchestrator.llm.config import LLMConfig
+        from continuum.llm.client import LLMClient
+        from continuum.llm.config import LLMConfig
 
         client = LLMClient(
             config=LLMConfig(model="nonexistent-model-xyz"),
@@ -52,7 +52,7 @@ class TestCountTokensFallback:
 
 class TestLLMRateLimiter:
     def test_rate_limiter_allows_initial_request(self):
-        from orchestrator.llm.client import _LLMRateLimiter
+        from continuum.llm.client import _LLMRateLimiter
 
         rl = _LLMRateLimiter(rpm=60)
         # Should not block
@@ -61,7 +61,7 @@ class TestLLMRateLimiter:
 
     def test_rate_limiter_with_low_rpm_handled(self):
         """Low RPM should not cause errors — rate limiter should handle gracefully."""
-        from orchestrator.llm.client import _LLMRateLimiter
+        from continuum.llm.client import _LLMRateLimiter
 
         rl = _LLMRateLimiter(rpm=120)  # 2 per second
         # Consume one token
@@ -82,7 +82,7 @@ class TestLLMRateLimiter:
 
 class TestSummaryCacheBounded:
     def test_evicts_when_over_max_size(self):
-        from orchestrator.llm.context_management import SummaryCache
+        from continuum.llm.context_management import SummaryCache
 
         cache = SummaryCache(ttl_seconds=3600, max_size=3)
         for i in range(5):
@@ -93,7 +93,7 @@ class TestSummaryCacheBounded:
         assert len(cache._cache) <= 3
 
     def test_expired_entries_evicted(self):
-        from orchestrator.llm.context_management import SummaryCache
+        from continuum.llm.context_management import SummaryCache
 
         cache = SummaryCache(ttl_seconds=0, max_size=10)  # TTL=0 = expire immediately
         msgs = [{"role": "user", "content": "hello"}]
@@ -103,7 +103,7 @@ class TestSummaryCacheBounded:
         assert result is None  # Should be expired
 
     def test_get_refreshes_lru_timestamp(self):
-        from orchestrator.llm.context_management import SummaryCache
+        from continuum.llm.context_management import SummaryCache
 
         cache = SummaryCache(ttl_seconds=3600, max_size=2)
         msgs1 = [{"role": "user", "content": "first"}]
@@ -131,7 +131,7 @@ class TestSummaryCacheBounded:
 class TestStreamChunkNullSafety:
     def test_from_empty_chunk(self):
         """StreamChunk should handle chunks with no choices gracefully."""
-        from orchestrator.llm.types import StreamChunk
+        from continuum.llm.types import StreamChunk
 
         class FakeChunk:
             choices = None
@@ -144,7 +144,7 @@ class TestStreamChunkNullSafety:
         assert result.is_finished is False
 
     def test_from_chunk_with_delta_no_content(self):
-        from orchestrator.llm.types import StreamChunk
+        from continuum.llm.types import StreamChunk
 
         class FakeDelta:
             content = None
@@ -165,7 +165,7 @@ class TestStreamChunkNullSafety:
         assert result.role == "assistant"
 
     def test_from_chunk_with_finish_reason(self):
-        from orchestrator.llm.types import StreamChunk
+        from continuum.llm.types import StreamChunk
 
         class FakeDelta:
             content = "done"
@@ -194,7 +194,7 @@ class TestStreamChunkNullSafety:
 
 class TestCompressSummarizeEmptyGuard:
     def test_empty_messages_returns_empty(self):
-        from orchestrator.llm.context_management import (
+        from continuum.llm.context_management import (
             ContextManagementConfig,
             ProgressiveContextManager,
         )
@@ -215,7 +215,7 @@ class TestCompressSummarizeEmptyGuard:
 
 class TestContextWindowTokenFallback:
     def test_count_tokens_returns_positive(self):
-        from orchestrator.llm.context_window import ContextWindowManager
+        from continuum.llm.context_window import ContextWindowManager
 
         mgr = ContextWindowManager()
         messages = [{"role": "user", "content": "a" * 300}]

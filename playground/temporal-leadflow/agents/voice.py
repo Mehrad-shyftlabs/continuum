@@ -13,8 +13,8 @@ in handoff history when the target agent has no tools defined.
 
 from __future__ import annotations
 
-from orchestrator import AgentConfig, AgentMemoryConfig, BaseAgent
-from orchestrator.agent.types import Handoff
+from continuum import AgentConfig, AgentMemoryConfig, BaseAgent
+from continuum.agent.types import Handoff
 
 _NO_MEMORY = AgentMemoryConfig(search_memories=False, store_memories=False)
 

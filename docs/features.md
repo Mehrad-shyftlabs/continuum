@@ -224,18 +224,18 @@ Requires `pip install shyftlabs-continuum[temporal]`.
 
 | Layer                      | Location                                 |
 | -------------------------- | ---------------------------------------- |
-| Agent core                 | `src/orchestrator/agent/`                |
-| Workflow agents            | `src/orchestrator/agent/workflow/`       |
-| Smart layer (tier routing) | `src/orchestrator/agent/smart_layer/`    |
-| LLM clients & dispatchers  | `src/orchestrator/llm/`                  |
-| Tool execution             | `src/orchestrator/tools/`                |
-| Tool attention             | `src/orchestrator/tools/tool_attention/` |
-| Security & access control  | `src/orchestrator/security/`             |
-| Memory                     | `src/orchestrator/memory/`               |
-| Session                    | `src/orchestrator/session/`              |
-| Observability              | `src/orchestrator/observability/`        |
-| Evaluation                 | `src/orchestrator/evaluation/`           |
-| Lifecycle & health         | `src/orchestrator/core/`                 |
-| Temporal integration       | `src/orchestrator/temporal/`             |
+| Agent core                 | `src/continuum/agent/`                |
+| Workflow agents            | `src/continuum/agent/workflow/`       |
+| Smart layer (tier routing) | `src/continuum/agent/smart_layer/`    |
+| LLM clients & dispatchers  | `src/continuum/llm/`                  |
+| Tool execution             | `src/continuum/tools/`                |
+| Tool attention             | `src/continuum/tools/tool_attention/` |
+| Security & access control  | `src/continuum/security/`             |
+| Memory                     | `src/continuum/memory/`               |
+| Session                    | `src/continuum/session/`              |
+| Observability              | `src/continuum/observability/`        |
+| Evaluation                 | `src/continuum/evaluation/`           |
+| Lifecycle & health         | `src/continuum/core/`                 |
+| Temporal integration       | `src/continuum/temporal/`             |
 
 

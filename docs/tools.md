@@ -22,10 +22,10 @@ What this module gives you:
 ## 1 · Quick start
 
 ```python
-from orchestrator.tools import (
+from continuum.tools import (
     MCPServerStreamableHttp, ToolExecutor, MCPUtil,
 )
-from orchestrator.agent import BaseAgent, AgentRunner
+from continuum.agent import BaseAgent, AgentRunner
 
 server = MCPServerStreamableHttp(
     {"url": "https://example.com/mcp", "headers": {"Authorization": "Bearer …"}},
@@ -81,7 +81,7 @@ constructor shape (only the `params` payload differs).
 
 ### `MCPServerStdio`
 
-`from orchestrator.tools import MCPServerStdio`
+`from continuum.tools import MCPServerStdio`
 
 ```python
 mcp = MCPServerStdio({
@@ -96,7 +96,7 @@ mcp = MCPServerStdio({
 
 ### `MCPServerSse`
 
-`from orchestrator.tools import MCPServerSse`
+`from continuum.tools import MCPServerSse`
 
 ```python
 mcp = MCPServerSse({
@@ -109,7 +109,7 @@ mcp = MCPServerSse({
 
 ### `MCPServerStreamableHttp` *(recommended for remote)*
 
-`from orchestrator.tools import MCPServerStreamableHttp`
+`from continuum.tools import MCPServerStreamableHttp`
 
 ```python
 from datetime import timedelta
@@ -128,7 +128,7 @@ mcp = MCPServerStreamableHttp({
 
 ## 3 · `ToolExecutor`
 
-`from orchestrator.tools import ToolExecutor, ToolExecutorConfig`
+`from continuum.tools import ToolExecutor, ToolExecutorConfig`
 
 ```python
 executor = ToolExecutor(
@@ -173,7 +173,7 @@ include. Continuum captures this automatically and re-injects it.
 ### `ToolContextConfig`
 
 ```python
-from orchestrator.tools import ToolContextConfig, ToolContextVariable
+from continuum.tools import ToolContextConfig, ToolContextVariable
 
 ctx_cfg = ToolContextConfig(
     variables=[
@@ -238,7 +238,7 @@ auth_token, token, access_token, authToken, bearer
 ## 5 · Tool filtering
 
 ```python
-from orchestrator.tools import create_static_tool_filter, ToolFilterContext
+from continuum.tools import create_static_tool_filter, ToolFilterContext
 
 # Static (allowlist / blocklist)
 server = MCPServerStreamableHttp(
@@ -297,7 +297,7 @@ captured widget before forwarding to a frontend.
 
 ## 7 · `MCPUtil`
 
-`from orchestrator.tools import MCPUtil`
+`from continuum.tools import MCPUtil`
 
 | Method | Returns | Notes |
 |---|---|---|
@@ -310,7 +310,7 @@ captured widget before forwarding to a frontend.
 Schema helpers:
 
 ```python
-from orchestrator.tools import normalize_schema_for_llm, ensure_strict_json_schema
+from continuum.tools import normalize_schema_for_llm, ensure_strict_json_schema
 ```
 
 These fix common MCP schema oddities (arrays without `items`, objects
@@ -321,7 +321,7 @@ schemas don't reject them.
 
 ## 8 · Exceptions
 
-`from orchestrator.tools.exceptions import (
+`from continuum.tools.exceptions import (
     ToolError, MCPError, MCPConnectionError, MCPToolError,
 )`
 

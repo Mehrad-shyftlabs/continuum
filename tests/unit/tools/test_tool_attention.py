@@ -17,9 +17,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orchestrator.tools.tool_attention.config import ToolAttentionConfig
-from orchestrator.tools.tool_attention.registry import ToolSummaryRegistry, _tool_summary
-from orchestrator.tools.tool_attention.router import (
+from continuum.tools.tool_attention.config import ToolAttentionConfig
+from continuum.tools.tool_attention.registry import ToolSummaryRegistry, _tool_summary
+from continuum.tools.tool_attention.router import (
     ToolAttentionRouter,
     _extract_user_query,
     _tool_name,
@@ -181,7 +181,7 @@ class TestToolSummaryRegistry:
 
         with (
             self._mock_modules(mock_client, mock_encoder),
-            patch("orchestrator.config.settings") as mock_settings,
+            patch("continuum.config.settings") as mock_settings,
         ):
             mock_settings.milvus_host = "localhost"
             mock_settings.milvus_port = 19530
@@ -205,7 +205,7 @@ class TestToolSummaryRegistry:
 
         with (
             self._mock_modules(mock_client, mock_encoder),
-            patch("orchestrator.config.settings") as mock_settings,
+            patch("continuum.config.settings") as mock_settings,
         ):
             mock_settings.milvus_host = "localhost"
             mock_settings.milvus_port = 19530
@@ -226,7 +226,7 @@ class TestToolSummaryRegistry:
 
         with (
             patch.dict(sys.modules, {"pymilvus": mock_pymilvus}),
-            patch("orchestrator.config.settings") as mock_settings,
+            patch("continuum.config.settings") as mock_settings,
         ):
             mock_settings.milvus_host = "localhost"
             mock_settings.milvus_port = 19530
@@ -514,7 +514,7 @@ class TestApplyToolAttention:
     async def test_creates_router_on_first_call(self):
         agent = self._make_agent(tool_attention=ToolAttentionConfig(min_tools=5))
 
-        with patch("orchestrator.tools.tool_attention.router.ToolAttentionRouter") as MockRouter:
+        with patch("continuum.tools.tool_attention.router.ToolAttentionRouter") as MockRouter:
             mock_router = MagicMock()
             mock_router._initialized = True
             mock_router.initialize = AsyncMock()  # initialize is async, must be AsyncMock

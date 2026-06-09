@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from orchestrator.exceptions import (
+from continuum.exceptions import (
     InputBlockedError,
     OrchestratorError,
     ValidationError,

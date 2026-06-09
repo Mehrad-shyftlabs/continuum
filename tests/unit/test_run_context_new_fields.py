@@ -4,8 +4,8 @@ Tests for new RunContext fields: conversation_id and is_handoff.
 
 from __future__ import annotations
 
-from orchestrator.agent.types import PrepareRunResult, RunContext
-from orchestrator.agent.utils.context_utils import create_run_context
+from continuum.agent.types import PrepareRunResult, RunContext
+from continuum.agent.utils.context_utils import create_run_context
 
 
 class TestRunContextConversationId:

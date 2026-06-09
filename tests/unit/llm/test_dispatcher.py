@@ -11,7 +11,7 @@ import asyncio
 
 import pytest
 
-from orchestrator.llm.dispatcher import PriorityDispatcher, TwoLevelDispatcher
+from continuum.llm.dispatcher import PriorityDispatcher, TwoLevelDispatcher
 
 # ---------------------------------------------------------------------------
 # Helpers

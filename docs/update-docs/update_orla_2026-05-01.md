@@ -156,7 +156,7 @@ Priority values flow through all LLM call paths: main turn, reasoning pass, and 
 
 **Files:** `security/__init__.py` (new), `security/policy.py` (new), `tools/executor.py`, `memory/client.py`, `agent/base.py`, `agent/exceptions.py`, `exceptions.py`
 
-New `orchestrator.security` module implementing Orla-style deny-overrides ABAC:
+New `continuum.security` module implementing Orla-style deny-overrides ABAC:
 
 - **`AccessPolicy`**: rule with `subjects` (glob patterns against caller identity), `resources` (glob patterns against resource name), `effect` (`"allow"` or `"deny"`).
 - **`PolicyStore`**: in-memory store. Evaluation order: explicit deny → explicit allow → open default (allow).

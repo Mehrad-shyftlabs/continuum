@@ -15,11 +15,11 @@ import asyncio
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from orchestrator.core.background_tasks import BackgroundTaskRegistry
-from orchestrator.llm.types import ChatMessage
-from orchestrator.session.client import SessionClient
-from orchestrator.session.config import SessionConfig
-from orchestrator.session.types import SessionMetadata
+from continuum.core.background_tasks import BackgroundTaskRegistry
+from continuum.llm.types import ChatMessage
+from continuum.session.client import SessionClient
+from continuum.session.config import SessionConfig
+from continuum.session.types import SessionMetadata
 
 
 def _metadata(session_id="sess-1234abcd"):
@@ -76,7 +76,7 @@ class TestSyncMode:
         # The shipped default is 'background' (writes off the response path).
         # Isolate from any ambient SESSION_MEMORY_WRITE_MODE in the dev .env/shell
         # by pinning the setting the field reads from.
-        with patch("orchestrator.session.config.settings") as mock_settings:
+        with patch("continuum.session.config.settings") as mock_settings:
             mock_settings.session_memory_write_mode = "background"
             assert SessionConfig().memory_write_mode == "background"
 
@@ -130,7 +130,7 @@ class TestBackgroundMode:
         # background mode + no registry (and container unavailable) → inline write.
         client, mem, _, _ = _make_client(mode="background", with_registry=False)
         with patch(
-            "orchestrator.core.container.get_container",
+            "continuum.core.container.get_container",
             side_effect=RuntimeError("no container"),
         ):
             await client.add_message("sess-1234abcd", _msg())
@@ -142,7 +142,7 @@ class TestTemporalDowngrade:
         # Inside a Temporal activity, background mode is downgraded to sync so the
         # write completes within the durable/retriable activity boundary.
         client, mem, provider, registry = _make_client(mode="background")
-        with patch("orchestrator.session.client._in_temporal_activity", return_value=True):
+        with patch("continuum.session.client._in_temporal_activity", return_value=True):
             await client.add_message("sess-1234abcd", _msg())
         mem.add.assert_awaited_once()  # ran inline (sync)
         assert len(registry) == 0  # nothing was scheduled in the background
@@ -151,7 +151,7 @@ class TestTemporalDowngrade:
         # Outside Temporal, background mode schedules the write off the path.
         gate = asyncio.Event()
         client, mem, provider, registry = _make_client(mode="background", add_mock=_gated_add(gate))
-        with patch("orchestrator.session.client._in_temporal_activity", return_value=False):
+        with patch("continuum.session.client._in_temporal_activity", return_value=False):
             await client.add_message("sess-1234abcd", _msg())
         assert mem.add.await_count == 0  # not awaited inline
         assert len(registry) == 1  # scheduled in background

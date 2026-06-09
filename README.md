@@ -62,7 +62,7 @@ Your first agent:
 
 ```python
 import asyncio
-from orchestrator.agent import BaseAgent, AgentRunner
+from continuum.agent import BaseAgent, AgentRunner
 
 async def main():
     agent = BaseAgent(

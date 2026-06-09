@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 def _make_runner(session_client=None):
     """Build an AgentRunner with all heavy dependencies mocked out."""
-    from orchestrator.agent.runner import AgentRunner
+    from continuum.agent.runner import AgentRunner
 
     llm = MagicMock()
     llm.is_enabled = True
@@ -22,7 +22,7 @@ def _make_runner(session_client=None):
     else:
         sc = session_client
 
-    with patch("orchestrator.agent.runner.get_container") as mock_container:
+    with patch("continuum.agent.runner.get_container") as mock_container:
         container = MagicMock()
         container.llm_client = llm
         container.memory_client = MagicMock()
@@ -41,8 +41,8 @@ def _make_runner(session_client=None):
 
 
 def _make_agent(store_memories=False, extraction_prompt=None):
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
 
     mem_cfg = AgentMemoryConfig(
         store_memories=store_memories,

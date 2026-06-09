@@ -23,7 +23,7 @@ def _uid() -> str:
 @pytest.fixture
 async def memory_client():
     """Provide a real MemoryClient and clean up after the test."""
-    from orchestrator.memory.client import MemoryClient
+    from continuum.memory.client import MemoryClient
 
     client = MemoryClient()
     if not client.is_enabled:

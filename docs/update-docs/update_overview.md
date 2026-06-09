@@ -50,7 +50,7 @@ The original `run_id` was regenerated on every request, making it unsuitable for
 
 ### Changes
 
-#### `src/orchestrator/agent/types.py`
+#### `src/continuum/agent/types.py`
 
 - `MemoryScope.RUN` → `MemoryScope.CONVERSATION`
 - `RunContext` gains a new `conversation_id: str | None` field
@@ -58,34 +58,34 @@ The original `run_id` was regenerated on every request, making it unsuitable for
 - `PrepareRunResult.initial_message_count` → `user_message_index` (more precise semantics)
 - `RunContext` gains `is_handoff: bool = False` flag to skip redundant Redis history loads during handoffs
 
-#### `src/orchestrator/agent/utils/context_utils.py`
+#### `src/continuum/agent/utils/context_utils.py`
 
 - `create_run_context()` now accepts `conversation_id` parameter and passes it through to `RunContext`
 
-#### `src/orchestrator/memory/types.py`
+#### `src/continuum/memory/types.py`
 
 - `MemoryEntry.run_id` → `MemoryEntry.conversation_id` (maps to mem0's `run_id` internally)
 - `MemoryFilter.run_id` → `MemoryFilter.conversation_id` (translates to `run_id` in mem0 API calls)
 
-#### `src/orchestrator/memory/scopes.py`
+#### `src/continuum/memory/scopes.py`
 
 - All occurrences of `run_id` parameter/field → `conversation_id`
 - `MemoryScope.run()` factory method → `MemoryScope.conversation()`
 - `_run_id` metadata key → `_conversation_id`
 - Scope registry: `"run"` mode → `"conversation"` mode
 
-#### `src/orchestrator/memory/providers/mem0.py`
+#### `src/continuum/memory/providers/mem0.py`
 
 - `_build_identifiers()` maps `conversation_id` → mem0's `run_id` (backward-compatible with mem0 API)
 - All method signatures: `run_id` → `conversation_id` (add, search, get_all, delete_all, etc.)
 
-#### `src/orchestrator/session/types.py`
+#### `src/continuum/session/types.py`
 
 - `SessionMetadata` gains `conversation_id: str | None` field
 - `SessionMessage.from_dict()` now **raises `ValueError`** on missing `timestamp` instead of silently defaulting to `datetime.now()` (prevents subtle ordering bugs)
 - Imports `UTC` for timezone-aware datetimes
 
-#### `src/orchestrator/config.py`
+#### `src/continuum/config.py`
 
 - `memory_isolation` literal choices: `"run"` → `"conversation"`
 
@@ -99,7 +99,7 @@ The SDK was hard-coded to Qdrant. Production environments may use Milvus/Zilliz 
 
 ### Changes
 
-#### `src/orchestrator/config.py`
+#### `src/continuum/config.py`
 
 - New setting: `vector_store_provider: str = "qdrant"` (accepts `"qdrant"` | `"milvus"`)
 - New settings block for Milvus: `milvus_host`, `milvus_port`, `milvus_token`, `milvus_collection`
@@ -116,7 +116,7 @@ The SDK was hard-coded to Qdrant. Production environments may use Milvus/Zilliz 
 
 - Added `pymilvus` dependency
 
-#### `src/orchestrator/core/health.py`
+#### `src/continuum/core/health.py`
 
 - New `_check_milvus()` internal health check (mirrors `_check_qdrant()` pattern)
 - New `check_milvus()` public method
@@ -128,26 +128,26 @@ The SDK was hard-coded to Qdrant. Production environments may use Milvus/Zilliz 
 
 - Health check CLI now supports `vector_store`, `qdrant`, and `milvus` service names
 
-#### `src/orchestrator/memory/providers/mem0.py`
+#### `src/continuum/memory/providers/mem0.py`
 
 - New `_patch_milvus_strong_consistency()` method: Patches `MilvusDB.list()` to use `consistency_level="Strong"` so JSON-field filter queries see growing segments immediately after writes
 - New `_flush_milvus()` method: Called only in `delete_all()` (rare, expensive operation) to ensure all growing segments are sealed before deletion
 - `kwargs["prompts"]` → `kwargs["prompt"]` (fixes mem0 API parameter name bug, affected both `add()` custom prompts and `update()` custom prompts)
 
-#### `src/orchestrator/memory/config.py`
+#### `src/continuum/memory/config.py`
 
 - Config builder now routes to Milvus provider configuration when `vector_store_provider == "milvus"`
 
-#### `src/orchestrator/memory/base.py`
+#### `src/continuum/memory/base.py`
 
 - Method signatures updated: `run_id` → `conversation_id`
 
-#### `src/orchestrator/memory/client.py`
+#### `src/continuum/memory/client.py`
 
 - All public methods updated: `run_id` → `conversation_id`
 - Scope building calls updated accordingly
 
-#### `src/orchestrator/memory/intelligence.py`
+#### `src/continuum/memory/intelligence.py`
 
 - Scope references updated for new naming
 
@@ -173,52 +173,52 @@ All workflow agents now follow the same pattern:
 
 ### Changes
 
-#### `src/orchestrator/agent/runner.py`
+#### `src/continuum/agent/runner.py`
 
 - New `save_turn()` method: Saves exactly one conversation turn (user + assistant) to the session — the canonical way for workflows to persist visible messages
 - `_prepare_run()` and `run()` now accept `conversation_id` parameter
 - `threading.Lock` → `asyncio.Lock` for artifact clearing (fixes potential deadlock in async context)
 - `initial_message_count` → `user_message_index` throughout
 
-#### `src/orchestrator/agent/workflow/sequential.py` (~266 lines changed)
+#### `src/continuum/agent/workflow/sequential.py` (~266 lines changed)
 
 - Wraps execution in `try/finally` to temporarily disable `log_to_session` on sub-agents
 - Calls `runner.save_turn()` at completion
 - Injects `pipeline_context` into sub-agent `RunContext.metadata` so later agents can see prior outputs
 
-#### `src/orchestrator/agent/workflow/parallel.py` (~190 lines changed)
+#### `src/continuum/agent/workflow/parallel.py` (~190 lines changed)
 
 - Same pattern: disable sub-agent logging → run all in parallel → save single turn
 - Restored original `log_to_session` in `finally` block
 
-#### `src/orchestrator/agent/workflow/supervised.py` (~329 lines changed)
+#### `src/continuum/agent/workflow/supervised.py` (~329 lines changed)
 
 - Same pattern applied to supervised sequential with quality scoring
 - Fixed indentation/scope issues in retry loop error handling
 
-#### `src/orchestrator/agent/workflow/planner.py` (~358 lines changed)
+#### `src/continuum/agent/workflow/planner.py` (~358 lines changed)
 
 - Same pattern for planner with dynamic replanning
 - Sub-agents disabled from logging; planner saves final consolidated turn
 
-#### `src/orchestrator/agent/workflow/loop.py` (~178 lines changed)
+#### `src/continuum/agent/workflow/loop.py` (~178 lines changed)
 
 - Same pattern for iterative agent loops
 - Saves `(original_input, final_iteration_output)` as single turn
 
-#### `src/orchestrator/agent/workflow/scatter.py` (~225 lines changed)
+#### `src/continuum/agent/workflow/scatter.py` (~225 lines changed)
 
 - Same pattern for scatter-gather workflows
 
-#### `src/orchestrator/agent/workflow/reflection.py` (~124 lines changed)
+#### `src/continuum/agent/workflow/reflection.py` (~124 lines changed)
 
 - Same pattern for two-pass reasoning workflows
 
-#### `src/orchestrator/agent/workflow/debate.py` (+25 lines)
+#### `src/continuum/agent/workflow/debate.py` (+25 lines)
 
 - Added debate workflow changes consistent with session logging pattern
 
-#### `src/orchestrator/agent/workflow/router.py` (~14 lines)
+#### `src/continuum/agent/workflow/router.py` (~14 lines)
 
 - Minor updates for consistency
 
@@ -233,7 +233,7 @@ All workflow agents now follow the same pattern:
 
 ### Changes
 
-#### `src/orchestrator/agent/execution/message_builder.py`
+#### `src/continuum/agent/execution/message_builder.py`
 
 - `prepare_messages()` now returns `tuple[list[dict], int]` — the second element is `user_message_index`, the exact position where user input begins
 - **Skips Redis history during handoffs** (`context.is_handoff` check) to prevent duplicate context
@@ -243,37 +243,37 @@ All workflow agents now follow the same pattern:
 - After context compression, re-scans for user message index to maintain accuracy
 - Final prompt log now includes agent name for easier debugging
 
-#### `src/orchestrator/agent/services/session_service.py` (~120 lines removed/refactored)
+#### `src/continuum/agent/services/session_service.py` (~120 lines removed/refactored)
 
 - Dramatically simplified `save_messages()`: removed ~90 lines of verbose logging and redundant condition checks
 - Added `agent_id` parameter to `add_message()` calls
 - Default history limit: `50` → `20` with updated docstring (turns, not individual messages)
 
-#### `src/orchestrator/agent/execution/run_finalizer.py`
+#### `src/continuum/agent/execution/run_finalizer.py`
 
 - Updated to use `user_message_index` instead of `initial_message_count`
 
-#### `src/orchestrator/agent/execution/executor.py`
+#### `src/continuum/agent/execution/executor.py`
 
 - Minor refactoring for consistency with new types
 
-#### `src/orchestrator/agent/execution/handoff_executor.py`
+#### `src/continuum/agent/execution/handoff_executor.py`
 
 - Sets `context.is_handoff = True` so MessageBuilder skips redundant history loading
 
-#### `src/orchestrator/agent/config.py`
+#### `src/continuum/agent/config.py`
 
 - `session_history_limit` → `session_history_turns` rename
 
-#### `src/orchestrator/agent/handoff/history.py`
+#### `src/continuum/agent/handoff/history.py`
 
 - Updated for `conversation_id` rename
 
-#### `src/orchestrator/agent/handoff/manager.py`
+#### `src/continuum/agent/handoff/manager.py`
 
 - Updated for `conversation_id` rename
 
-#### `src/orchestrator/agent/services/memory_service.py` (~97 lines changed)
+#### `src/continuum/agent/services/memory_service.py` (~97 lines changed)
 
 - Refactored scope building to use `conversation_id` instead of `run_id`
 - Simplified code flow
@@ -290,24 +290,24 @@ All workflow agents now follow the same pattern:
 
 ### Changes
 
-#### `src/orchestrator/session/providers/redis.py` (~378 lines changed)
+#### `src/continuum/session/providers/redis.py` (~378 lines changed)
 
 - **Atomic pipeline operations**: `get_messages`, `clear_session`, and `update_session_metadata` now use `redis.pipeline(transaction=True)` to batch metadata updates + TTL refreshes atomically
 - **New method**: `update_session_metadata()` — standalone metadata updater with TTL refresh on both keys
 - **Timezone-aware datetimes**: `datetime.now()` → `datetime.now(UTC)` throughout
 - **Removed**: user+agent mapping cleanup in `delete_session()` (was unreliable; simplifies deletion logic)
 
-#### `src/orchestrator/session/base.py`
+#### `src/continuum/session/base.py`
 
 - Added `conversation_id` to session base interface
 - Updated method signatures
 
-#### `src/orchestrator/session/client.py`
+#### `src/continuum/session/client.py`
 
 - `conversation_id` support throughout session lifecycle
 - Updated create/get session methods
 
-#### `src/orchestrator/session/config.py`
+#### `src/continuum/session/config.py`
 
 - Minor config updates
 
@@ -319,35 +319,35 @@ All workflow agents now follow the same pattern:
 
 All Temporal integration files now catch `ImportError` and re-raise with a helpful install message instead of crashing with a generic traceback:
 
-- `src/orchestrator/temporal/activities.py`
-- `src/orchestrator/temporal/client.py`
-- `src/orchestrator/temporal/worker.py`
-- `src/orchestrator/temporal/workflows/agent_workflow.py`
-- `src/orchestrator/temporal/workflows/loop_workflow.py`
-- `src/orchestrator/temporal/workflows/parallel_workflow.py`
-- `src/orchestrator/temporal/workflows/sequential_workflow.py`
+- `src/continuum/temporal/activities.py`
+- `src/continuum/temporal/client.py`
+- `src/continuum/temporal/worker.py`
+- `src/continuum/temporal/workflows/agent_workflow.py`
+- `src/continuum/temporal/workflows/loop_workflow.py`
+- `src/continuum/temporal/workflows/parallel_workflow.py`
+- `src/continuum/temporal/workflows/sequential_workflow.py`
 
 ### Observability — Langfuse Retry Fix
 
-`**src/orchestrator/observability/providers/langfuse_client.py`**
+`**src/continuum/observability/providers/langfuse_client.py`**
 
 - **Bug fix**: `ImportError` now sets `_initialized = True` (package missing won't change, no point retrying), but **transient failures** (network, bad credentials) leave `_initialized = False` so they can be retried on next call
 
 ### MCP Tool Cleanup — Shutdown Error Handling
 
-`**src/orchestrator/tools/mcp.py`**
+`**src/continuum/tools/mcp.py`**
 
 - Expanded exception handling during MCP server cleanup to catch `"already running"` RuntimeErrors and `WouldBlock`/`Busy` anyio errors (common during FastAPI shutdown)
 
 ### LLM Client
 
-`**src/orchestrator/llm/client.py**`
+`**src/continuum/llm/client.py**`
 
 - Minor 2-line change for consistency
 
 ### Agent Service Interface
 
-`**src/orchestrator/agent/interfaces/service_interface.py**`
+`**src/continuum/agent/interfaces/service_interface.py**`
 
 - Updated interface method signature for `conversation_id`
 
@@ -424,52 +424,52 @@ Click to expand full file list (66 files)
  pyproject.toml                                     |   1 +
  requirements.txt                                   |   1 +
  scripts/health_check.py                            |   6 +-
- src/orchestrator/agent/config.py                   |  10 +-
- src/orchestrator/agent/execution/executor.py       |   9 +-
- src/orchestrator/agent/execution/handoff_executor.py |  22 +-
- src/orchestrator/agent/execution/message_builder.py |  48 +-
- src/orchestrator/agent/execution/run_finalizer.py  |   8 +-
- src/orchestrator/agent/handoff/history.py          |   4 +-
- src/orchestrator/agent/handoff/manager.py          |  13 +-
- src/orchestrator/agent/interfaces/service_interface.py |   2 +-
- src/orchestrator/agent/runner.py                   |  73 ++-
- src/orchestrator/agent/services/memory_service.py  |  97 ++--
- src/orchestrator/agent/services/session_service.py | 120 +----
- src/orchestrator/agent/types.py                    |  18 +-
- src/orchestrator/agent/utils/context_utils.py      |   3 +
- src/orchestrator/agent/workflow/debate.py          |  25 +
- src/orchestrator/agent/workflow/loop.py            | 178 ++++----
- src/orchestrator/agent/workflow/parallel.py        | 190 ++++----
- src/orchestrator/agent/workflow/planner.py         | 358 ++++++++-------
- src/orchestrator/agent/workflow/reflection.py      | 124 +++--
- src/orchestrator/agent/workflow/router.py          |  14 +-
- src/orchestrator/agent/workflow/scatter.py         | 225 ++++-----
- src/orchestrator/agent/workflow/sequential.py      | 266 ++++++-----
- src/orchestrator/agent/workflow/supervised.py      | 329 ++++++++------
- src/orchestrator/config.py                         |  13 +-
- src/orchestrator/core/health.py                    |  83 +++-
- src/orchestrator/llm/client.py                     |   2 +-
- src/orchestrator/memory/base.py                    |  26 +-
- src/orchestrator/memory/client.py                  |  48 +-
- src/orchestrator/memory/config.py                  |  93 ++--
- src/orchestrator/memory/intelligence.py            |   8 +-
- src/orchestrator/memory/providers/mem0.py          | 120 +++--
- src/orchestrator/memory/scopes.py                  |  70 +--
- src/orchestrator/memory/types.py                   |  19 +-
- src/orchestrator/observability/providers/langfuse_client.py |   4 +-
- src/orchestrator/session/base.py                   |  21 +-
- src/orchestrator/session/client.py                 |  87 ++--
- src/orchestrator/session/config.py                 |   9 +-
- src/orchestrator/session/providers/redis.py        | 378 ++++++++-------
- src/orchestrator/session/types.py                  |  14 +-
- src/orchestrator/temporal/activities.py            |   8 +-
- src/orchestrator/temporal/client.py                |   8 +-
- src/orchestrator/temporal/worker.py                |   8 +-
- src/orchestrator/temporal/workflows/agent_workflow.py |  10 +-
- src/orchestrator/temporal/workflows/loop_workflow.py |  10 +-
- src/orchestrator/temporal/workflows/parallel_workflow.py |  10 +-
- src/orchestrator/temporal/workflows/sequential_workflow.py |  10 +-
- src/orchestrator/tools/mcp.py                      |  22 +-
+ src/continuum/agent/config.py                   |  10 +-
+ src/continuum/agent/execution/executor.py       |   9 +-
+ src/continuum/agent/execution/handoff_executor.py |  22 +-
+ src/continuum/agent/execution/message_builder.py |  48 +-
+ src/continuum/agent/execution/run_finalizer.py  |   8 +-
+ src/continuum/agent/handoff/history.py          |   4 +-
+ src/continuum/agent/handoff/manager.py          |  13 +-
+ src/continuum/agent/interfaces/service_interface.py |   2 +-
+ src/continuum/agent/runner.py                   |  73 ++-
+ src/continuum/agent/services/memory_service.py  |  97 ++--
+ src/continuum/agent/services/session_service.py | 120 +----
+ src/continuum/agent/types.py                    |  18 +-
+ src/continuum/agent/utils/context_utils.py      |   3 +
+ src/continuum/agent/workflow/debate.py          |  25 +
+ src/continuum/agent/workflow/loop.py            | 178 ++++----
+ src/continuum/agent/workflow/parallel.py        | 190 ++++----
+ src/continuum/agent/workflow/planner.py         | 358 ++++++++-------
+ src/continuum/agent/workflow/reflection.py      | 124 +++--
+ src/continuum/agent/workflow/router.py          |  14 +-
+ src/continuum/agent/workflow/scatter.py         | 225 ++++-----
+ src/continuum/agent/workflow/sequential.py      | 266 ++++++-----
+ src/continuum/agent/workflow/supervised.py      | 329 ++++++++------
+ src/continuum/config.py                         |  13 +-
+ src/continuum/core/health.py                    |  83 +++-
+ src/continuum/llm/client.py                     |   2 +-
+ src/continuum/memory/base.py                    |  26 +-
+ src/continuum/memory/client.py                  |  48 +-
+ src/continuum/memory/config.py                  |  93 ++--
+ src/continuum/memory/intelligence.py            |   8 +-
+ src/continuum/memory/providers/mem0.py          | 120 +++--
+ src/continuum/memory/scopes.py                  |  70 +--
+ src/continuum/memory/types.py                   |  19 +-
+ src/continuum/observability/providers/langfuse_client.py |   4 +-
+ src/continuum/session/base.py                   |  21 +-
+ src/continuum/session/client.py                 |  87 ++--
+ src/continuum/session/config.py                 |   9 +-
+ src/continuum/session/providers/redis.py        | 378 ++++++++-------
+ src/continuum/session/types.py                  |  14 +-
+ src/continuum/temporal/activities.py            |   8 +-
+ src/continuum/temporal/client.py                |   8 +-
+ src/continuum/temporal/worker.py                |   8 +-
+ src/continuum/temporal/workflows/agent_workflow.py |  10 +-
+ src/continuum/temporal/workflows/loop_workflow.py |  10 +-
+ src/continuum/temporal/workflows/parallel_workflow.py |  10 +-
+ src/continuum/temporal/workflows/sequential_workflow.py |  10 +-
+ src/continuum/tools/mcp.py                      |  22 +-
  tests/conftest.py                                  |  26 ++
  tests/integration/test_memory_leak.py              | 263 +++++++++++
  tests/integration/test_memory_scenarios.py         | 505 +++++++++++++++++++++
@@ -580,7 +580,7 @@ If you only use `runner.run()` and never call memory APIs directly, skip this st
 #### Step 5: Rename `MemoryScope.RUN` → `MemoryScope.CONVERSATION` — **REQUIRED if referenced in code**
 
 ```diff
-  from orchestrator.agent.types import MemoryScope
+  from continuum.agent.types import MemoryScope
 
   config = AgentMemoryConfig(
 -     search_scope=MemoryScope.RUN,
@@ -678,8 +678,8 @@ The SDK exposes **two memory layers** that are independently controllable per-ag
 Configured per-agent via `AgentMemoryConfig`:
 
 ```python
-from orchestrator.agent.config import AgentMemoryConfig, AgentConfig
-from orchestrator.agent.types import MemoryScope
+from continuum.agent.config import AgentMemoryConfig, AgentConfig
+from continuum.agent.types import MemoryScope
 
 agent_config = AgentConfig(
     memory=AgentMemoryConfig(

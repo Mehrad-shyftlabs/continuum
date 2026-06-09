@@ -23,9 +23,9 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
-from orchestrator.llm.types import FunctionCall, ToolCall
-from orchestrator.tools.executor import ToolExecutor
-from orchestrator.tools.mcp import (
+from continuum.llm.types import FunctionCall, ToolCall
+from continuum.tools.executor import ToolExecutor
+from continuum.tools.mcp import (
     MCPServerFunction,
     MCPServerSse,
     MCPServerStdio,

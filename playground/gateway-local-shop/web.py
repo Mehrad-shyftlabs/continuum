@@ -25,7 +25,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
-from orchestrator import LogLevel, setup_logging
+from continuum import LogLevel, setup_logging
 
 setup_logging(level=LogLevel.INFO)
 

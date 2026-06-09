@@ -6,18 +6,18 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from orchestrator.agent.config import RouterConfig
-from orchestrator.agent.smart_layer import classifier as classifier_mod
-from orchestrator.agent.smart_layer.classifier import classify_product_tier
-from orchestrator.agent.smart_layer.errors import TierClassifierError
-from orchestrator.agent.smart_layer.heuristics import heuristic_tier
-from orchestrator.agent.smart_layer.json_parse import (
+from continuum.agent.config import RouterConfig
+from continuum.agent.smart_layer import classifier as classifier_mod
+from continuum.agent.smart_layer.classifier import classify_product_tier
+from continuum.agent.smart_layer.errors import TierClassifierError
+from continuum.agent.smart_layer.heuristics import heuristic_tier
+from continuum.agent.smart_layer.json_parse import (
     parse_classifier_json,
     parse_classifier_tier_strict,
 )
-from orchestrator.agent.smart_layer.resolve import resolve_model_for_tier
-from orchestrator.agent.smart_layer.types import ProductTier
-from orchestrator.llm.types import LLMResponse
+from continuum.agent.smart_layer.resolve import resolve_model_for_tier
+from continuum.agent.smart_layer.types import ProductTier
+from continuum.llm.types import LLMResponse
 
 
 class TestJsonParse:
@@ -132,7 +132,7 @@ async def test_gpt_4o_mini_classifier_ignores_remote_router_url(monkeypatch):
 
     llm.chat = AsyncMock(side_effect=fake_chat)
     monkeypatch.setattr(
-        "orchestrator.agent.smart_layer.classifier.heuristic_tier",
+        "continuum.agent.smart_layer.classifier.heuristic_tier",
         lambda _: None,
     )
     await classify_product_tier(
@@ -155,7 +155,7 @@ async def test_classify_llm_json(monkeypatch):
     llm.chat = AsyncMock(side_effect=fake_chat)
 
     monkeypatch.setattr(
-        "orchestrator.agent.smart_layer.classifier.heuristic_tier",
+        "continuum.agent.smart_layer.classifier.heuristic_tier",
         lambda _: None,
     )
 
@@ -174,7 +174,7 @@ async def test_classify_llm_json(monkeypatch):
 @pytest.mark.asyncio
 async def test_qwen_uses_hf_defaults_when_only_hf_api_key(monkeypatch):
     """qwen mode: HF router URL + model default; auth from HF_API_KEY."""
-    import orchestrator.config as oc
+    import continuum.config as oc
 
     monkeypatch.setattr(oc.settings, "hf_api_key", "hf_test_token")
     monkeypatch.setattr(oc.settings, "llm_route_router_api_base", None)
@@ -191,7 +191,7 @@ async def test_qwen_uses_hf_defaults_when_only_hf_api_key(monkeypatch):
 
     llm.chat = AsyncMock(side_effect=fake_chat)
     monkeypatch.setattr(
-        "orchestrator.agent.smart_layer.classifier.heuristic_tier",
+        "continuum.agent.smart_layer.classifier.heuristic_tier",
         lambda _: None,
     )
     out = await classify_product_tier(
@@ -210,7 +210,7 @@ async def test_qwen_uses_hf_defaults_when_only_hf_api_key(monkeypatch):
 @pytest.mark.asyncio
 async def test_qwen_local_short_prompt_still_requires_classifier_no_heuristic(monkeypatch):
     """Heuristics must not bypass qwen_local — otherwise local server is never called."""
-    import orchestrator.config as oc
+    import continuum.config as oc
 
     monkeypatch.setattr(oc.settings, "llm_route_local_router_api_base", None)
     rc = RouterConfig(
@@ -258,7 +258,7 @@ async def test_qwen_local_always_calls_classifier_llm_for_short_message():
 async def test_qwen_local_ignores_remote_router_api_base(monkeypatch):
     """HF URL in tier_router_api_base must not satisfy qwen_local (common playground mistake)."""
     monkeypatch.setattr(
-        "orchestrator.agent.smart_layer.classifier.heuristic_tier",
+        "continuum.agent.smart_layer.classifier.heuristic_tier",
         lambda _: None,
     )
     rc = RouterConfig(
@@ -281,7 +281,7 @@ async def test_qwen_local_ignores_remote_router_api_base(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_qwen_local_requires_local_or_router_base(monkeypatch):
-    import orchestrator.config as oc
+    import continuum.config as oc
 
     monkeypatch.setattr(oc.settings, "llm_route_local_router_api_base", None)
     rc = RouterConfig(
@@ -291,7 +291,7 @@ async def test_qwen_local_requires_local_or_router_base(monkeypatch):
     llm = MagicMock()
     llm.chat = AsyncMock()
     monkeypatch.setattr(
-        "orchestrator.agent.smart_layer.classifier.heuristic_tier",
+        "continuum.agent.smart_layer.classifier.heuristic_tier",
         lambda _: None,
     )
     with pytest.raises(TierClassifierError, match="LLM_ROUTE_LOCAL_ROUTER_API_BASE"):
@@ -306,7 +306,7 @@ async def test_qwen_local_requires_local_or_router_base(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_qwen_requires_hf_openai_or_router_token(monkeypatch):
-    import orchestrator.config as oc
+    import continuum.config as oc
 
     monkeypatch.setattr(oc.settings, "hf_api_key", None)
     monkeypatch.setattr(oc.settings, "llm_route_router_api_key", None)
@@ -319,7 +319,7 @@ async def test_qwen_requires_hf_openai_or_router_token(monkeypatch):
     llm = MagicMock()
     llm.chat = AsyncMock()
     monkeypatch.setattr(
-        "orchestrator.agent.smart_layer.classifier.heuristic_tier",
+        "continuum.agent.smart_layer.classifier.heuristic_tier",
         lambda _: None,
     )
     with pytest.raises(TierClassifierError, match="HF_API_KEY"):
@@ -338,7 +338,7 @@ async def test_classifier_llm_failure_propagates(monkeypatch):
     llm = MagicMock()
     llm.chat = AsyncMock(side_effect=ConnectionError("refused"))
     monkeypatch.setattr(
-        "orchestrator.agent.smart_layer.classifier.heuristic_tier",
+        "continuum.agent.smart_layer.classifier.heuristic_tier",
         lambda _: None,
     )
     with pytest.raises(ConnectionError, match="refused"):
@@ -356,7 +356,7 @@ async def test_classifier_unparseable_response_raises(monkeypatch):
     llm = MagicMock()
     llm.chat = AsyncMock(return_value=LLMResponse(model="gpt-4o-mini", content="thanks"))
     monkeypatch.setattr(
-        "orchestrator.agent.smart_layer.classifier.heuristic_tier",
+        "continuum.agent.smart_layer.classifier.heuristic_tier",
         lambda _: None,
     )
     with pytest.raises(TierClassifierError, match="valid tier"):

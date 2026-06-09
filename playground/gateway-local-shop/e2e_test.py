@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from agent import LocalShopAgent  # noqa: E402
 
-from orchestrator import LogLevel, setup_logging  # noqa: E402
+from continuum import LogLevel, setup_logging  # noqa: E402
 
 USER = "e2e-user"
 CONV = "e2e-conv-1"

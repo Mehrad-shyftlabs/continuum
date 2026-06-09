@@ -16,12 +16,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orchestrator.agent.config import AgentConfig
-from orchestrator.agent.execution.executor import Executor
-from orchestrator.agent.runner import AgentRunner
-from orchestrator.agent.types import PrepareRunResult
-from orchestrator.tools.tool_attention.config import ToolAttentionConfig
-from orchestrator.tools.tool_attention.router import ToolAttentionRouter
+from continuum.agent.config import AgentConfig
+from continuum.agent.execution.executor import Executor
+from continuum.agent.runner import AgentRunner
+from continuum.agent.types import PrepareRunResult
+from continuum.tools.tool_attention.config import ToolAttentionConfig
+from continuum.tools.tool_attention.router import ToolAttentionRouter
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -97,7 +97,7 @@ class TestExecutorToolAttentionWiring:
         messages = [{"role": "user", "content": "find dog food"}]
         ctx = _make_context(metadata={"_filtered_tools": filtered})
 
-        with patch("orchestrator.agent.execution.executor.LLMConfig") as MockConfig:
+        with patch("continuum.agent.execution.executor.LLMConfig") as MockConfig:
             MockConfig.from_agent_config.return_value = MagicMock()
             await executor.execute_loop(agent, messages, ctx, _make_run_state(messages))
 
@@ -120,11 +120,11 @@ class TestExecutorToolAttentionWiring:
 
         with (
             patch(
-                "orchestrator.tools.tool_attention.router.apply_tool_attention",
+                "continuum.tools.tool_attention.router.apply_tool_attention",
                 new_callable=AsyncMock,
                 return_value=None,  # router decided not to filter
             ),
-            patch("orchestrator.agent.execution.executor.LLMConfig") as MockConfig,
+            patch("continuum.agent.execution.executor.LLMConfig") as MockConfig,
         ):
             MockConfig.from_agent_config.return_value = MagicMock()
             await executor.execute_loop(agent, messages, _make_context(), _make_run_state(messages))
@@ -145,11 +145,11 @@ class TestExecutorToolAttentionWiring:
 
         with (
             patch(
-                "orchestrator.tools.tool_attention.router.apply_tool_attention",
+                "continuum.tools.tool_attention.router.apply_tool_attention",
                 new_callable=AsyncMock,
                 return_value=None,  # simulate disabled — returns None so fallback triggers
             ),
-            patch("orchestrator.agent.execution.executor.LLMConfig") as MockConfig,
+            patch("continuum.agent.execution.executor.LLMConfig") as MockConfig,
         ):
             MockConfig.from_agent_config.return_value = MagicMock()
             await executor.execute_loop(agent, messages, _make_context(), _make_run_state(messages))
@@ -244,7 +244,7 @@ def _make_stream_agent(tool_attention=None, num_tools: int = 5):
 
 
 def _make_runner(mock_llm) -> AgentRunner:
-    with patch("orchestrator.agent.runner.get_container") as mock_gc:
+    with patch("continuum.agent.runner.get_container") as mock_gc:
         mock_gc.return_value = MagicMock()
         runner = AgentRunner(llm_client=mock_llm)
     return runner
@@ -317,7 +317,7 @@ class TestRunStreamToolAttentionWiring:
         runner._finalizer.finalize = AsyncMock()
 
         with patch(
-            "orchestrator.tools.tool_attention.router.apply_tool_attention",
+            "continuum.tools.tool_attention.router.apply_tool_attention",
             new_callable=AsyncMock,
             return_value=None,
         ):
