@@ -266,9 +266,7 @@ class ScatterAgent(BaseAgent):
             branch_ctx, branch_rec = branch_recorder_context(context, index=i)
             branch_recs.append(branch_rec)
             tasks.append(
-                asyncio.create_task(
-                    self._run_agent_safe(agent, slice_input, runner, branch_ctx)
-                )
+                asyncio.create_task(self._run_agent_safe(agent, slice_input, runner, branch_ctx))
             )
 
         try:
@@ -380,9 +378,7 @@ class ScatterAgent(BaseAgent):
             # Re-run only the forked branch into an isolated recorder, absorb at
             # its stage index, and replace its cached entry.
             agent = self.agents[stage_idx]
-            new_input = resumed_input(
-                stage_first.get(stage_idx), override, parent_trace.user_query
-            )
+            new_input = resumed_input(stage_first.get(stage_idx), override, parent_trace.user_query)
             branch_ctx, branch_rec = branch_recorder_context(context, index=stage_idx)
             resp = await self._run_agent_safe(agent, new_input, runner, branch_ctx)
             successful[agent.name] = resp

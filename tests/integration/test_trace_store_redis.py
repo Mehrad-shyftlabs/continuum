@@ -32,18 +32,39 @@ async def store():
 
 
 def _trace(run_id: str) -> DecisionTrace:
-    t = DecisionTrace(run_id=run_id, root_agent="support_agent",
-                      user_query="Is my order delayed?")
-    think = t.add(DecisionStep(step_id="s1", kind=StepKind.REASONING,
-                               agent_name="support_agent", turn=1,
-                               rationale="check the order first"))
-    t.add(DecisionStep(step_id="s2", kind=StepKind.TOOL_CALL, agent_name="support_agent",
-                       turn=1, parent_id=think.step_id,
-                       input={"tool": "lookup_order", "args": {"order_id": 123}},
-                       output={"status": "shipped"}, latency_ms=1200))
-    t.add(DecisionStep(step_id="s3", kind=StepKind.LLM_CALL, agent_name="support_agent",
-                       turn=2, parent_id="s2", output="No, ships tomorrow.",
-                       total_tokens=240))
+    t = DecisionTrace(run_id=run_id, root_agent="support_agent", user_query="Is my order delayed?")
+    think = t.add(
+        DecisionStep(
+            step_id="s1",
+            kind=StepKind.REASONING,
+            agent_name="support_agent",
+            turn=1,
+            rationale="check the order first",
+        )
+    )
+    t.add(
+        DecisionStep(
+            step_id="s2",
+            kind=StepKind.TOOL_CALL,
+            agent_name="support_agent",
+            turn=1,
+            parent_id=think.step_id,
+            input={"tool": "lookup_order", "args": {"order_id": 123}},
+            output={"status": "shipped"},
+            latency_ms=1200,
+        )
+    )
+    t.add(
+        DecisionStep(
+            step_id="s3",
+            kind=StepKind.LLM_CALL,
+            agent_name="support_agent",
+            turn=2,
+            parent_id="s2",
+            output="No, ships tomorrow.",
+            total_tokens=240,
+        )
+    )
     t.final_response = "No, ships tomorrow."
     return t
 
@@ -58,7 +79,9 @@ class TestRedisTraceStoreIntegration:
         assert got.run_id == run_id
         assert got.final_response == "No, ships tomorrow."
         assert [s.kind for s in got.steps] == [
-            StepKind.REASONING, StepKind.TOOL_CALL, StepKind.LLM_CALL
+            StepKind.REASONING,
+            StepKind.TOOL_CALL,
+            StepKind.LLM_CALL,
         ]
         assert got.steps[1].input == {"tool": "lookup_order", "args": {"order_id": 123}}
         assert got.metrics()["total_tokens"] == 240

@@ -92,7 +92,19 @@ async def test_planner_resume_from_mid_plan_step(monkeypatch) -> None:
 
     captured: dict = {}
 
-    async def fake_drive(self, plan_steps, current_input, runner, context, *, workflow_span, start_stage, goal, llm_client, initial_usage=None):  # noqa: E501
+    async def fake_drive(
+        self,
+        plan_steps,
+        current_input,
+        runner,
+        context,
+        *,
+        workflow_span,
+        start_stage,
+        goal,
+        llm_client,
+        initial_usage=None,
+    ):  # noqa: E501
         captured["plan_steps"] = plan_steps
         captured["current_input"] = current_input
         captured["start_stage"] = start_stage

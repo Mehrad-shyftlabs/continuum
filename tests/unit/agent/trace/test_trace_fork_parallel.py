@@ -63,12 +63,15 @@ class _FakeRunner:
                 agent.name, 1, output=f"{agent.name} llm", agent_stack=[agent.name]
             )
             context.recorder.record_tool_call(
-                agent.name, 1, "t", {"q": input}, content,
-                parent_id=parent, agent_stack=[agent.name],
+                agent.name,
+                1,
+                "t",
+                {"q": input},
+                content,
+                parent_id=parent,
+                agent_stack=[agent.name],
             )
-        return AgentResponse(
-            content=content, agent_name=agent.name, status=ResponseStatus.SUCCESS
-        )
+        return AgentResponse(content=content, agent_name=agent.name, status=ResponseStatus.SUCCESS)
 
 
 def test_parallel_satisfies_forkable() -> None:
@@ -103,9 +106,7 @@ async def test_parallel_ordered_capture_is_deterministic() -> None:
 
     # Branch steps are contiguous and stage-indexed; web before db, then merge.
     step_stage, stage_first = segment_by_markers(trace)
-    branch_stages = [
-        step_stage[s.step_id] for s in steps if s.kind != StepKind.WORKFLOW_STEP
-    ]
+    branch_stages = [step_stage[s.step_id] for s in steps if s.kind != StepKind.WORKFLOW_STEP]
     assert branch_stages == [0, 0, 1, 1, 2]  # two branches (2 steps each) + merge step
     assert set(stage_first) == {0, 1, 2}
 
@@ -164,7 +165,5 @@ async def test_parallel_resume_reruns_only_forked_branch() -> None:
     # The re-run branch's input was the override-applied recovered input.
     from continuum.agent.trace.types import StepKind
 
-    tool_steps = [
-        s for s in ctx.recorder.trace.steps if s.kind == StepKind.TOOL_CALL
-    ]
+    tool_steps = [s for s in ctx.recorder.trace.steps if s.kind == StepKind.TOOL_CALL]
     assert any(s.input.get("args", {}).get("q") == "edited web input" for s in tool_steps)

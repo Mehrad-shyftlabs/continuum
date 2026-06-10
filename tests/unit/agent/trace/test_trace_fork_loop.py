@@ -61,7 +61,9 @@ async def test_loop_resume_from_starts_at_iteration(monkeypatch) -> None:
 
     captured: dict = {}
 
-    async def fake_drive(self, current_input, runner, context, *, start_iteration, original_input, llm_client):  # noqa: E501
+    async def fake_drive(
+        self, current_input, runner, context, *, start_iteration, original_input, llm_client
+    ):  # noqa: E501
         captured["start_iteration"] = start_iteration
         captured["current_input"] = current_input
         captured["original_input"] = original_input

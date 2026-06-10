@@ -91,11 +91,7 @@ async def test_scatter_ordered_capture_one_marker_per_branch() -> None:
     assert marker_stages == [0, 1, 2, 3]
 
     # Branch steps fall into contiguous stages 0..2, gather LLM step into stage 3.
-    branch_stages = {
-        step_stage[s.step_id]
-        for s in trace.steps
-        if s.kind != StepKind.WORKFLOW_STEP
-    }
+    branch_stages = {step_stage[s.step_id] for s in trace.steps if s.kind != StepKind.WORKFLOW_STEP}
     assert branch_stages == {0, 1, 2, 3}
     assert set(stage_first) == {0, 1, 2, 3}
 
@@ -115,7 +111,9 @@ def _parent_scatter_trace() -> tuple[object, list[str]]:
     rec = TraceRecorder("scatter-parent", root_agent="market-scatter", checkpoint=True)
     branch_step_ids: list[str] = []
     for i, name in enumerate(["financials", "competitors", "news"]):
-        rec.record_workflow_step("market-scatter", stage=i, label=name, agent_stack=["market-scatter"])
+        rec.record_workflow_step(
+            "market-scatter", stage=i, label=name, agent_stack=["market-scatter"]
+        )
         sid = rec.record_llm_call(
             name,
             1,
@@ -124,7 +122,9 @@ def _parent_scatter_trace() -> tuple[object, list[str]]:
             messages_snapshot=[{"role": "user", "content": f"slice {name}"}],
         )
         branch_step_ids.append(sid)
-    rec.record_workflow_step("market-scatter", stage=3, label="gather", agent_stack=["market-scatter"])
+    rec.record_workflow_step(
+        "market-scatter", stage=3, label="gather", agent_stack=["market-scatter"]
+    )
     rec.record(
         StepKind.LLM_CALL, "market-scatter", agent_stack=["market-scatter"], output="merged cached"
     )
@@ -156,9 +156,7 @@ async def test_scatter_resume_reruns_only_forked_branch() -> None:
 
     # Override flowed into the re-run input via the branch's recorded snapshot.
     forked_steps = [
-        s
-        for s in ctx.recorder.trace.steps
-        if s.agent_name == "competitors" and s.messages_snapshot
+        s for s in ctx.recorder.trace.steps if s.agent_name == "competitors" and s.messages_snapshot
     ]
     assert forked_steps
     assert forked_steps[-1].messages_snapshot[-1]["content"] == "edited competitors slice"

@@ -55,7 +55,9 @@ async def test_reflection_resume_from_starts_at_attempt(monkeypatch) -> None:
 
     captured: dict = {}
 
-    async def fake_drive(self, current_input, runner, context, *, start_attempt, original_input, llm_client):  # noqa: E501
+    async def fake_drive(
+        self, current_input, runner, context, *, start_attempt, original_input, llm_client
+    ):  # noqa: E501
         captured["start_attempt"] = start_attempt
         captured["current_input"] = current_input
         captured["original_input"] = original_input

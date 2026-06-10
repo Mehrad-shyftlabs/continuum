@@ -122,7 +122,9 @@ def _parent_debate_trace() -> tuple[object, dict[int, str]]:
         (2, "arch-debate-judge", "assembled judge prompt"),
     ]
     for stage, agent, user_msg in specs:
-        rec.record_workflow_step("arch-debate", stage=stage, label=agent, agent_stack=["arch-debate"])
+        rec.record_workflow_step(
+            "arch-debate", stage=stage, label=agent, agent_stack=["arch-debate"]
+        )
         sid = rec.record_llm_call(
             agent,
             1,

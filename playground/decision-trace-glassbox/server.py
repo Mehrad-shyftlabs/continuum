@@ -29,33 +29,90 @@ ESCALATION_FLOOR_USD = 1_000_000  # SOX-style floor: $1M+ items can't be silentl
 
 ENTITIES = [
     {"name": "Alpha Corp", "assets": 48_000_000, "liabilities": 30_000_000, "equity": 18_000_000},
-    {"name": "Beta Holdings", "assets": 26_000_000, "liabilities": 15_000_000, "equity": 11_000_000},
+    {
+        "name": "Beta Holdings",
+        "assets": 26_000_000,
+        "liabilities": 15_000_000,
+        "equity": 11_000_000,
+    },
     {"name": "Gamma Labs", "assets": 19_000_000, "liabilities": 12_000_000, "equity": 7_000_000},
 ]
 
 # Only D1 affects the balance (a real $2M misstatement); the rest are immaterial.
 DISCREPANCIES = [
-    {"id": "D1", "entity": "Alpha Corp", "account": "1990 — Suspense / unreconciled bank posting",
-     "amount_usd": 2_000_000, "affects_balance": True, "kind": "misstatement"},
-    {"id": "D2", "entity": "Beta Holdings", "account": "2100 — Vendor accrual",
-     "amount_usd": 120_000, "affects_balance": False, "kind": "timing"},
-    {"id": "D3", "entity": "Alpha Corp", "account": "7400 — FX revaluation",
-     "amount_usd": 40_000, "affects_balance": False, "kind": "rounding"},
-    {"id": "D4", "entity": "Gamma Labs", "account": "5100 — Payroll accrual",
-     "amount_usd": 85_000, "affects_balance": False, "kind": "timing"},
-    {"id": "D5", "entity": "Beta Holdings", "account": "1200 — AR cutoff",
-     "amount_usd": 260_000, "affects_balance": False, "kind": "timing"},
-    {"id": "D6", "entity": "Gamma Labs", "account": "1400 — Inventory write-down",
-     "amount_usd": 300_000, "affects_balance": False, "kind": "estimate"},
-    {"id": "D7", "entity": "Alpha Corp", "account": "2400 — Lease reclassification",
-     "amount_usd": 75_000, "affects_balance": False, "kind": "reclassification"},
+    {
+        "id": "D1",
+        "entity": "Alpha Corp",
+        "account": "1990 — Suspense / unreconciled bank posting",
+        "amount_usd": 2_000_000,
+        "affects_balance": True,
+        "kind": "misstatement",
+    },
+    {
+        "id": "D2",
+        "entity": "Beta Holdings",
+        "account": "2100 — Vendor accrual",
+        "amount_usd": 120_000,
+        "affects_balance": False,
+        "kind": "timing",
+    },
+    {
+        "id": "D3",
+        "entity": "Alpha Corp",
+        "account": "7400 — FX revaluation",
+        "amount_usd": 40_000,
+        "affects_balance": False,
+        "kind": "rounding",
+    },
+    {
+        "id": "D4",
+        "entity": "Gamma Labs",
+        "account": "5100 — Payroll accrual",
+        "amount_usd": 85_000,
+        "affects_balance": False,
+        "kind": "timing",
+    },
+    {
+        "id": "D5",
+        "entity": "Beta Holdings",
+        "account": "1200 — AR cutoff",
+        "amount_usd": 260_000,
+        "affects_balance": False,
+        "kind": "timing",
+    },
+    {
+        "id": "D6",
+        "entity": "Gamma Labs",
+        "account": "1400 — Inventory write-down",
+        "amount_usd": 300_000,
+        "affects_balance": False,
+        "kind": "estimate",
+    },
+    {
+        "id": "D7",
+        "entity": "Alpha Corp",
+        "account": "2400 — Lease reclassification",
+        "amount_usd": 75_000,
+        "affects_balance": False,
+        "kind": "reclassification",
+    },
 ]
 
 INTERCOMPANY = [
-    {"id": "IC1", "from_entity": "Alpha Corp", "to_entity": "Beta Holdings",
-     "amount_usd": 1_500_000, "description": "Intercompany management fee"},
-    {"id": "IC2", "from_entity": "Beta Holdings", "to_entity": "Gamma Labs",
-     "amount_usd": 900_000, "description": "Intercompany inventory transfer"},
+    {
+        "id": "IC1",
+        "from_entity": "Alpha Corp",
+        "to_entity": "Beta Holdings",
+        "amount_usd": 1_500_000,
+        "description": "Intercompany management fee",
+    },
+    {
+        "id": "IC2",
+        "from_entity": "Beta Holdings",
+        "to_entity": "Gamma Labs",
+        "amount_usd": 900_000,
+        "description": "Intercompany inventory transfer",
+    },
 ]
 
 
@@ -93,10 +150,20 @@ def assess_materiality(threshold_usd: int) -> dict:
     for d in DISCREPANCIES:
         material = d["amount_usd"] >= threshold_usd
         (material_ids if material else waived_ids).append(d["id"])
-        assessments.append({"id": d["id"], "amount_usd": d["amount_usd"],
-                            "affects_balance": d["affects_balance"], "material": material})
-    return {"threshold_usd": threshold_usd, "assessments": assessments,
-            "material_ids": material_ids, "waived_ids": waived_ids}
+        assessments.append(
+            {
+                "id": d["id"],
+                "amount_usd": d["amount_usd"],
+                "affects_balance": d["affects_balance"],
+                "material": material,
+            }
+        )
+    return {
+        "threshold_usd": threshold_usd,
+        "assessments": assessments,
+        "material_ids": material_ids,
+        "waived_ids": waived_ids,
+    }
 
 
 @mcp.tool()
@@ -110,8 +177,9 @@ def compute_consolidation(threshold_usd: int) -> dict:
     → CLEAN). Narrate the result, do not recompute."""
     booked = {d["id"] for d in DISCREPANCIES if d["amount_usd"] >= threshold_usd}
     required = sum(d["amount_usd"] for d in DISCREPANCIES if d["affects_balance"])
-    booked_amt = sum(d["amount_usd"] for d in DISCREPANCIES
-                     if d["affects_balance"] and d["id"] in booked)
+    booked_amt = sum(
+        d["amount_usd"] for d in DISCREPANCIES if d["affects_balance"] and d["id"] in booked
+    )
     suspense = required - booked_amt
     balanced = suspense == 0
     return {

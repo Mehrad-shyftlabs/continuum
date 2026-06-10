@@ -457,9 +457,7 @@ class DebateAgent(BaseAgent):
         if stage_idx < self._judge_stage:
             # Round-level resume: re-run both debaters (with the edit applied to
             # the recovered round input) and then the judge.
-            new_input = resumed_input(
-                stage_first.get(stage_idx), override, parent_trace.user_query
-            )
+            new_input = resumed_input(stage_first.get(stage_idx), override, parent_trace.user_query)
             pro_content, con_content, debater_usage = await self._run_debaters(
                 new_input, runner, context
             )

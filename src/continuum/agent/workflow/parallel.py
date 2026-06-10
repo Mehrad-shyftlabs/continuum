@@ -131,9 +131,7 @@ class ParallelAgent(BaseAgent):
         tasks: list[tuple[BaseAgent, Any, asyncio.Task[AgentResponse]]] = []
         for i, agent in enumerate(self.agents):
             branch_ctx, branch_rec = branch_recorder_context(context, index=i)
-            task = asyncio.create_task(
-                self._run_agent_safe(agent, input_text, runner, branch_ctx)
-            )
+            task = asyncio.create_task(self._run_agent_safe(agent, input_text, runner, branch_ctx))
             tasks.append((agent, branch_rec, task))
 
         # Wait for all tasks with timeout
@@ -284,9 +282,7 @@ class ParallelAgent(BaseAgent):
         if stage_idx < 0 or stage_idx >= len(self.agents):
             raise ValueError(f"resume_from: branch index {stage_idx} out of range")
 
-        branch_input = resumed_input(
-            stage_first.get(stage_idx), override, parent_trace.user_query
-        )
+        branch_input = resumed_input(stage_first.get(stage_idx), override, parent_trace.user_query)
 
         created = runner.ensure_recorder(context, self.name, parent_trace.user_query)
         if created:

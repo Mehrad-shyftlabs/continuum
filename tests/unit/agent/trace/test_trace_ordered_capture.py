@@ -26,7 +26,9 @@ def test_absorb_orders_and_renumbers_branches() -> None:
     b1 = _branch("parallel", "db", 2)
 
     # Branches finished in arbitrary real order; absorb in deterministic branch order.
-    main.absorb(b1.trace.steps, stage=1, label="db", orchestrator_name="parallel")  # out of order on purpose
+    main.absorb(
+        b1.trace.steps, stage=1, label="db", orchestrator_name="parallel"
+    )  # out of order on purpose
     main.absorb(b0.trace.steps, stage=0, label="web", orchestrator_name="parallel")
 
     steps = main.trace.steps
