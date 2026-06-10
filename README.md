@@ -45,18 +45,43 @@ Build, run, and deploy reliable AI agents at enterprise scale — multi-LLM rout
 
 ## 🚀 Quick start
 
-**Requirements:** Python 3.13+ and Docker (for Redis · Milvus/Qdrant · Langfuse).
+**Requirements:** Python 3.13+ and Docker (for Redis · Qdrant/Milvus · Langfuse).
 
 ```bash
-git clone https://github.com/shyftlabs/continuum.git
-cd continuum
-
 python3.13 -m venv .venv && source .venv/bin/activate
-pip install -e .
+pip install shyftlabs-continuum
 
-cp .env.template .env        # add your provider key(s) — see Configuration below
-docker compose up -d         # Redis · Milvus/Qdrant · Langfuse
+continuum up                 # start local infra (Redis + Qdrant); writes ./.env
+echo "OPENAI_API_KEY=sk-…" >> .env   # add your provider key(s) — see Configuration below
 ```
+
+`continuum up` ships with the package — it locates the bundled Docker stack and starts
+it for you, so there's no compose file to find or copy. It defaults to the **minimal**
+profile (Redis + Qdrant); pick a bigger one with `continuum up standard` / `continuum up full`.
+
+> **Contributors** working from a clone: `git clone https://github.com/shyftlabs/continuum.git && cd continuum`,
+> then `python3.13 -m venv .venv && source .venv/bin/activate`, `pip install -e ".[dev]"`,
+> `cp .env.template .env`, and `continuum up`.
+
+#### Infrastructure profiles
+
+| Command | Services started | Use it when |
+|---|---|---|
+| `continuum up` *(minimal)* | Redis + Qdrant (2 containers) | Day-to-day development — a stateful agent with memory, nothing heavy. |
+| `continuum up standard` | minimal + Langfuse stack (8) | You want tracing/observability in the [Langfuse UI](http://localhost:3000). |
+| `continuum up full` | everything (13), incl. Temporal + Milvus | Durable workflows (Temporal) or the Milvus vector store. |
+
+Each profile also writes a managed block to `./.env` (`VECTOR_STORE_PROVIDER`, `LANGFUSE_ENABLED`, …)
+so the SDK only talks to services that are actually running. Other commands:
+`continuum down [-v]`, `continuum status`, `continuum logs [service] [-f]`, `continuum config-path`.
+
+**Port conflicts?** Every published host port is overridable via `.env` (defaults shown):
+`SESSION_REDIS_PORT=6380`, `QDRANT_PORT=6333`, `QDRANT_GRPC_PORT=6334`, `MILVUS_PORT=19530`,
+`LANGFUSE_WEB_PORT=3000`, `LANGFUSE_WORKER_PORT=3030`, `LANGFUSE_POSTGRES_PORT=5433`,
+`LANGFUSE_REDIS_PORT=6382`, `CLICKHOUSE_HTTP_PORT=8123`, `CLICKHOUSE_NATIVE_PORT=9000`,
+`MINIO_API_PORT=9090`, `MINIO_CONSOLE_PORT=9091`, `TEMPORAL_PORT=7233`, `TEMPORAL_UI_PORT=8233`,
+`TEMPORAL_POSTGRES_PORT=5434`. For the stores the SDK connects to (`QDRANT_PORT`, `MILVUS_PORT`,
+`SESSION_REDIS_PORT`), the same variable drives both the container and the client, so they stay in sync.
 
 Your first agent:
 
