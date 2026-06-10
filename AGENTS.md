@@ -272,10 +272,10 @@ When the participant asks a topical question, point them at the right doc.
 
 - Start from `playground/memory-modes-demo/` or `playground/sdk_feature_test/`
   and incrementally add memory/tools/handoffs.
-- Use `docker compose ps` to confirm Redis + Qdrant are healthy before running memory examples.
-- For tracing, run `docker compose up -d langfuse` (or full Langfuse stack) and visit `http://localhost:3000`.
+- Use `continuum status` to confirm Redis + Qdrant are healthy before running memory examples.
+- For tracing, run `continuum up standard` (adds the Langfuse stack) and visit `http://localhost:3000`.
 - For durable workflows, install the temporal extra (`pip install -e ".[temporal]"`),
-  run `docker compose --profile temporal up -d`, and visit `http://localhost:8080`.
+  run `continuum up full` (adds Temporal + Milvus), and visit `http://localhost:8233`.
 - If you change `.env`, re-source / restart the venv shell — pydantic-settings reads on import.
 - Editable install for development: `pip install -e ".[dev,temporal,eval]"`.
 - Run the test suite with `pytest -m unit` (or `-m integration` once infra is up).

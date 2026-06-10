@@ -923,7 +923,7 @@ ANONYMIZED_TELEMETRY=false
 TOKENIZERS_PARALLELISM=false</pre></div>
 
       <p style="margin-top: 1rem; margin-bottom: 0.5rem; color: #4b5563;">Finally, spin up the infrastructure:</p>
-      <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>docker compose up -d       <span class="cm"># Redis (:6380) + Milvus (:19530)</span></pre></div>
+      <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>continuum up               <span class="cm"># Redis + Qdrant (minimal); `continuum up full` adds Langfuse · Temporal · Milvus</span></pre></div>
     </li>
     <li>
       <strong>Create and run your first agent</strong>
@@ -2524,7 +2524,7 @@ Session/memory:  Redis (:6380)  ·  Milvus (:19530)</pre></div>
   <ol class="steps">
     <li><strong>Continuum stack</strong> — Redis, Milvus, Langfuse, ClickHouse, Postgres, MinIO
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>cd continuum
-docker compose up -d redis-sdk milvus milvus-etcd postgres clickhouse minio langfuse-web langfuse-worker</pre></div>
+continuum up full</pre></div>
     </li>
     <li><strong>Smart Inference gateway</strong> — build, then run from Docker (sharing Continuum's Langfuse Redis)
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>cd ../continuum-backend-smart-inference
@@ -2715,7 +2715,7 @@ mypy src/</pre>
   </ol>
 
   <div class="callout callout-warn">
-    <strong>Integration tests over mocks:</strong> Continuum integration tests hit real services (Redis, Qdrant/Milvus). Run <code>docker compose up -d</code> before running the test suite.
+    <strong>Integration tests over mocks:</strong> Continuum integration tests hit real services (Redis, Qdrant/Milvus). Run <code>continuum up</code> before running the test suite.
   </div>
 
 
