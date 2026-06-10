@@ -6,10 +6,14 @@ Extracted from AgentRunner to provide clean separation of concerns.
 
 from __future__ import annotations
 
-import copy
 from typing import TYPE_CHECKING, Any
 
 from orchestrator.agent.exceptions import MaxTurnsExceededError
+from orchestrator.agent.execution.trace_capture import (
+    capture_snapshot,
+    record_llm_turn,
+    record_tool_steps,
+)
 from orchestrator.agent.interfaces.executor_interface import IExecutor
 from orchestrator.agent.types import (
     AgentResponse,
@@ -33,49 +37,6 @@ if TYPE_CHECKING:
     from orchestrator.llm import LLMClient
 
 logger = get_logger(__name__)
-
-
-def _record_tool_steps(
-    recorder: Any,
-    agent_name: str,
-    turn: int,
-    tool_calls: list[Any],
-    tool_results: list[dict[str, Any]],
-    parent_id: str | None,
-    agent_stack: list[str] | None = None,
-) -> None:
-    """Record one TOOL_CALL decision step per executed tool, pairing each call
-    with its result by ``tool_call_id`` (best-effort)."""
-    import json as _json
-
-    results_by_id: dict[str, Any] = {}
-    for r in tool_results:
-        rid = r.get("tool_call_id") if isinstance(r, dict) else None
-        if rid:
-            results_by_id[rid] = r.get("content")
-    for tc in tool_calls:
-        name = (
-            tc.function.name if hasattr(tc, "function") else tc.get("function", {}).get("name", "")
-        )
-        raw_args = (
-            tc.function.arguments
-            if hasattr(tc, "function")
-            else tc.get("function", {}).get("arguments", "{}")
-        )
-        try:
-            args = _json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-        except Exception:
-            args = raw_args
-        tc_id = tc.id if hasattr(tc, "id") else tc.get("id", "")
-        recorder.record_tool_call(
-            agent_name,
-            turn,
-            name,
-            args,
-            results_by_id.get(tc_id),
-            parent_id=parent_id,
-            agent_stack=agent_stack,
-        )
 
 
 def _enrich_config_for_gateway(config: LLMConfig, context: RunContext) -> LLMConfig:
@@ -333,15 +294,9 @@ class Executor(IExecutor):
                 # clobber each other's stack. Recomputed each turn, so it's also
                 # correct after a return-to-parent handoff pops the child.
                 _agent_stack = run_state.get_agent_stack_snapshot()
-                # deepcopy so the snapshot is fully independent of the live message
-                # list — message_to_dict returns dicts by reference, so without this
-                # any later in-place edit of a message would corrupt this stored
-                # snapshot (and thus a fork replayed from it).
-                _snapshot = (
-                    copy.deepcopy([message_to_dict(m) for m in llm_messages])
-                    if recorder is not None and recorder.checkpoint
-                    else None
-                )
+                # Checkpoint the messages sent this turn BEFORE the assistant
+                # output is appended below (shared with the streaming path).
+                _snapshot = capture_snapshot(recorder, llm_messages)
 
                 # Add assistant message
                 assistant_msg = {
@@ -357,20 +312,16 @@ class Executor(IExecutor):
                 run_state.messages = [message_to_dict(m) for m in messages]
 
                 # Record this turn's LLM decision (nests reasoning/tool steps below it).
-                llm_step_id: str | None = None
-                if recorder is not None:
-                    _u = response.usage
-                    llm_step_id = recorder.record_llm_call(
-                        agent.name,
-                        turn,
-                        output=response.content or "",
-                        decision="tool_call" if response.tool_calls else "final_answer",
-                        prompt_tokens=(_u.prompt_tokens or 0) if _u else 0,
-                        completion_tokens=(_u.completion_tokens or 0) if _u else 0,
-                        total_tokens=(_u.total_tokens or 0) if _u else 0,
-                        messages_snapshot=_snapshot,
-                        agent_stack=_agent_stack,
-                    )
+                llm_step_id = record_llm_turn(
+                    recorder,
+                    agent.name,
+                    turn,
+                    content=response.content,
+                    has_tool_calls=bool(response.tool_calls),
+                    usage=response.usage,
+                    snapshot=_snapshot,
+                    agent_stack=_agent_stack,
+                )
 
                 # Log LLM response details
                 if response.model and settings.smart_gateway_url:
@@ -487,7 +438,7 @@ class Executor(IExecutor):
                         messages.extend(tool_results)
 
                         if recorder is not None:
-                            _record_tool_steps(
+                            record_tool_steps(
                                 recorder,
                                 agent.name,
                                 turn,

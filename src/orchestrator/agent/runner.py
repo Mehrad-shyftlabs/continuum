@@ -27,6 +27,12 @@ from orchestrator.agent.execution.run_finalizer import RunFinalizer
 from orchestrator.agent.execution.run_lifecycle import RunLifecycle
 from orchestrator.agent.execution.stream_executor import StreamExecutor
 from orchestrator.agent.execution.tool_handler import ToolHandler
+from orchestrator.agent.execution.trace_capture import (
+    capture_snapshot,
+    latest_step_payload,
+    record_llm_turn,
+    record_tool_steps,
+)
 from orchestrator.agent.handoff.manager import HandoffManager
 from orchestrator.agent.persistence.state import RunStateManager
 from orchestrator.agent.services.context_service import ContextService
@@ -878,6 +884,55 @@ class AgentRunner:
                     trace_id=ctx.trace_id,
                     run_artifacts={"routing": last_routing} if last_routing else None,
                 )
+
+                # Decision-trace capture for the smart-layer (model_tier) streaming
+                # router path: record the routing decision + the answer with a
+                # checkpoint, so this run is inspectable and forkable like the
+                # normal streaming loop. Captured BEFORE the assistant message is
+                # appended below (the snapshot is the fork resume point).
+                if ctx.recorder is not None:
+                    from orchestrator.agent.trace.types import StepKind
+
+                    _agent_stack = run_state.get_agent_stack_snapshot()
+                    _snapshot = capture_snapshot(ctx.recorder, messages)
+                    ctx.recorder.record(
+                        StepKind.ROUTING,
+                        agent.name,
+                        agent_stack=_agent_stack,
+                        input=user_text,
+                        decision=last_routing or {},
+                        rationale=(
+                            f"model_tier → {last_routing.get('tier')}" if last_routing else ""
+                        ),
+                        messages_snapshot=_snapshot,
+                    )
+                    if (_ds := latest_step_payload(ctx.recorder)) is not None:
+                        yield AgentEvent(
+                            type=EventType.DECISION_STEP,
+                            agent_name=agent.name,
+                            run_id=ctx.run_id,
+                            data=_ds,
+                            trace_id=ctx.trace_id,
+                        )
+                    record_llm_turn(
+                        ctx.recorder,
+                        agent.name,
+                        1,
+                        content=content,
+                        has_tool_calls=False,
+                        usage=None,
+                        snapshot=_snapshot,
+                        agent_stack=_agent_stack,
+                    )
+                    if (_ds := latest_step_payload(ctx.recorder)) is not None:
+                        yield AgentEvent(
+                            type=EventType.DECISION_STEP,
+                            agent_name=agent.name,
+                            run_id=ctx.run_id,
+                            data=_ds,
+                            trace_id=ctx.trace_id,
+                        )
+
                 if content:
                     messages.append({"role": "assistant", "content": content})
 
@@ -1027,6 +1082,32 @@ class AgentRunner:
                         trace_id=ctx.trace_id,
                     )
 
+                # Decision-trace capture (parity with the non-streaming executor):
+                # checkpoint the messages sent this turn (the fork resume point) and
+                # record this turn's LLM decision, BEFORE appending the assistant
+                # message below. Records every turn — including the final no-tool
+                # turn — so a streamed run is inspectable and forkable.
+                _agent_stack = run_state.get_agent_stack_snapshot()
+                _snapshot = capture_snapshot(ctx.recorder, llm_messages)
+                llm_step_id = record_llm_turn(
+                    ctx.recorder,
+                    agent.name,
+                    turn,
+                    content=content,
+                    has_tool_calls=bool(tool_calls),
+                    usage=None,
+                    snapshot=_snapshot,
+                    agent_stack=_agent_stack,
+                )
+                if (_ds := latest_step_payload(ctx.recorder)) is not None:
+                    yield AgentEvent(
+                        type=EventType.DECISION_STEP,
+                        agent_name=agent.name,
+                        run_id=ctx.run_id,
+                        data=_ds,
+                        trace_id=ctx.trace_id,
+                    )
+
                 if tool_calls:
                     messages.append(
                         {
@@ -1055,6 +1136,25 @@ class AgentRunner:
                                 data={"target": target},
                                 trace_id=ctx.trace_id,
                             )
+
+                            if ctx.recorder is not None:
+                                _hc = agent.get_handoff(target)
+                                ctx.recorder.record_handoff(
+                                    agent.name,
+                                    target,
+                                    turn,
+                                    parent_id=llm_step_id,
+                                    agent_stack=_agent_stack,
+                                    return_to_parent=bool(_hc and _hc.return_to_parent),
+                                )
+                                if (_ds := latest_step_payload(ctx.recorder)) is not None:
+                                    yield AgentEvent(
+                                        type=EventType.DECISION_STEP,
+                                        agent_name=agent.name,
+                                        run_id=ctx.run_id,
+                                        data=_ds,
+                                        trace_id=ctx.trace_id,
+                                    )
 
                             if not self._handoff_executor:
                                 yield AgentEvent(
@@ -1156,6 +1256,24 @@ class AgentRunner:
                                 agent, tc, ctx
                             )
                             messages.append(tool_result)
+                            if ctx.recorder is not None:
+                                record_tool_steps(
+                                    ctx.recorder,
+                                    agent.name,
+                                    turn,
+                                    [tc],
+                                    [tool_result],
+                                    parent_id=llm_step_id,
+                                    agent_stack=_agent_stack,
+                                )
+                                if (_ds := latest_step_payload(ctx.recorder)) is not None:
+                                    yield AgentEvent(
+                                        type=EventType.DECISION_STEP,
+                                        agent_name=agent.name,
+                                        run_id=ctx.run_id,
+                                        data=_ds,
+                                        trace_id=ctx.trace_id,
+                                    )
                             yield AgentEvent(
                                 type=EventType.TOOL_CALL_END,
                                 agent_name=agent.name,

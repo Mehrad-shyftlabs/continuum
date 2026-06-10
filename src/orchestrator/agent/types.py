@@ -91,6 +91,10 @@ class EventType(str, Enum):
     WORKFLOW_STEP = "workflow_step"
     LOOP_ITERATION = "loop_iteration"
 
+    # Decision-trace events — one per recorded trace step, so a streaming client
+    # can watch the decision trace build in real time (S2).
+    DECISION_STEP = "decision_step"
+
 
 class MemoryScope(str, Enum):
     """Scope for memory operations."""

@@ -179,7 +179,10 @@ class ParallelAgent(BaseAgent):
         # contiguous, stage-indexed segments regardless of wall-clock interleaving.
         if context.recorder is not None:
             for i, (agent, branch_rec, _task) in enumerate(tasks):
-                if branch_rec is not None and agent.name in successful:
+                if branch_rec is not None:
+                    # Absorb EVERY branch (incl. failed → empty/partial steps) so
+                    # stage indices stay contiguous and the trace shows all
+                    # branches, matching Scatter.
                     context.recorder.absorb(
                         branch_rec.trace.steps,
                         stage=i,
@@ -216,6 +219,17 @@ class ParallelAgent(BaseAgent):
             input_text,
             llm_client,
         )
+
+        # Record the synthesis/merge as its own stage so the final answer (and the
+        # fact that a merge happened) is visible in the trace, mirroring Scatter's
+        # explicit gather stage.
+        if context.recorder is not None:
+            context.recorder.record_workflow_step(
+                self.name, stage=len(self.agents), label="merge", agent_stack=[self.name]
+            )
+            context.recorder.record_llm_call(
+                self.name, 0, output=merged, decision="merge", agent_stack=[self.name]
+            )
 
         # Calculate totals
         total_usage = TokenUsage()

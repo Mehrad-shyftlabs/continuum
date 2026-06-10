@@ -88,25 +88,26 @@ async def test_parallel_ordered_capture_is_deterministic() -> None:
     trace = runner.persisted["trace"]
     steps = trace.steps
 
-    # One WORKFLOW_STEP marker per branch, in agent order (web=stage 0, db=stage 1).
+    # One WORKFLOW_STEP marker per branch (web=stage 0, db=stage 1) plus the
+    # merge/synthesis stage (stage 2), in order.
     from orchestrator.agent.trace.types import StepKind
 
     markers = [s for s in steps if s.kind == StepKind.WORKFLOW_STEP]
-    assert len(markers) == 2
-    assert [m.decision["stage"] for m in markers] == [0, 1]
-    assert [m.decision["label"] for m in markers] == ["web", "db"]
+    assert len(markers) == 3
+    assert [m.decision["stage"] for m in markers] == [0, 1, 2]
+    assert [m.decision["label"] for m in markers] == ["web", "db", "merge"]
 
     # Step ids are unique after renumbering.
     ids = [s.step_id for s in steps]
     assert len(ids) == len(set(ids))
 
-    # Branch steps are contiguous and stage-indexed; web before db.
+    # Branch steps are contiguous and stage-indexed; web before db, then merge.
     step_stage, stage_first = segment_by_markers(trace)
     branch_stages = [
         step_stage[s.step_id] for s in steps if s.kind != StepKind.WORKFLOW_STEP
     ]
-    assert branch_stages == [0, 0, 1, 1]  # contiguous, in order
-    assert set(stage_first) == {0, 1}
+    assert branch_stages == [0, 0, 1, 1, 2]  # two branches (2 steps each) + merge step
+    assert set(stage_first) == {0, 1, 2}
 
     # Orchestrator prepended to every absorbed branch step's stack.
     for s in steps:
