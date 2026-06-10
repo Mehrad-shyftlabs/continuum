@@ -55,6 +55,10 @@ class ReflectionAgent(BaseAgent):
     # Reflection configuration
     reflection_config: ReflectionConfig = field(default_factory=ReflectionConfig)
 
+    # Agent whose memory_config governs post-execution long-term memory writes.
+    # Defaults to the inner agent (the natural producer of the final output).
+    memory_agent: BaseAgent | None = None
+
     def __post_init__(self) -> None:
         if not self.name:
             from continuum.agent.exceptions import AgentConfigurationError
@@ -149,7 +153,7 @@ class ReflectionAgent(BaseAgent):
                     session_id=context.session_id,
                     user_message=input_text,
                     assistant_message=response.content or "",
-                    agent=None,
+                    agent=self.memory_agent,
                 )
 
             return AgentResponse(
@@ -307,6 +311,7 @@ def create_reflection_agent(
     critique_prompt: str | None = None,
     max_reflections: int = 2,
     reflection_model: str | None = None,
+    memory_agent: BaseAgent | None = None,
 ) -> ReflectionAgent:
     """
     Factory function to create a reflection agent.
@@ -332,4 +337,5 @@ def create_reflection_agent(
         name=name,
         agent=agent,
         reflection_config=config,
+        memory_agent=memory_agent,
     )

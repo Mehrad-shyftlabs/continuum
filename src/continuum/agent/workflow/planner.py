@@ -88,6 +88,10 @@ class PlannerAgent(BaseAgent):
     # Planning configuration
     planning_config: PlanningConfig = field(default_factory=PlanningConfig)
 
+    # Agent whose memory_config governs post-execution long-term memory writes.
+    # If None (default), no memory is written after the planner completes.
+    memory_agent: BaseAgent | None = None
+
     def __post_init__(self) -> None:
         if not self.name:
             from continuum.agent.exceptions import AgentConfigurationError
@@ -356,7 +360,7 @@ class PlannerAgent(BaseAgent):
                     session_id=context.session_id,
                     user_message=input_text,
                     assistant_message=final_content or "",
-                    agent=None,
+                    agent=self.memory_agent,
                 )
 
             return result
@@ -614,6 +618,7 @@ def create_planner_agent(
     planning_model: str | None = None,
     fail_strategy: FailStrategy = FailStrategy.FAIL_FAST,
     strict_agent_pool: bool = False,
+    memory_agent: BaseAgent | None = None,
 ) -> PlannerAgent:
     """
     Factory function to create a planner agent.
@@ -667,6 +672,7 @@ def create_planner_agent(
         instructions=instructions,
         agent=agent,
         agents=agents or [],
+        memory_agent=memory_agent,
         planning_config=PlanningConfig(
             max_steps=max_steps,
             enable_replanning=enable_replanning,

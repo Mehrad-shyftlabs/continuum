@@ -140,6 +140,10 @@ class DAGAgent(BaseAgent):
     # Whether to stop immediately when any stage raises an exception.
     fail_strategy: FailStrategy = FailStrategy.FAIL_FAST
 
+    # Agent whose memory_config governs post-execution long-term memory writes.
+    # If None (default), no memory is written after the DAG completes.
+    memory_agent: BaseAgent | None = None
+
     def __post_init__(self) -> None:
         if not self.name:
             from continuum.agent.exceptions import AgentConfigurationError
@@ -266,7 +270,7 @@ class DAGAgent(BaseAgent):
                     session_id=context.session_id,
                     user_message=input_text,
                     assistant_message=content,
-                    agent=None,
+                    agent=self.memory_agent,
                 )
 
             return AgentResponse(
@@ -422,6 +426,7 @@ def create_dag_agent(
     *,
     merge_strategy: MergeStrategy = MergeStrategy.CONCATENATE,
     fail_strategy: FailStrategy = FailStrategy.FAIL_FAST,
+    memory_agent: BaseAgent | None = None,
 ) -> DAGAgent:
     """Create a DAGAgent from a flat list of ``(stage_id, agent, depends_on)`` tuples.
 
@@ -440,7 +445,12 @@ def create_dag_agent(
             ],
         )
     """
-    dag = DAGAgent(name=name, merge_strategy=merge_strategy, fail_strategy=fail_strategy)
+    dag = DAGAgent(
+        name=name,
+        merge_strategy=merge_strategy,
+        fail_strategy=fail_strategy,
+        memory_agent=memory_agent,
+    )
     for stage_id, agent, depends_on in stages:
         dag.add_stage(stage_id, agent, depends_on)
     return dag

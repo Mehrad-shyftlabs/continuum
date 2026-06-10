@@ -373,8 +373,8 @@ def setup_logging(
     if json_format is None:
         json_format = settings.environment in ("production", "staging")
 
-    # Get root orchestrator logger
-    root_logger = logging.getLogger("orchestrator")
+    # Get root continuum logger
+    root_logger = logging.getLogger("continuum")
     root_logger.setLevel(log_level)
 
     # Remove existing handlers
@@ -409,7 +409,7 @@ def get_logger(name: str | None = None) -> OrchestratorLogger:
     Get a logger instance for the given name.
 
     Args:
-        name: Logger name (typically __name__). If None, returns root orchestrator logger.
+        name: Logger name (typically __name__). If None, returns root continuum logger.
 
     Returns:
         Configured OrchestratorLogger instance.
@@ -429,10 +429,10 @@ def get_logger(name: str | None = None) -> OrchestratorLogger:
     if not _initialized:
         setup_logging()
 
-    # Default to orchestrator namespace
+    # Default to continuum namespace
     if name is None:
-        name = "orchestrator"
-    elif not name.startswith("orchestrator"):
+        name = "continuum"
+    elif not name.startswith("continuum"):
         name = f"continuum.{name}"
 
     # Return cached logger or create new one
@@ -478,7 +478,7 @@ def logger_for_module(module_name: str) -> OrchestratorLogger:
         logger = logger_for_module(__name__)
         ```
     """
-    # Extract the relevant part after 'orchestrator'
+    # Ensure the module name is under the 'continuum' namespace
     if module_name.startswith("continuum."):
         return get_logger(module_name)
     return get_logger(f"continuum.{module_name}")

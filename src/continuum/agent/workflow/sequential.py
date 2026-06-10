@@ -78,6 +78,10 @@ class SequentialAgent(BaseAgent):
     # Sequential configuration
     sequential_config: SequentialConfig = field(default_factory=SequentialConfig)
 
+    # Agent whose memory_config governs post-sequence long-term memory writes.
+    # If None (default), no memory is written after the sequence completes.
+    memory_agent: BaseAgent | None = None
+
     def __post_init__(self) -> None:
         """Initialize sequential agent."""
         # Skip base validation as we're a composite agent
@@ -260,7 +264,7 @@ class SequentialAgent(BaseAgent):
                     session_id=context.session_id,
                     user_message=input_text,
                     assistant_message=final_response.content or "",
-                    agent=None,
+                    agent=self.memory_agent,
                 )
 
             return result
@@ -287,6 +291,7 @@ def create_sequential_agent(
     *,
     pass_full_history: bool = False,
     fail_strategy: FailStrategy = FailStrategy.FAIL_FAST,
+    memory_agent: BaseAgent | None = None,
 ) -> SequentialAgent:
     """
     Factory function to create a sequential agent.
@@ -296,6 +301,7 @@ def create_sequential_agent(
         agents: List of agents to execute in order
         pass_full_history: Whether to pass full history to each agent
         fail_strategy: How to handle failures
+        memory_agent: Agent whose memory_config governs post-sequence long-term memory writes
 
     Returns:
         Configured SequentialAgent
@@ -303,6 +309,7 @@ def create_sequential_agent(
     return SequentialAgent(
         name=name,
         agents=agents,
+        memory_agent=memory_agent,
         sequential_config=SequentialConfig(
             pass_full_history=pass_full_history,
             fail_strategy=fail_strategy,

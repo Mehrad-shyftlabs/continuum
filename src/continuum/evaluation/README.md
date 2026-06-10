@@ -24,7 +24,7 @@ cd apps/api/shyftlabs-continuum-customer-os/src
 Generates ~408 golden cases from pgvector, then scores with RAGAS and DeepEval.
 
 ```bash
-python -m orchestrator.evaluation.build_golden_dataset --run-eval
+python -m continuum.evaluation.build_golden_dataset --run-eval
 ```
 
 **Estimated time:** ~3 hours (generation ~40 min, RAGAS ~50 min, DeepEval ~90 min)
@@ -34,8 +34,8 @@ python -m orchestrator.evaluation.build_golden_dataset --run-eval
 Skips regeneration and scores the existing dataset.
 
 ```bash
-python -m orchestrator.evaluation.build_golden_dataset \
-  --eval-only orchestrator/evaluation/eval-dataset/golden_cases.json
+python -m continuum.evaluation.build_golden_dataset \
+  --eval-only continuum/evaluation/eval-dataset/golden_cases.json
 ```
 
 **Estimated time:** ~2 hours
@@ -43,7 +43,7 @@ python -m orchestrator.evaluation.build_golden_dataset \
 ### Option 3 — Generate dataset only (no scoring)
 
 ```bash
-python -m orchestrator.evaluation.build_golden_dataset
+python -m continuum.evaluation.build_golden_dataset
 ```
 
 ---
