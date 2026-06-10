@@ -38,7 +38,7 @@ git clone https://github.com/bhavik-shyftlabs/continuum.git
 cd continuum
 
 cp .env.template .env                      # add OPENAI_API_KEY
-docker compose up -d                       # Redis (:6380) + Milvus (:19530)
+continuum up full                          # Redis · Qdrant · Langfuse · Temporal · Milvus (all tiers)
 
 python3.13 -m venv .venv
 source .venv/bin/activate
@@ -236,7 +236,7 @@ python -c "from continuum.llm.providers import get_provider; print('providers OK
 Smoke-test with infra:
 
 ```bash
-docker compose up -d
+continuum up
 python -m playground.sdk_feature_test
 ```
 
@@ -252,8 +252,8 @@ Missing credentials` means infra is fine but `OPENAI_API_KEY` isn't set
 |---|---|---|
 | `ModuleNotFoundError: continuum` | venv not active | `source .venv/bin/activate` |
 | `Failed to initialize mem0: Missing credentials` | mem0 needs OpenAI for embeddings | set `OPENAI_API_KEY` or `MEMORY_ENABLED=false` |
-| `redis.exceptions.ConnectionError` | Redis not running / wrong port | `docker compose ps`; check `SESSION_REDIS_PORT=6380` |
-| Vector store collection not found | Stale volume after schema change | `docker compose down -v && docker compose up -d` |
+| `redis.exceptions.ConnectionError` | Redis not running / wrong port | `continuum status`; check `SESSION_REDIS_PORT=6380` |
+| Vector store collection not found | Stale volume after schema change | `continuum down -v && continuum up` |
 | `aiohttp` deprecation warnings | Older aiohttp | `pip install "aiohttp>=3.13.2" --upgrade` |
 | Imports work but tools never fire | Forgot `await server.connect()` or `executor.initialize()` | Add the missing `await` |
 | `add_message() got an unexpected keyword argument 'role'` | Old API | Pass a `ChatMessage` object — see [`session.md`](session.md) |
