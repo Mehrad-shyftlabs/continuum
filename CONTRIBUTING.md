@@ -78,7 +78,7 @@ Before opening a PR:
 
 1. **Tests pass locally** — `pytest`
 2. **Lint passes** — `ruff check .`
-3. **Type-check passes** — `mypy src/orchestrator`
+3. **Type-check passes** — `mypy src/continuum`
 4. **Docs updated** if user-facing
 5. **`CHANGELOG.md` updated** under `## [Unreleased]` if user-facing
 6. **Every commit is signed off** (`git commit -s`)
@@ -129,7 +129,7 @@ pre-commit install                          # ruff lint+format on commit
 pre-commit install --hook-type pre-push     # mypy on push
 
 cp .env.template .env       # add your provider keys
-docker compose up -d        # Redis · Milvus · Langfuse
+continuum up                # start local infra (Redis + Qdrant); `continuum up full` adds Langfuse · Temporal · Milvus
 
 pytest                      # run the test suite
 ```
@@ -141,7 +141,7 @@ pytest                      # run the test suite
 ```bash
 ruff check .            # lint
 ruff format .           # format
-mypy src/orchestrator   # type-check
+mypy src/continuum      # type-check
 pre-commit run --all-files   # everything, across the whole repo
 ```
 
