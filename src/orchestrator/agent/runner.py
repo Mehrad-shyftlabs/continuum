@@ -570,8 +570,14 @@ class AgentRunner:
         restored message checkpoint) — not re-executed — and the agent loop runs
         forward from there. The parent run is never mutated; the new run records
         its lineage. Requires DECISION_TRACE_CHECKPOINT to have been on for the
-        parent run. Single-agent runs only (handoff/workflow forks are not yet
-        supported).
+        parent run.
+
+        Works for single-agent, handoff, and workflow runs: if the root agent (or
+        an explicit ``agent=``) implements the ``Forkable`` protocol — all nine
+        workflow orchestrators do — the fork delegates to its ``resume_from``;
+        otherwise it falls back to the built-in single-agent / handoff snapshot
+        replay below. The one unsupported case is a step inside a
+        ``return_to_parent`` handoff (raises a clear error — see below).
 
         Args:
             run_id: The parent run to fork from.

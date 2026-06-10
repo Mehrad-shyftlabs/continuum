@@ -126,28 +126,6 @@ class TestDecisionTrace:
 
 
 class TestTraceDetail:
-    def test_summary_shrinks_large_blobs_but_keeps_decisions(self) -> None:
-        trace = DecisionTrace(run_id="r", root_agent="a")
-        big = "x" * 5000
-        trace.add(
-            DecisionStep(
-                step_id="s1",
-                kind=StepKind.TOOL_CALL,
-                agent_name="a",
-                input=big,
-                output=big,
-                decision="call_x",
-                rationale="because reasons",
-            )
-        )
-        full = trace.to_dict(TraceDetail.FULL)["steps"][0]
-        summary = trace.to_dict(TraceDetail.SUMMARY)["steps"][0]
-
-        assert full["input"] == big  # full keeps everything
-        assert len(summary["input"]) < len(big)  # summary shrinks the blob
-        assert summary["decision"] == "call_x"  # but keeps the decision
-        assert summary["rationale"] == "because reasons"  # and the why
-
     def test_full_is_default(self) -> None:
         trace = _sample_trace()
         assert trace.to_dict() == trace.to_dict(TraceDetail.FULL)

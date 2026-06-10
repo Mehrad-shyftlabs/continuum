@@ -22,7 +22,7 @@ def trace_enabled(monkeypatch):
     from orchestrator.config import settings
 
     monkeypatch.setattr(settings, "decision_trace_enabled", True)
-    monkeypatch.setattr(settings, "decision_trace_detail", "summary")
+    monkeypatch.setattr(settings, "decision_trace_detail", "full")
     monkeypatch.setattr(settings, "decision_trace_store", "redis")
 
     from orchestrator.agent.trace import config as trace_config

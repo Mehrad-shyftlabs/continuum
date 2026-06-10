@@ -43,7 +43,6 @@ class TraceDetail(str, Enum):
     """
 
     OFF = "off"  # capture + persist, but attach nothing to the response
-    SUMMARY = "summary"  # steps + decisions + metrics, large blobs dropped
     FULL = "full"  # everything inlined (prompts, outputs)
 
 
@@ -92,8 +91,7 @@ class DecisionStep:
 
     # Resume point for fork: the exact message array sent to the LLM at this
     # step. Only populated on LLM_CALL steps when DECISION_TRACE_CHECKPOINT is on
-    # (it is heavy). Dropped from the SUMMARY response view but kept in the
-    # persisted full trace so fork() can replay from here.
+    # (it is heavy); kept in the persisted trace so fork() can replay from here.
     messages_snapshot: list[dict[str, Any]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -112,15 +110,6 @@ class DecisionStep:
         if isinstance(started, str):
             data["started_at"] = datetime.fromisoformat(started)
         return cls(**data)
-
-    def summary(self) -> DecisionStep:
-        """A lighter copy for SUMMARY detail: drop heavy input/output blobs and
-        the message checkpoint, keep the decision + rationale (what humans read)."""
-        c = copy.deepcopy(self)
-        c.input = _shrink(c.input)
-        c.output = _shrink(c.output)
-        c.messages_snapshot = None
-        return c
 
 
 @dataclass
@@ -160,7 +149,9 @@ class DecisionTrace:
         }
 
     def to_dict(self, detail: TraceDetail = TraceDetail.FULL) -> dict[str, Any]:
-        steps = self.steps if detail == TraceDetail.FULL else [s.summary() for s in self.steps]
+        # `detail` is retained for API compatibility. OFF is handled by the caller
+        # (run_finalizer skips attaching the trace), so it always serializes in full.
+        steps = self.steps
         return {
             "run_id": self.run_id,
             "root_agent": self.root_agent,
@@ -190,22 +181,3 @@ class DecisionTrace:
         if isinstance(completed, str):
             data["completed_at"] = datetime.fromisoformat(completed)
         return cls(steps=steps, **data)
-
-
-# --------------------------------------------------------------------------- #
-# Helpers
-# --------------------------------------------------------------------------- #
-_MAX_SUMMARY_LEN = 500
-
-
-def _shrink(value: Any) -> Any:
-    """Truncate large strings/containers for SUMMARY detail without losing shape."""
-    if isinstance(value, str) and len(value) > _MAX_SUMMARY_LEN:
-        return value[:_MAX_SUMMARY_LEN] + f"… [+{len(value) - _MAX_SUMMARY_LEN} chars]"
-    if isinstance(value, dict):
-        return {k: _shrink(v) for k, v in value.items()}
-    if isinstance(value, list):
-        if len(value) > 10:
-            return [_shrink(v) for v in value[:10]] + [f"… [+{len(value) - 10} items]"]
-        return [_shrink(v) for v in value]
-    return value

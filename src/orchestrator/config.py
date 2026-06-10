@@ -240,9 +240,9 @@ class Settings(BaseSettings):
     # execution path is byte-for-byte unchanged.
     decision_trace_enabled: bool = False  # DECISION_TRACE_ENABLED
     # How much of the trace is attached to the response (the full trace is always
-    # persisted): 'off' (persist only), 'summary' (steps + decisions, blobs
-    # shrunk), 'full' (everything inlined).
-    decision_trace_detail: Literal["off", "summary", "full"] = "summary"
+    # persisted): 'off' (persist only, attach nothing) or 'full' (attach the
+    # complete trace to the response).
+    decision_trace_detail: Literal["off", "full"] = "full"
     # Persistence backend: 'redis' (durable, reuses session Redis), 'memory'
     # (process-local), 'null' (don't persist).
     decision_trace_store: Literal["redis", "memory", "null"] = "redis"

@@ -34,8 +34,8 @@ def _patch_store_and_detail(monkeypatch, detail: TraceDetail) -> InMemoryTraceSt
     return store
 
 
-async def test_persists_and_attaches_summary(monkeypatch) -> None:
-    store = _patch_store_and_detail(monkeypatch, TraceDetail.SUMMARY)
+async def test_persists_and_attaches_full(monkeypatch) -> None:
+    store = _patch_store_and_detail(monkeypatch, TraceDetail.FULL)
     ctx = _context_with_recorder()
     resp = AgentResponse(content="hi there", status=ResponseStatus.SUCCESS)
 
@@ -74,7 +74,7 @@ async def test_no_recorder_does_nothing(monkeypatch) -> None:
 
 async def test_suppressed_subagent_skips(monkeypatch) -> None:
     """Workflow/handoff sub-agents share the recorder but must not finalize."""
-    store = _patch_store_and_detail(monkeypatch, TraceDetail.SUMMARY)
+    store = _patch_store_and_detail(monkeypatch, TraceDetail.FULL)
     ctx = _context_with_recorder()
     ctx.suppress_session_log = True
     resp = AgentResponse(content="hi", status=ResponseStatus.SUCCESS)
@@ -90,7 +90,7 @@ async def test_store_failure_is_swallowed(monkeypatch) -> None:
             raise RuntimeError("down")
 
     monkeypatch.setattr("orchestrator.agent.trace.config.get_trace_store", lambda: Boom())
-    monkeypatch.setattr("orchestrator.agent.trace.config.trace_detail", lambda: TraceDetail.SUMMARY)
+    monkeypatch.setattr("orchestrator.agent.trace.config.trace_detail", lambda: TraceDetail.FULL)
     ctx = _context_with_recorder()
     resp = AgentResponse(content="hi", status=ResponseStatus.SUCCESS)
 
