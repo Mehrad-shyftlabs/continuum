@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import pytest
 
-from orchestrator.agent.base import BaseAgent
-from orchestrator.agent.config import ReflectionConfig
-from orchestrator.agent.interfaces.forkable import Forkable
-from orchestrator.agent.trace.recorder import TraceRecorder
-from orchestrator.agent.types import AgentResponse, ResponseStatus
-from orchestrator.agent.utils.context_utils import create_run_context
-from orchestrator.agent.workflow.reflection import ReflectionAgent
+from continuum.agent.base import BaseAgent
+from continuum.agent.config import ReflectionConfig
+from continuum.agent.interfaces.forkable import Forkable
+from continuum.agent.trace.recorder import TraceRecorder
+from continuum.agent.types import AgentResponse, ResponseStatus
+from continuum.agent.utils.context_utils import create_run_context
+from continuum.agent.workflow.reflection import ReflectionAgent
 
 
 def _make_reflection() -> ReflectionAgent:

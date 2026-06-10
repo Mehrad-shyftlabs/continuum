@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from orchestrator.llm.config import LLMConfig
-from orchestrator.llm.types import ChatMessage, LLMResponse, StreamChunk, Usage
+from continuum.llm.config import LLMConfig
+from continuum.llm.types import ChatMessage, LLMResponse, StreamChunk, Usage
 
 logger = logging.getLogger(__name__)
 
@@ -22,20 +22,20 @@ def _make_llm_response(**kwargs) -> LLMResponse:
 
 
 class TestLLMClientSetup:
-    @patch("orchestrator.llm.client.setup_langfuse")
+    @patch("continuum.llm.client.setup_langfuse")
     def test_client_initializes_with_providers(self, mock_setup):
         logger.info("LLMClientSetup: client initializes with provider layer")
-        from orchestrator.llm.client import LLMClient
+        from continuum.llm.client import LLMClient
 
         client = LLMClient(enable_langfuse=False)
         assert client.default_config is not None
 
-    @patch("orchestrator.llm.client.setup_langfuse")
+    @patch("continuum.llm.client.setup_langfuse")
     def test_json_mode_pydantic_log(self, mock_setup):
         logger.info("LLMClientSetup: json mode pydantic log")
         from pydantic import BaseModel
 
-        from orchestrator.llm.client import LLMClient
+        from continuum.llm.client import LLMClient
 
         client = LLMClient(enable_langfuse=False)
 
@@ -45,37 +45,37 @@ class TestLLMClientSetup:
         # Should not raise
         client._log_json_mode_status(LLMConfig(response_format=MyModel))
 
-    @patch("orchestrator.llm.client.setup_langfuse")
+    @patch("continuum.llm.client.setup_langfuse")
     def test_validate_json_response_array(self, mock_setup):
         logger.info("LLMClientSetup: validate json response array")
-        from orchestrator.llm.client import LLMClient
+        from continuum.llm.client import LLMClient
 
         client = LLMClient(enable_langfuse=False)
         client._validate_json_response("[1, 2, 3]", LLMConfig(json_mode=True))
 
-    @patch("orchestrator.llm.client.setup_langfuse")
+    @patch("continuum.llm.client.setup_langfuse")
     def test_validate_json_response_invalid(self, mock_setup):
         logger.info("LLMClientSetup: validate json response invalid")
-        from orchestrator.llm.client import LLMClient
+        from continuum.llm.client import LLMClient
 
         client = LLMClient(enable_langfuse=False)
         client._validate_json_response("{invalid", LLMConfig(json_mode=True))
 
-    @patch("orchestrator.llm.client.setup_langfuse")
+    @patch("continuum.llm.client.setup_langfuse")
     def test_validate_json_response_no_format(self, mock_setup):
         logger.info("LLMClientSetup: validate json response no format")
-        from orchestrator.llm.client import LLMClient
+        from continuum.llm.client import LLMClient
 
         client = LLMClient(enable_langfuse=False)
         client._validate_json_response("hello", LLMConfig(json_mode=False))
 
 
 class TestLLMClientSyncStream:
-    @patch("orchestrator.llm.client.get_provider")
-    @patch("orchestrator.llm.client.setup_langfuse")
+    @patch("continuum.llm.client.get_provider")
+    @patch("continuum.llm.client.setup_langfuse")
     def test_chat_stream_sync(self, mock_setup, mock_get_provider):
         logger.info("LLMClientSyncStream: chat stream sync")
-        from orchestrator.llm.client import LLMClient
+        from continuum.llm.client import LLMClient
 
         mock_provider = MagicMock()
         mock_provider.stream.return_value = iter(
@@ -99,7 +99,7 @@ class TestLLMRateLimiter:
     @pytest.mark.asyncio
     async def test_rate_limiter_acquire(self):
         logger.info("LLMRateLimiter: rate limiter acquire")
-        from orchestrator.llm.client import _LLMRateLimiter
+        from continuum.llm.client import _LLMRateLimiter
 
         rl = _LLMRateLimiter(rpm=60)
         await rl.acquire()
@@ -108,7 +108,7 @@ class TestLLMRateLimiter:
     @pytest.mark.asyncio
     async def test_rate_limiter_multiple_acquires(self):
         logger.info("LLMRateLimiter: rate limiter multiple acquires")
-        from orchestrator.llm.client import _LLMRateLimiter
+        from continuum.llm.client import _LLMRateLimiter
 
         rl = _LLMRateLimiter(rpm=1000)
         for _ in range(5):

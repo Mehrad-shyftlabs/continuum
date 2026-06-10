@@ -18,14 +18,14 @@ from tests.e2e.conftest import skip_on_api_error as _skip_on_api_error
 
 @pytest.fixture
 def trace_checkpoint_enabled(monkeypatch):
-    from orchestrator.config import settings
+    from continuum.config import settings
 
     monkeypatch.setattr(settings, "decision_trace_enabled", True)
     monkeypatch.setattr(settings, "decision_trace_detail", "full")
     monkeypatch.setattr(settings, "decision_trace_store", "redis")
     monkeypatch.setattr(settings, "decision_trace_checkpoint", True)
 
-    from orchestrator.agent.trace import config as trace_config
+    from continuum.agent.trace import config as trace_config
 
     trace_config.get_trace_store.cache_clear()
     yield
@@ -33,8 +33,8 @@ def trace_checkpoint_enabled(monkeypatch):
 
 
 def _agent():
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
 
     return BaseAgent(
         name="answerer",
@@ -51,10 +51,10 @@ class TestStreamingTraceE2E:
         non-streamed run, and its LLM step carries a checkpoint (forkable)."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.trace.config import get_trace_store
-        from orchestrator.agent.trace.types import StepKind
-        from orchestrator.agent.types import EventType
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.trace.config import get_trace_store
+        from continuum.agent.trace.types import StepKind
+        from continuum.agent.types import EventType
 
         runner = AgentRunner()
         store = get_trace_store()
@@ -95,9 +95,9 @@ class TestStreamingTraceE2E:
         stream, carrying the step's kind and a forkable flag."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.trace.config import get_trace_store
-        from orchestrator.agent.types import EventType
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.trace.config import get_trace_store
+        from continuum.agent.types import EventType
 
         runner = AgentRunner()
         run_id = None
@@ -125,9 +125,9 @@ class TestStreamingTraceE2E:
         non-streamed one."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.trace.config import get_trace_store
-        from orchestrator.agent.types import EventType
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.trace.config import get_trace_store
+        from continuum.agent.types import EventType
 
         agent = _agent()
         runner = AgentRunner()

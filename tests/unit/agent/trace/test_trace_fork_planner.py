@@ -17,13 +17,13 @@ from __future__ import annotations
 
 import pytest
 
-from orchestrator.agent.base import BaseAgent
-from orchestrator.agent.interfaces.forkable import Forkable
-from orchestrator.agent.trace.recorder import TraceRecorder
-from orchestrator.agent.trace.types import StepKind
-from orchestrator.agent.types import AgentResponse, ResponseStatus
-from orchestrator.agent.utils.context_utils import create_run_context
-from orchestrator.agent.workflow.planner import PlannerAgent
+from continuum.agent.base import BaseAgent
+from continuum.agent.interfaces.forkable import Forkable
+from continuum.agent.trace.recorder import TraceRecorder
+from continuum.agent.trace.types import StepKind
+from continuum.agent.types import AgentResponse, ResponseStatus
+from continuum.agent.utils.context_utils import create_run_context
+from continuum.agent.workflow.planner import PlannerAgent
 
 
 def _make_planner() -> PlannerAgent:

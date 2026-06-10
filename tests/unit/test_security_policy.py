@@ -4,7 +4,7 @@ Tests for the deny-overrides policy engine (security/policy.py).
 
 from __future__ import annotations
 
-from orchestrator.security.policy import AccessPolicy, PolicyDecision, PolicyStore
+from continuum.security.policy import AccessPolicy, PolicyDecision, PolicyStore
 
 
 def _allow(name, subjects, resources):

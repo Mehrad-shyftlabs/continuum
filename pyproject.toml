@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shyftlabs-continuum"
-version = "0.2.0"
+version = "0.2.2"
 description = "Agentic Framework for Enterprise-Wide Execution with multi-LLM provider support, observability, and error tracking"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [
-    {name = "Bhavik Ardeshna", email = "continuum@shyftlabs.io"}
+    {name = "shyftlabs", email = "continuum@shyftlabs.io"}
 ]
 keywords = [
     "ai",
@@ -77,6 +77,9 @@ eval = [
     "ragas>=0.2.0",
 ]
 
+[project.scripts]
+continuum = "continuum.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/shyftlabs/continuum"
 Documentation = "https://github.com/shyftlabs/continuum/tree/main/docs"
@@ -88,11 +91,14 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["orchestrator*"]
+include = ["continuum*"]
 exclude = ["tests*", "playground*"]
 
 [tool.setuptools.package-data]
-"orchestrator" = ["py.typed"]
+"continuum" = ["py.typed"]
+# Bundle the docker-compose stack + Temporal dynamic config so `continuum up`
+# works from a pip install without cloning the repo.
+"continuum.infra" = ["docker-compose.yml", "temporal/dynamicconfig/*.yaml"]
 "*" = []
 
 [tool.ruff]
@@ -115,7 +121,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["orchestrator"]
+known-first-party = ["continuum"]
 
 [tool.ruff.lint.per-file-ignores]
 # Re-export hubs, plus modules that must configure logging before importing deps.
@@ -123,7 +129,7 @@ known-first-party = ["orchestrator"]
 # Tests commonly importorskip/guard before imports, use dict() fixtures, and
 # deliberately assert on broad exceptions.
 "tests/**" = ["E402", "C408", "B017"]
-# Playground demos set gateway env vars / sys.path before importing orchestrator.
+# Playground demos set gateway env vars / sys.path before importing continuum.
 "playground/**" = ["E402"]
 
 [tool.mypy]
@@ -131,7 +137,7 @@ python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
-packages = ["src/orchestrator"]
+packages = ["src/continuum"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -151,7 +157,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["src/orchestrator"]
+source = ["src/continuum"]
 omit = [
     "*/tests/*",
     "*/__pycache__/*",

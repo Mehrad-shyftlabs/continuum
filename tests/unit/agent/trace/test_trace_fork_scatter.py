@@ -10,14 +10,14 @@ trace, applies the override, and stamps lineage.
 
 from __future__ import annotations
 
-from orchestrator.agent.base import BaseAgent
-from orchestrator.agent.interfaces.forkable import Forkable
-from orchestrator.agent.trace.recorder import TraceRecorder
-from orchestrator.agent.trace.types import StepKind
-from orchestrator.agent.types import AgentResponse, MergeStrategy, ResponseStatus
-from orchestrator.agent.utils.context_utils import create_run_context
-from orchestrator.agent.workflow._forkable import segment_by_markers
-from orchestrator.agent.workflow.scatter import ScatterAgent, ScatterConfig
+from continuum.agent.base import BaseAgent
+from continuum.agent.interfaces.forkable import Forkable
+from continuum.agent.trace.recorder import TraceRecorder
+from continuum.agent.trace.types import StepKind
+from continuum.agent.types import AgentResponse, MergeStrategy, ResponseStatus
+from continuum.agent.utils.context_utils import create_run_context
+from continuum.agent.workflow._forkable import segment_by_markers
+from continuum.agent.workflow.scatter import ScatterAgent, ScatterConfig
 
 
 def _make_scatter() -> ScatterAgent:

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from orchestrator.agent.utils.context_utils import create_run_context
+from continuum.agent.utils.context_utils import create_run_context
 
 
 def _make_memory_result(results=None):
@@ -28,8 +28,8 @@ def _make_memory_client(isolation="user", search_result=None):
 
 
 def _make_agent(search_memories=True, search_limit=5):
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
 
     return BaseAgent(
         name="scoping-agent",
@@ -43,7 +43,7 @@ def _make_agent(search_memories=True, search_limit=5):
 
 
 def _make_service(memory_client, session_client=None):
-    from orchestrator.agent.services.memory_service import MemoryService
+    from continuum.agent.services.memory_service import MemoryService
 
     return MemoryService(memory_client=memory_client, session_client=session_client)
 
@@ -144,7 +144,7 @@ class TestConversationIsolation:
         agent = _make_agent()
         ctx = create_run_context()  # no conversation_id
 
-        with patch("orchestrator.agent.services.memory_service.logger") as mock_logger:
+        with patch("continuum.agent.services.memory_service.logger") as mock_logger:
             await svc.retrieve_memories(agent, "query", ctx)
 
         all_warnings = " ".join(str(c) for c in mock_logger.warning.call_args_list)
@@ -173,7 +173,7 @@ class TestSkipWhenDisabled:
         mc.search.assert_not_called()
 
     async def test_returns_empty_when_no_memory_client(self):
-        from orchestrator.agent.services.memory_service import MemoryService
+        from continuum.agent.services.memory_service import MemoryService
 
         svc = MemoryService(memory_client=None)
         agent = _make_agent()

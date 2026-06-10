@@ -1,6 +1,6 @@
 ---
 name: continuum-quickstart
-description: Get a Continuum agent up and running — Python 3.13 venv, infra via docker compose, smallest possible BaseAgent + AgentRunner example. Invoke when the user asks "how do I start", "set up Continuum", "run my first agent", or is at the very beginning of a project.
+description: Get a Continuum agent up and running — Python 3.13 venv, infra via `continuum up`, smallest possible BaseAgent + AgentRunner example. Invoke when the user asks "how do I start", "set up Continuum", "run my first agent", or is at the very beginning of a project.
 ---
 
 # Continuum Quickstart Skill
@@ -10,23 +10,21 @@ get them to a running agent in a few minutes.
 
 ---
 
-## Path A — Library consumer (5 commands)
+## Path A — Library consumer
 
 ```bash
-# 1. Configure infra & secrets
-cp .env.template .env
-# Edit .env and set OPENAI_API_KEY
-
-# 2. Start infra (Redis :6380, Qdrant :6333)
-docker compose up -d
-
-# 3. Create venv (Python 3.13 required)
+# 1. Create venv (Python 3.13 required) & install the package
 python3.13 -m venv .venv && source .venv/bin/activate
-
-# 4. Install the package
 pip install shyftlabs-continuum
 
-# 5. Run the smallest example (see snippet below)
+# 2. Start infra (Redis :6380, Qdrant :6333) — `continuum up` ships with the
+#    package, resolves the bundled stack, and writes a managed ./.env
+continuum up
+
+# 3. Add your provider key
+echo "OPENAI_API_KEY=sk-..." >> .env
+
+# 4. Run the smallest example (see snippet below)
 python my_first_agent.py
 ```
 
@@ -36,7 +34,7 @@ python my_first_agent.py
 git clone https://github.com/bhavik-shyftlabs/continuum.git
 cd continuum
 cp .env.template .env                       # add OPENAI_API_KEY
-docker compose up -d                        # Redis + Qdrant
+continuum up                                # Redis + Qdrant (minimal); `continuum up full` adds Langfuse · Temporal · Milvus
 python3.13 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,temporal,eval]"      # editable install with all extras
 
@@ -79,7 +77,7 @@ asyncio.run(main())
 |---|---|
 | `ModuleNotFoundError: orchestrator` | `source .venv/bin/activate` |
 | `Failed to initialize mem0: Missing credentials` | Set `OPENAI_API_KEY` in `.env` (mem0 needs it for embeddings, even if you use Anthropic/Gemini for chat) |
-| `redis ConnectionError` on port 6380 | `docker compose ps` — make sure the SDK Redis service is healthy |
+| `redis ConnectionError` on port 6380 | `continuum status` — make sure the SDK Redis service is healthy |
 | `ImportError` on Python startup | Wrong Python — must be 3.13 |
 | `pip install -e .` fails on Python <3.13 | Switch to Python 3.13 (pyenv / uv) |
 

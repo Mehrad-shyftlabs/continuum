@@ -25,7 +25,7 @@ def _aid() -> str:
 
 @pytest.fixture
 async def memory_client():
-    from orchestrator.memory.client import MemoryClient
+    from continuum.memory.client import MemoryClient
 
     client = MemoryClient()
     if not client.is_enabled:

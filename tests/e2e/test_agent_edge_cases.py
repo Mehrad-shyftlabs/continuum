@@ -33,7 +33,7 @@ class TestMaxTurnsLimit:
 
         from mcp.types import CallToolResult, TextContent, Tool
 
-        from orchestrator.tools.types import ToolContextConfig
+        from continuum.tools.types import ToolContextConfig
 
         class NeverSatisfiedMCPServer:
             """Tool that always returns 'need more info', provoking infinite tool calls."""
@@ -92,11 +92,11 @@ class TestMaxTurnsLimit:
 
                 return GetPromptResult(messages=[])
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.tools.executor import ToolExecutor
-        from orchestrator.tools.util import MCPUtil
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.tools.executor import ToolExecutor
+        from continuum.tools.util import MCPUtil
 
         server = NeverSatisfiedMCPServer()
         await server.connect()
@@ -116,7 +116,7 @@ class TestMaxTurnsLimit:
             config=AgentConfig(log_to_session=False, max_turns=4),
         )
 
-        from orchestrator.agent.exceptions import MaxTurnsExceededError
+        from continuum.agent.exceptions import MaxTurnsExceededError
 
         runner = AgentRunner(tool_executor=executor)
 
@@ -168,10 +168,10 @@ class TestStructuredOutput:
         """Agent should return valid structured sentiment output."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         agent = BaseAgent(
             name="sentiment-agent",
@@ -214,10 +214,10 @@ class TestStructuredOutput:
         """Agent should extract entities into structured format."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         agent = BaseAgent(
             name="entity-agent",
@@ -267,10 +267,10 @@ class TestSessionPersistence:
 
         import uuid
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.session.client import SessionClient
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.session.client import SessionClient
 
         agent = BaseAgent(
             name="memory-agent",
@@ -324,9 +324,9 @@ class TestSessionPersistence:
 
         import uuid
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
 
         agent = BaseAgent(
             name="isolation-agent",
@@ -377,10 +377,10 @@ class TestMultiMessageInput:
         """Agent should handle list of messages as input."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         agent = BaseAgent(
             name="history-agent",
@@ -421,10 +421,10 @@ class TestTemplateVariables:
         """Agent should use template variables in system prompt."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         agent = BaseAgent(
             name="template-agent",
@@ -462,10 +462,10 @@ class TestAgentHooks:
         """on_start and on_end hooks should be called during agent execution."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         hook_log = []
 
@@ -509,10 +509,10 @@ class TestEdgeCaseInputs:
         """Agent should handle long input without crashing."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         agent = BaseAgent(
             name="long-input-agent",
@@ -540,10 +540,10 @@ class TestEdgeCaseInputs:
         """Agent should handle unicode/emoji input correctly."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         agent = BaseAgent(
             name="unicode-agent",
@@ -568,10 +568,10 @@ class TestEdgeCaseInputs:
         """Agent should not follow malicious instructions embedded in input."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         agent = BaseAgent(
             name="security-agent",
@@ -615,10 +615,10 @@ class TestMultiAgentRunner:
         """Same runner should handle agents with different configs correctly."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         mem_config = AgentMemoryConfig(search_memories=False, store_memories=False)
 
@@ -687,10 +687,10 @@ class TestResponseMetadata:
         """Response should have run_id, agent_name, timing, usage, etc."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         agent = BaseAgent(
             name="metadata-agent",

@@ -19,14 +19,14 @@ from __future__ import annotations
 
 import pytest
 
-from orchestrator.agent.base import BaseAgent
-from orchestrator.agent.interfaces.forkable import Forkable
-from orchestrator.agent.trace.recorder import TraceRecorder
-from orchestrator.agent.trace.types import StepKind
-from orchestrator.agent.types import AgentResponse, ResponseStatus, TokenUsage
-from orchestrator.agent.utils.context_utils import create_run_context
-from orchestrator.agent.workflow._forkable import segment_by_markers
-from orchestrator.agent.workflow.debate import DebateAgent
+from continuum.agent.base import BaseAgent
+from continuum.agent.interfaces.forkable import Forkable
+from continuum.agent.trace.recorder import TraceRecorder
+from continuum.agent.trace.types import StepKind
+from continuum.agent.types import AgentResponse, ResponseStatus, TokenUsage
+from continuum.agent.utils.context_utils import create_run_context
+from continuum.agent.workflow._forkable import segment_by_markers
+from continuum.agent.workflow.debate import DebateAgent
 
 
 def _make_debate() -> DebateAgent:

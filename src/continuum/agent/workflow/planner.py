@@ -1,0 +1,864 @@
+"""
+Planner Agent - Goal decomposition and dynamic execution.
+
+Takes a high-level goal, generates an ordered task list via one LLM call,
+then executes each step. Supports two modes:
+
+  Single-agent mode  — one worker agent executes all steps with different instructions.
+                       The LLM freely generates any steps based on the goal.
+
+  Agent-pool mode    — a list of specialist agents; the LLM routes each step to the
+                       right agent by name. All possible agents must be declared upfront.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+from continuum.agent.base import BaseAgent
+from continuum.agent.config import PlanningConfig
+from continuum.agent.exceptions import PlannerWorkflowError
+from continuum.agent.types import (
+    AgentResponse,
+    FailStrategy,
+    ResponseStatus,
+    TokenUsage,
+)
+from continuum.llm.config import LLMConfig
+from continuum.logging import get_logger
+from continuum.observability.trace_context import SpanScope
+
+if TYPE_CHECKING:
+    from continuum.agent.runner import AgentRunner
+    from continuum.agent.types import RunContext
+
+logger = get_logger(__name__)
+
+
+@dataclass
+class PlannerAgent(BaseAgent):
+    """
+    Decomposes a high-level goal into steps, then executes them.
+
+    Two modes:
+
+    **Single-agent mode** (simpler, recommended):
+        One worker agent executes every step with different instructions.
+        The LLM freely creates any steps — no need to pre-define specialists.
+
+        Example::
+
+            worker = BaseAgent(name="worker", instructions="You are a helpful assistant.", ...)
+
+            planner = PlannerAgent(
+                name="planner",
+                agent=worker,
+                planning_config=PlanningConfig(enable_replanning=True),
+            )
+
+            result = await runner.run(planner, "Build a market research report on Tesla")
+
+    **Agent-pool mode** (for specialist workflows):
+        The LLM routes each step to a named agent from the pool.
+        Every agent the LLM might need MUST be declared in ``agents`` upfront.
+
+        Example::
+
+            researcher = BaseAgent(name="researcher", description="Research a topic", ...)
+            writer     = BaseAgent(name="writer",     description="Write a report", ...)
+
+            planner = PlannerAgent(
+                name="planner",
+                agents=[researcher, writer],
+            )
+
+        WARNING: If an agent named in the plan is not in the ``agents`` list, that step
+        is skipped. Make sure all possible agents are declared.
+    """
+
+    # Single-agent mode: one agent executes all steps
+    agent: BaseAgent | None = None
+
+    # Agent-pool mode: specialist agents the planner can route steps to
+    agents: list[BaseAgent] = field(default_factory=list)
+
+    # Planning configuration
+    planning_config: PlanningConfig = field(default_factory=PlanningConfig)
+
+    # Agent whose memory_config governs post-execution long-term memory writes.
+    # If None (default), no memory is written after the planner completes.
+    memory_agent: BaseAgent | None = None
+
+    def __post_init__(self) -> None:
+        if not self.name:
+            from continuum.agent.exceptions import AgentConfigurationError
+
+            raise AgentConfigurationError("Agent name is required")
+
+        if not self.agent and not self.agents:
+            from continuum.agent.exceptions import AgentConfigurationError
+
+            raise AgentConfigurationError(
+                "PlannerAgent requires either 'agent' (single-agent mode) "
+                "or 'agents' (agent-pool mode)"
+            )
+
+        if self.agent and self.agents:
+            from continuum.agent.exceptions import AgentConfigurationError
+
+            raise AgentConfigurationError(
+                "PlannerAgent accepts either 'agent' or 'agents', not both"
+            )
+
+        # Warn user when using agent-pool mode
+        if self.agents:
+            agent_names = ", ".join(a.name for a in self.agents)
+            logger.warning(
+                f"PlannerAgent '{self.name}' is using agent-pool mode. "
+                f"The LLM can ONLY use these agents: [{agent_names}]. "
+                f"Any agent not in this list will be skipped. "
+                f"Consider single-agent mode (agent=worker) for more flexibility."
+            )
+
+    @property
+    def _mode(self) -> str:
+        return "single" if self.agent else "pool"
+
+    async def execute(
+        self,
+        input_text: str,
+        runner: AgentRunner,
+        context: RunContext,
+    ) -> AgentResponse:
+        """
+        Decompose the goal into steps and execute them.
+
+        Args:
+            input_text: High-level goal
+            runner: Agent runner for executing child agents
+            context: Run context
+
+        Returns:
+            Final AgentResponse from the last executed step
+        """
+        from continuum.core.container import get_container
+
+        llm_client = get_container().llm_client
+
+        # Own the one decision trace spanning planning + every executed step
+        # (rooted at this planner). Sub-runs share this recorder but are
+        # suppressed, so we persist it ourselves at the end.
+        created = runner.ensure_recorder(context, self.name, input_text)
+        context.suppress_session_log = True
+        try:
+            async with SpanScope(
+                f"workflow.planner.{self.name}",
+                input={"goal": input_text[:500], "mode": self._mode},
+                metadata={"workflow_type": "planner", "mode": self._mode},
+            ) as workflow_span:
+                # Stage 0: generate the plan (one LLM call).
+                plan_steps, plan_usage = await self._generate_plan(input_text, llm_client)
+                logger.info(
+                    f"PlannerAgent '{self.name}' [{self._mode} mode]: "
+                    f"generated {len(plan_steps)} steps"
+                )
+
+                # Decision trace: mark the planning call as stage 0 and embed the
+                # plan so a fork from a mid-plan step can recover it (see resume_from).
+                self._record_plan_marker(context, plan_steps)
+
+                result = await self._drive(
+                    plan_steps,
+                    input_text,
+                    runner,
+                    context,
+                    workflow_span=workflow_span,
+                    start_stage=1,
+                    goal=input_text,
+                    llm_client=llm_client,
+                    initial_usage=plan_usage,
+                )
+
+            if context.session_id and result.turn_count:
+                await runner.save_turn(
+                    session_id=context.session_id,
+                    user_message=input_text,
+                    assistant_message=result.content or "",
+                    agent=self.memory_agent,
+                )
+
+            if created:
+                await runner.persist_decision_trace(context, result)
+            return result
+        finally:
+            context.metadata.pop("pipeline_context", None)
+
+    async def _drive(
+        self,
+        plan_steps: list[dict[str, Any]],
+        current_input: str,
+        runner: AgentRunner,
+        context: RunContext,
+        *,
+        workflow_span: Any,
+        start_stage: int,
+        goal: str,
+        llm_client: Any,
+        initial_usage: TokenUsage | None = None,
+    ) -> AgentResponse:
+        """Execute the planned steps, assemble, and return the final response.
+
+        Shared by :meth:`execute` (fresh run) and :meth:`resume_from` (fork).
+
+        ``start_stage`` is the 1-based stage index of the first executed step to
+        run — ``1`` for a fresh run, ``k`` when resuming a fork from the k-th
+        planned step so the new trace's WORKFLOW_STEP markers stay aligned with
+        the parent's (stage 0 is always the planning call). The corresponding
+        index into ``plan_steps`` is ``start_stage - 1``.
+        """
+        total_usage = initial_usage or TokenUsage()
+        completed: list[dict[str, Any]] = []
+        step_outputs: list[dict[str, str]] = []  # accumulated outputs for assembly
+        pipeline_history: list[str] = []
+        i = start_stage - 1  # index into plan_steps (stage k → index k-1)
+        executed = 0  # actual agent executions (max_steps cap applies here only)
+
+        while i < len(plan_steps) and executed < self.planning_config.max_steps:
+            step = plan_steps[i]
+            instruction = step.get("instruction", "")
+            step_id = step.get("step_id", str(i + 1))
+
+            # Resolve which agent runs this step
+            if self._mode == "single":
+                agent = self.agent
+                agent_name = agent.name  # type: ignore[union-attr]
+            else:
+                agent_name = step.get("agent_name", "")
+                agent = self._find_agent(agent_name)
+                if not agent:
+                    if self.planning_config.strict_agent_pool:
+                        workflow_span.set_error(f"Unknown agent '{agent_name}' at step {step_id}")
+                        raise PlannerWorkflowError(
+                            f"Step {step_id} references unknown agent '{agent_name}'. "
+                            f"Declare it in the agents list or disable strict_agent_pool.",
+                            failed_agent=agent_name,
+                            step=i + 1,
+                            run_id=context.run_id,
+                        )
+                    logger.warning(
+                        f"PlannerAgent: step {step_id} references unknown agent "
+                        f"'{agent_name}' — skipping. "
+                        f"Add it to the agents list to fix this."
+                    )
+                    i += 1
+                    continue
+
+            # Decision trace: mark the start of this executed step. The planning
+            # call is stage 0, so the step at plan index ``i`` is stage ``i + 1``.
+            if context.recorder is not None:
+                context.recorder.record_workflow_step(
+                    self.name, stage=i + 1, label=agent_name, agent_stack=[self.name]
+                )
+
+            # For the last step, pass full accumulated history so assembly works correctly
+            is_last_step = i == len(plan_steps) - 1
+            if is_last_step and len(step_outputs) > 1:
+                history = "\n\n".join(
+                    f"[Step {s['step_id']} output]\n{s['output']}" for s in step_outputs
+                )
+                step_input = (
+                    f"{instruction}\n\nAll previous step outputs:\n{history}"
+                    if instruction
+                    else history
+                )
+            else:
+                step_input = (
+                    f"{instruction}\n\nInput:\n{current_input}" if instruction else current_input
+                )
+
+            logger.info(f"PlannerAgent step {step_id} → {agent_name}: {instruction[:80]}")
+
+            async with SpanScope(
+                f"workflow.planner.step.{step_id}",
+                input={"agent_name": agent_name, "instruction": instruction},
+            ) as step_span:
+                try:
+                    # Inject prior steps so this agent sees what earlier agents produced.
+                    # For regular steps: exclude the immediately preceding step (it is
+                    # already the [user] input) — context carries only steps 1..N-2.
+                    # For the last step: [user] already contains ALL outputs, so skip
+                    # context entirely to avoid full redundancy.
+                    if not is_last_step:
+                        background = pipeline_history[:-1]
+                        if background:
+                            context.metadata["pipeline_context"] = (
+                                "Prior pipeline steps in this request:\n" + "\n".join(background)
+                            )
+                    else:
+                        # Last step [user] already contains all outputs — clear any
+                        # pipeline_context left over from the previous step iteration.
+                        context.metadata.pop("pipeline_context", None)
+
+                    response = await runner.run(
+                        agent=agent,
+                        input=step_input,
+                        context=context,
+                    )
+                    total_usage = total_usage.add(response.usage)
+                    completed.append(
+                        {
+                            "step": step,
+                            "output": response.content or "",
+                            "success": True,
+                        }
+                    )
+                    current_input = response.content or current_input
+                    step_outputs.append({"step_id": step_id, "output": current_input})
+                    pipeline_history.append(f"{agent_name}: {current_input[:300]}")
+
+                    step_span.set_output(
+                        {
+                            "success": True,
+                            "output_preview": (response.content or "")[:200],
+                        }
+                    )
+
+                    # Optional: replan after successful step.
+                    # Uses a separate counter so replan checks do not consume max_steps.
+                    remaining = plan_steps[i + 1 :]
+                    if self.planning_config.enable_replanning and remaining:
+                        new_remaining, replan_usage = await self._maybe_replan(
+                            goal=goal,
+                            completed=completed,
+                            remaining=remaining,
+                            last_output=current_input,
+                            llm_client=llm_client,
+                        )
+                        total_usage = total_usage.add(replan_usage)
+                        if new_remaining is not None:
+                            plan_steps = plan_steps[: i + 1] + new_remaining
+                            logger.info(
+                                f"PlannerAgent: replanned after step {step_id} — "
+                                f"{len(new_remaining)} remaining steps"
+                            )
+
+                    i += 1
+                    executed += 1
+
+                except Exception as e:
+                    logger.error(f"PlannerAgent step {step_id} ({agent_name}) failed: {e}")
+                    step_span.set_error(str(e))
+                    completed.append(
+                        {
+                            "step": step,
+                            "output": str(e),
+                            "success": False,
+                        }
+                    )
+
+                    if self.planning_config.replan_on_failure:
+                        remaining = plan_steps[i + 1 :]
+                        new_plan, replan_usage = await self._replan_on_failure(
+                            goal=goal,
+                            completed=completed,
+                            failed_step=step,
+                            remaining=remaining,
+                            error=str(e),
+                            llm_client=llm_client,
+                        )
+                        total_usage = total_usage.add(replan_usage)
+                        if new_plan is not None:
+                            plan_steps = plan_steps[:i] + new_plan
+                            logger.info(
+                                f"PlannerAgent: replanned after failure at step {step_id} — "
+                                f"{len(new_plan)} new steps"
+                            )
+                            continue
+
+                    if self.planning_config.fail_strategy == FailStrategy.FAIL_FAST:
+                        workflow_span.set_error(f"Step {step_id} failed: {e}")
+                        raise PlannerWorkflowError(
+                            f"Step {step_id} ({agent_name}) failed: {e}",
+                            failed_agent=agent_name,
+                            step=i + 1,
+                            run_id=context.run_id,
+                        ) from e
+
+                    i += 1
+                    executed += 1
+
+        workflow_span.set_output(
+            {
+                "steps_executed": len(completed),
+                "total_tokens": total_usage.total_tokens,
+            }
+        )
+
+        result = AgentResponse(
+            content=current_input,
+            agent_name=self.name,
+            status=ResponseStatus.SUCCESS,
+            usage=total_usage,
+            turn_count=len(completed),
+            agents_used=[
+                c["step"].get("agent_name", self.agent.name if self.agent else "")
+                for c in completed
+                if c["success"]
+            ],
+        )
+        result.run_id = context.run_id
+        return result
+
+    # -------------------------------------------------------------------------
+    # Forkable: trace ownership + resume
+    # -------------------------------------------------------------------------
+
+    def _record_plan_marker(self, context: RunContext, plan_steps: list[dict[str, Any]]) -> None:
+        """Record the planning call as the stage-0 WORKFLOW_STEP, embedding the plan.
+
+        The plan is embedded in the marker's ``decision`` so a fork from a
+        *mid-plan executed step* can recover the exact plan that produced the
+        parent run (see :meth:`resume_from`) instead of re-planning — which would
+        defeat deterministic replay. ``segment_by_markers`` only reads
+        ``decision["stage"]``, so the extra ``plan`` key is harmless to it.
+        """
+        if context.recorder is None:
+            return
+        from continuum.agent.trace.types import StepKind
+
+        context.recorder.record(
+            StepKind.WORKFLOW_STEP,
+            self.name,
+            agent_stack=[self.name],
+            decision={"stage": 0, "label": "plan", "plan": plan_steps},
+        )
+
+    @staticmethod
+    def _recover_plan(parent_trace: Any) -> list[dict[str, Any]] | None:
+        """Recover the plan embedded in the parent trace's stage-0 marker, if any."""
+        from continuum.agent.trace.types import StepKind
+
+        for s in parent_trace.steps:
+            if (
+                s.kind == StepKind.WORKFLOW_STEP
+                and isinstance(s.decision, dict)
+                and s.decision.get("stage") == 0
+            ):
+                plan = s.decision.get("plan")
+                if isinstance(plan, list):
+                    return plan
+        return None
+
+    async def resume_from(
+        self,
+        *,
+        parent_trace: Any,
+        from_step: str,
+        override: dict[str, Any] | None,
+        runner: AgentRunner,
+        context: RunContext,
+    ) -> AgentResponse:
+        """Re-run the planner forward from the stage owning ``from_step``.
+
+        Stage model: stage 0 is the planning call; stage ``k`` (k ≥ 1) is the
+        k-th executed plan step. Two resume cases:
+
+        * **Fork the plan itself (stage 0).** The plan is intentionally *re-made*:
+          forking the planning decision means the caller wants a fresh plan (e.g.
+          with an edited goal), so this delegates to :meth:`execute` on the
+          recovered (possibly overridden) goal, which re-plans and re-executes.
+        * **Fork a mid-plan executed step (stage ≥ 1).** The plan is *re-used*: it
+          is recovered from the parent trace's stage-0 marker so the rewound step
+          re-runs against the exact same plan, then ``_drive`` runs forward from
+          that step. Stages before it are not re-run.
+
+        The parent run is never mutated; the new run records its lineage.
+        """
+        from continuum.agent.workflow._forkable import (
+            link_lineage,
+            resumed_input,
+            segment_by_markers,
+        )
+
+        step_stage, stage_first = segment_by_markers(parent_trace)
+        stage_idx = step_stage.get(from_step)
+        if stage_idx is None:
+            raise ValueError(f"resume_from: step '{from_step}' not found in trace")
+
+        # Stage 0 == the plan. Re-plan from the (possibly overridden) goal.
+        if stage_idx == 0:
+            new_goal = (
+                resumed_input(stage_first.get(0), override, parent_trace.user_query)
+                or parent_trace.user_query
+            )
+            # Own the trace here so the lineage stamp survives: execute() sees the
+            # recorder already exists, so its own ensure_recorder is a no-op and it
+            # won't persist — we persist below.
+            created = runner.ensure_recorder(context, self.name, new_goal)
+            if created:
+                link_lineage(context, parent_trace, from_step, override, 0)
+            result = await self.execute(new_goal, runner, context)
+            result.run_id = context.run_id
+            if created:
+                await runner.persist_decision_trace(context, result)
+            return result
+
+        # Stage >= 1: re-use the parent's plan, rewind to that executed step.
+        plan_steps = self._recover_plan(parent_trace)
+        if plan_steps is None:
+            raise ValueError(
+                "resume_from: cannot resume a mid-plan step — the parent trace has "
+                "no recoverable plan (recorded before plan embedding existed). Fork "
+                "from the plan (stage 0) to re-plan and re-execute instead."
+            )
+        stage_idx = max(1, min(stage_idx, len(plan_steps)))
+
+        new_input = resumed_input(stage_first.get(stage_idx), override, parent_trace.user_query)
+
+        created = runner.ensure_recorder(context, self.name, parent_trace.user_query)
+        if created:
+            link_lineage(context, parent_trace, from_step, override, stage_idx)
+            # Re-record the stage-0 plan marker so the forked trace stays
+            # self-describing (and itself re-forkable from a mid-plan step).
+            self._record_plan_marker(context, plan_steps)
+        context.suppress_session_log = True
+        try:
+            async with SpanScope(
+                f"workflow.planner.{self.name}",
+                input={"goal": parent_trace.user_query[:500], "mode": self._mode},
+                metadata={"workflow_type": "planner", "mode": self._mode, "resumed": True},
+            ) as workflow_span:
+                result = await self._drive(
+                    plan_steps,
+                    new_input,
+                    runner,
+                    context,
+                    workflow_span=workflow_span,
+                    start_stage=stage_idx,
+                    goal=parent_trace.user_query,
+                    llm_client=None,
+                )
+            if created:
+                await runner.persist_decision_trace(context, result)
+            return result
+        finally:
+            context.metadata.pop("pipeline_context", None)
+
+    # -------------------------------------------------------------------------
+    # Plan generation
+    # -------------------------------------------------------------------------
+
+    async def _generate_plan(
+        self,
+        goal: str,
+        llm_client: Any,
+    ) -> tuple[list[dict[str, Any]], TokenUsage]:
+        """One LLM call to decompose the goal into an ordered step list."""
+
+        if self._mode == "single":
+            # Single-agent: steps only need instructions, no agent_name
+            prompt = (
+                f"You are a planning agent. Break down the following goal into ordered steps.\n\n"
+                f"Goal: {goal}\n\n"
+                f"Output a JSON object with this exact format:\n"
+                f'{{\n  "steps": [\n'
+                f'    {{"step_id": "1", "instruction": "<what to do in this step>"}},\n'
+                f"    ...\n"
+                f"  ]\n}}\n\n"
+                f"Rules:\n"
+                f"- Maximum {self.planning_config.max_steps} steps\n"
+                f"- Each step's output becomes the next step's input\n"
+                f"- If the goal produces a document or content piece across multiple steps, "
+                f"the LAST step must combine all previous outputs into the final complete result\n"
+                f"- Output only valid JSON, nothing else"
+            )
+        else:
+            # Agent-pool: steps must name an agent from the list
+            agent_catalog = "\n".join(
+                f"- {a.name}: {a.description or (a.instructions[:100] + '...' if len(a.instructions) > 100 else a.instructions)}"
+                for a in self.agents
+            )
+            prompt = (
+                f"You are a planning agent. Break down the following goal into ordered steps.\n\n"
+                f"Goal: {goal}\n\n"
+                f"Available agents:\n{agent_catalog}\n\n"
+                f"Output a JSON object with this exact format:\n"
+                f'{{\n  "steps": [\n'
+                f'    {{"step_id": "1", "agent_name": "<name from list>", "instruction": "<what this step does>"}},\n'
+                f"    ...\n"
+                f"  ]\n}}\n\n"
+                f"Rules:\n"
+                f"- Only use agents from the list above\n"
+                f"- Maximum {self.planning_config.max_steps} steps\n"
+                f"- Each step's output becomes the next step's input\n"
+                f"- If the goal produces a document or content piece across multiple steps, "
+                f"the LAST step must combine all previous outputs into the final complete result\n"
+                f"- Output only valid JSON, nothing else"
+            )
+
+        model = self.planning_config.planning_model or self.model
+        try:
+            response = await llm_client.chat(
+                messages=[{"role": "user", "content": prompt}],
+                config=LLMConfig(model=model, temperature=0.2, max_tokens=2000),
+                auto_session=False,
+            )
+            usage = self._extract_usage(response)
+            logger.debug(f"PlannerAgent raw plan response: {repr(response.content)}")
+            steps = self._parse_steps(response.content or "")
+            return steps, usage
+        except Exception as e:
+            logger.error(f"PlannerAgent plan generation failed: {e}")
+            return [], TokenUsage()
+
+    # -------------------------------------------------------------------------
+    # Replanning
+    # -------------------------------------------------------------------------
+
+    async def _maybe_replan(
+        self,
+        goal: str,
+        completed: list[dict[str, Any]],
+        remaining: list[dict[str, Any]],
+        last_output: str,
+        llm_client: Any,
+    ) -> tuple[list[dict[str, Any]] | None, TokenUsage]:
+        """Lightweight check after a successful step — returns new remaining or None."""
+        remaining_str = "\n".join(
+            f"  {s['step_id']}: {s.get('agent_name', '')} — {s['instruction']}" for s in remaining
+        )
+        agent_hint = (
+            f"Available agents: {', '.join(a.name for a in self.agents)}\n\n"
+            if self._mode == "pool"
+            else ""
+        )
+        step_format = (
+            '{"step_id": "...", "agent_name": "...", "instruction": "..."}'
+            if self._mode == "pool"
+            else '{"step_id": "...", "instruction": "..."}'
+        )
+
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    f"Goal: {goal}\n\n"
+                    f"Last step output: {last_output[:400]}\n\n"
+                    f"Remaining planned steps:\n{remaining_str}\n\n"
+                    f"{agent_hint}"
+                    f"Does the remaining plan still make sense given the last output?\n"
+                    f'Reply ONLY with "CONTINUE" if valid, or a JSON object if replanning needed:\n'
+                    f'  {{"steps": [{step_format}]}}'
+                ),
+            }
+        ]
+
+        model = self.planning_config.planning_model or self.model
+        try:
+            response = await llm_client.chat(
+                messages=messages,
+                config=LLMConfig(model=model, temperature=0.1, max_tokens=1500),
+                auto_session=False,
+            )
+            usage = self._extract_usage(response)
+            content = (response.content or "").strip()
+            if content.upper().startswith("CONTINUE"):
+                return None, usage
+            steps = self._parse_steps(content)
+            return (steps if steps else None), usage
+        except Exception as e:
+            logger.warning(f"PlannerAgent replan check failed: {e}")
+            return None, TokenUsage()
+
+    async def _replan_on_failure(
+        self,
+        goal: str,
+        completed: list[dict[str, Any]],
+        failed_step: dict[str, Any],
+        remaining: list[dict[str, Any]],
+        error: str,
+        llm_client: Any,
+    ) -> tuple[list[dict[str, Any]] | None, TokenUsage]:
+        """Replan after a step failure."""
+        agent_hint = (
+            "Available agents:\n"
+            + "\n".join(f"- {a.name}: {a.description or a.instructions[:80]}" for a in self.agents)
+            + "\n\n"
+            if self._mode == "pool"
+            else ""
+        )
+        step_format = (
+            '{"step_id": "...", "agent_name": "...", "instruction": "..."}'
+            if self._mode == "pool"
+            else '{"step_id": "...", "instruction": "..."}'
+        )
+        completed_str = "\n".join(
+            f"  ✅ {c['step'].get('agent_name', '')} — {str(c['output'])[:100]}"
+            for c in completed
+            if c["success"]
+        )
+
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    f"Goal: {goal}\n\n"
+                    f"Completed steps:\n{completed_str or '  (none)'}\n\n"
+                    f"Failed step: {failed_step.get('agent_name', '')} — {failed_step['instruction']}\n"
+                    f"Error: {error}\n\n"
+                    f"{agent_hint}"
+                    f"Generate a new plan for the remaining work (replacing the failed step).\n"
+                    f'Output JSON only: {{"steps": [{step_format}]}}'
+                ),
+            }
+        ]
+
+        model = self.planning_config.planning_model or self.model
+        try:
+            response = await llm_client.chat(
+                messages=messages,
+                config=LLMConfig(model=model, temperature=0.2, max_tokens=1500),
+                auto_session=False,
+            )
+            usage = self._extract_usage(response)
+            steps = self._parse_steps(response.content or "")
+            return (steps if steps else None), usage
+        except Exception as e:
+            logger.warning(f"PlannerAgent replan-on-failure failed: {e}")
+            return None, TokenUsage()
+
+    # -------------------------------------------------------------------------
+    # Helpers
+    # -------------------------------------------------------------------------
+
+    def _find_agent(self, name: str) -> BaseAgent | None:
+        for a in self.agents:
+            if a.name == name:
+                return a
+        return None
+
+    def _parse_steps(self, content: str) -> list[dict[str, Any]]:
+        try:
+            match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
+            if match:
+                content = match.group(1)
+            else:
+                brace, start = 0, -1
+                for idx, ch in enumerate(content):
+                    if ch == "{":
+                        if start == -1:
+                            start = idx
+                        brace += 1
+                    elif ch == "}":
+                        brace -= 1
+                        if brace == 0 and start != -1:
+                            content = content[start : idx + 1]
+                            break
+            data = json.loads(content)
+            return data.get("steps", [])
+        except Exception as e:
+            logger.warning(f"PlannerAgent failed to parse steps: {e}")
+            return []
+
+    def _extract_usage(self, response: Any) -> TokenUsage:
+        if response.usage:
+            return TokenUsage(
+                prompt_tokens=response.usage.prompt_tokens or 0,
+                completion_tokens=response.usage.completion_tokens or 0,
+                total_tokens=response.usage.total_tokens or 0,
+            )
+        return TokenUsage()
+
+    def to_dict(self) -> dict[str, Any]:
+        base = super().to_dict()
+        base.update(
+            {
+                "mode": self._mode,
+                "agent": self.agent.name if self.agent else None,
+                "agents": [a.name for a in self.agents],
+                "planning_config": self.planning_config.to_dict(),
+                "workflow_type": "planner",
+            }
+        )
+        return base
+
+
+def create_planner_agent(
+    name: str,
+    *,
+    agent: BaseAgent | None = None,
+    agents: list[BaseAgent] | None = None,
+    instructions: str = "You are a planning agent that decomposes goals into steps.",
+    max_steps: int = 10,
+    enable_replanning: bool = False,
+    replan_on_failure: bool = True,
+    planning_model: str | None = None,
+    fail_strategy: FailStrategy = FailStrategy.FAIL_FAST,
+    strict_agent_pool: bool = False,
+    memory_agent: BaseAgent | None = None,
+) -> PlannerAgent:
+    """
+    Factory function to create a planner agent.
+
+    Choose one mode:
+
+    **Single-agent mode** (recommended):
+        One worker agent executes all steps with different instructions.
+        The LLM freely generates any steps — no pre-defined specialist list needed.
+
+        Example::
+
+            planner = create_planner_agent(name="planner", agent=worker)
+
+    **Agent-pool mode**:
+        Specialist agents; the LLM routes each step to the right agent by name.
+        Every agent the LLM might need MUST be in the list.
+        By default, steps referencing unknown agents are skipped with a warning.
+        Set strict_agent_pool=True to raise an error instead.
+
+        Example::
+
+            planner = create_planner_agent(
+                name="planner",
+                agents=[researcher, writer, editor],
+                strict_agent_pool=True,
+            )
+
+    Args:
+        name: Planner agent name
+        agent: Single worker agent (single-agent mode)
+        agents: Pool of specialist agents (agent-pool mode)
+        instructions: System instructions for the planner
+        max_steps: Maximum number of agent executions allowed (replan checks do not count)
+        enable_replanning: Check after each step whether to replan
+        replan_on_failure: Replan when a step fails
+        planning_model: Model for plan generation (defaults to agent model)
+        fail_strategy: How to handle unrecoverable step failures
+        strict_agent_pool: Raise an error if the plan names an agent not in the pool
+    """
+    if not agent and not agents:
+        raise ValueError(
+            "create_planner_agent requires either 'agent' (single-agent mode) "
+            "or 'agents' (agent-pool mode)"
+        )
+    if agent and agents:
+        raise ValueError("create_planner_agent accepts either 'agent' or 'agents', not both")
+
+    return PlannerAgent(
+        name=name,
+        instructions=instructions,
+        agent=agent,
+        agents=agents or [],
+        memory_agent=memory_agent,
+        planning_config=PlanningConfig(
+            max_steps=max_steps,
+            enable_replanning=enable_replanning,
+            replan_on_failure=replan_on_failure,
+            planning_model=planning_model,
+            fail_strategy=fail_strategy,
+            strict_agent_pool=strict_agent_pool,
+        ),
+    )

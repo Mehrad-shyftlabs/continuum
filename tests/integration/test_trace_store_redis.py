@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from orchestrator.agent.trace import DecisionStep, DecisionTrace, StepKind
-from orchestrator.agent.trace.store import RedisTraceStore
+from continuum.agent.trace import DecisionStep, DecisionTrace, StepKind
+from continuum.agent.trace.store import RedisTraceStore
 
 pytestmark = [pytest.mark.integration, pytest.mark.redis]
 

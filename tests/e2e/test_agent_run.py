@@ -24,10 +24,10 @@ class TestFullAgentRun:
         """Create an agent, run it with a real LLM, get a response."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         agent = BaseAgent(
             name="test-simple-agent",
@@ -53,10 +53,10 @@ class TestFullAgentRun:
         """Agent with custom instructions produces appropriate response."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         agent = BaseAgent(
             name="test-pirate-agent",
@@ -81,10 +81,10 @@ class TestFullAgentRun:
         """Agent run should track token usage."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         agent = BaseAgent(
             name="test-usage-agent",
@@ -106,10 +106,10 @@ class TestFullAgentRun:
         """Cloned agent should run independently without affecting original."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import RunContext
 
         original = BaseAgent(
             name="original-agent",
@@ -147,8 +147,8 @@ class TestEvaluatorE2E:
         """Run a real evaluator agent against an answer."""
         _skip_if_no_api_key()
 
-        from orchestrator.evaluation.evaluator_agent import EvaluatorAgent
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.evaluator_agent import EvaluatorAgent
+        from continuum.evaluation.types import EvalCase
 
         evaluator = EvaluatorAgent(
             name="e2e-judge",
@@ -174,8 +174,8 @@ class TestEvaluatorE2E:
         """Evaluator should give low score for incorrect answer."""
         _skip_if_no_api_key()
 
-        from orchestrator.evaluation.evaluator_agent import EvaluatorAgent
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.evaluator_agent import EvaluatorAgent
+        from continuum.evaluation.types import EvalCase
 
         evaluator = EvaluatorAgent(
             name="e2e-judge-wrong",

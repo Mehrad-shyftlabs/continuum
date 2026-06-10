@@ -10,18 +10,18 @@ recovers the sibling's cached output, applies the override, and stamps lineage.
 
 from __future__ import annotations
 
-from orchestrator.agent.base import BaseAgent
-from orchestrator.agent.config import ParallelConfig
-from orchestrator.agent.interfaces.forkable import Forkable
-from orchestrator.agent.trace.recorder import TraceRecorder
-from orchestrator.agent.types import (
+from continuum.agent.base import BaseAgent
+from continuum.agent.config import ParallelConfig
+from continuum.agent.interfaces.forkable import Forkable
+from continuum.agent.trace.recorder import TraceRecorder
+from continuum.agent.types import (
     AgentResponse,
     MergeStrategy,
     ResponseStatus,
 )
-from orchestrator.agent.utils.context_utils import create_run_context
-from orchestrator.agent.workflow._forkable import segment_by_markers
-from orchestrator.agent.workflow.parallel import ParallelAgent
+from continuum.agent.utils.context_utils import create_run_context
+from continuum.agent.workflow._forkable import segment_by_markers
+from continuum.agent.workflow.parallel import ParallelAgent
 
 
 def _make_parallel(strategy: MergeStrategy = MergeStrategy.CONCATENATE) -> ParallelAgent:
@@ -90,7 +90,7 @@ async def test_parallel_ordered_capture_is_deterministic() -> None:
 
     # One WORKFLOW_STEP marker per branch (web=stage 0, db=stage 1) plus the
     # merge/synthesis stage (stage 2), in order.
-    from orchestrator.agent.trace.types import StepKind
+    from continuum.agent.trace.types import StepKind
 
     markers = [s for s in steps if s.kind == StepKind.WORKFLOW_STEP]
     assert len(markers) == 3
@@ -162,7 +162,7 @@ async def test_parallel_resume_reruns_only_forked_branch() -> None:
     assert "trace" in runner.persisted
 
     # The re-run branch's input was the override-applied recovered input.
-    from orchestrator.agent.trace.types import StepKind
+    from continuum.agent.trace.types import StepKind
 
     tool_steps = [
         s for s in ctx.recorder.trace.steps if s.kind == StepKind.TOOL_CALL

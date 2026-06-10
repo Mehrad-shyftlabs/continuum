@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from orchestrator.agent.execution.run_finalizer import RunFinalizer
-from orchestrator.agent.trace.recorder import TraceRecorder
-from orchestrator.agent.trace.store import InMemoryTraceStore
-from orchestrator.agent.trace.types import TraceDetail
-from orchestrator.agent.types import AgentResponse, ResponseStatus, RunContext
+from continuum.agent.execution.run_finalizer import RunFinalizer
+from continuum.agent.trace.recorder import TraceRecorder
+from continuum.agent.trace.store import InMemoryTraceStore
+from continuum.agent.trace.types import TraceDetail
+from continuum.agent.types import AgentResponse, ResponseStatus, RunContext
 
 
 def _finalizer() -> RunFinalizer:
@@ -29,8 +29,8 @@ def _context_with_recorder() -> RunContext:
 
 def _patch_store_and_detail(monkeypatch, detail: TraceDetail) -> InMemoryTraceStore:
     store = InMemoryTraceStore()
-    monkeypatch.setattr("orchestrator.agent.trace.config.get_trace_store", lambda: store)
-    monkeypatch.setattr("orchestrator.agent.trace.config.trace_detail", lambda: detail)
+    monkeypatch.setattr("continuum.agent.trace.config.get_trace_store", lambda: store)
+    monkeypatch.setattr("continuum.agent.trace.config.trace_detail", lambda: detail)
     return store
 
 
@@ -89,8 +89,8 @@ async def test_store_failure_is_swallowed(monkeypatch) -> None:
         async def save(self, *a, **k):
             raise RuntimeError("down")
 
-    monkeypatch.setattr("orchestrator.agent.trace.config.get_trace_store", lambda: Boom())
-    monkeypatch.setattr("orchestrator.agent.trace.config.trace_detail", lambda: TraceDetail.FULL)
+    monkeypatch.setattr("continuum.agent.trace.config.get_trace_store", lambda: Boom())
+    monkeypatch.setattr("continuum.agent.trace.config.trace_detail", lambda: TraceDetail.FULL)
     ctx = _context_with_recorder()
     resp = AgentResponse(content="hi", status=ResponseStatus.SUCCESS)
 

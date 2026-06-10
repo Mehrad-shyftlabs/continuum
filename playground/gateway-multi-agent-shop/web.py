@@ -24,7 +24,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from workflows import MODES, _BaseWorkflow, create_workflow
 
-from orchestrator import LogLevel, setup_logging
+from continuum import LogLevel, setup_logging
 
 setup_logging(level=LogLevel.INFO)
 

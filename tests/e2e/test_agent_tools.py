@@ -12,7 +12,7 @@ import json
 import pytest
 from mcp.types import CallToolResult, TextContent, Tool
 
-from orchestrator.tools.types import ToolContextConfig
+from continuum.tools.types import ToolContextConfig
 
 pytestmark = pytest.mark.e2e
 
@@ -383,11 +383,11 @@ async def _make_agent_with_tools(
     log_to_session: bool = False,
 ):
     """Create a BaseAgent wired to a fake MCP server."""
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-    from orchestrator.agent.runner import AgentRunner
-    from orchestrator.tools.executor import ToolExecutor
-    from orchestrator.tools.util import MCPUtil
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.runner import AgentRunner
+    from continuum.tools.executor import ToolExecutor
+    from continuum.tools.util import MCPUtil
 
     await server.connect()
     tool_defs = await MCPUtil.get_function_tools(server)
@@ -430,7 +430,7 @@ class TestAgentToolCalling:
         response = await runner.run(
             agent,
             "What is 137 multiplied by 29?",
-            context=__import__("orchestrator.agent.types", fromlist=["RunContext"]).RunContext(
+            context=__import__("continuum.agent.types", fromlist=["RunContext"]).RunContext(
                 run_id="e2e-calc"
             ),
         )
@@ -451,7 +451,7 @@ class TestAgentToolCalling:
             instructions="You are a math assistant. Use the calculate tool. If a calculation fails, explain why.",
             server=server,
         )
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.types import RunContext
 
         response = await runner.run(
             agent,
@@ -480,7 +480,7 @@ class TestAgentToolCalling:
             ),
             server=server,
         )
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.types import RunContext
 
         response = await runner.run(
             agent,
@@ -514,7 +514,7 @@ class TestAgentMultiTool:
             instructions="You have access to weather and time tools. Use them when asked. Be concise.",
             server=server,
         )
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.types import RunContext
 
         response = await runner.run(
             agent,
@@ -539,7 +539,7 @@ class TestAgentMultiTool:
             ),
             server=server,
         )
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.types import RunContext
 
         response = await runner.run(
             agent,
@@ -576,7 +576,7 @@ class TestAgentToolFailure:
             ),
             server=server,
         )
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.types import RunContext
 
         response = await runner.run(
             agent,
@@ -615,7 +615,7 @@ class TestAgentMultiStepReasoning:
             ),
             server=server,
         )
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.types import RunContext
 
         response = await runner.run(
             agent,
@@ -643,7 +643,7 @@ class TestAgentMultiStepReasoning:
             instructions="You are a data analyst. Look up data using tools. If data isn't found, say so clearly.",
             server=server,
         )
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.types import RunContext
 
         response = await runner.run(
             agent,

@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "sr
 from config import default_config
 from workflows import MODES, create_workflow
 
-from orchestrator import LogLevel, setup_logging
+from continuum import LogLevel, setup_logging
 
 
 def print_help(mode: str) -> None:

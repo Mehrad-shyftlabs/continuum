@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from orchestrator.agent.types import (
+from continuum.agent.types import (
     AgentEvent,
     AgentResponse,
     EventType,
@@ -25,7 +25,7 @@ from orchestrator.agent.types import (
     generate_handoff_id,
     generate_run_id,
 )
-from orchestrator.llm.types import FunctionCall, StreamChunk, ToolCall
+from continuum.llm.types import FunctionCall, StreamChunk, ToolCall
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -109,7 +109,7 @@ def _event_types(events: list[AgentEvent]) -> list[str]:
 
 def _make_runner(handoff_executor=None):
     """Build an AgentRunner with all heavy dependencies mocked out."""
-    from orchestrator.agent.runner import AgentRunner
+    from continuum.agent.runner import AgentRunner
 
     runner = AgentRunner.__new__(AgentRunner)
 
@@ -128,7 +128,7 @@ def _make_runner(handoff_executor=None):
     runner._config.circuit_breaker_threshold = 5
     runner._config.circuit_breaker_cooldown = 60
 
-    from orchestrator.agent.utils.circuit_breaker import CircuitBreaker
+    from continuum.agent.utils.circuit_breaker import CircuitBreaker
 
     runner._circuit_breaker = CircuitBreaker(threshold=5, cooldown=60)
 

@@ -4,7 +4,7 @@ Decision-Trace GlassBox configuration (financial-close domain).
 Recreated on top of local/glassbox: the same deterministic month-end close,
 expressed across all 9 multi-agent patterns (+ handoff), with the materiality
 threshold as the universal fork lever. Loads the project-root .env and turns the
-Decision Trace feature ON. Import before `orchestrator.config` is first used.
+Decision Trace feature ON. Import before `continuum.config` is first used.
 """
 
 import os

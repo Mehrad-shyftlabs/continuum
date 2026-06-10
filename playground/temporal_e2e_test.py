@@ -22,9 +22,9 @@ os.environ.setdefault("TEMPORAL_ENABLED", "true")
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from orchestrator.agent import BaseAgent  # noqa: E402
-from orchestrator.agent.config import AgentMemoryConfig  # noqa: E402
-from orchestrator.temporal import (  # noqa: E402
+from continuum.agent import BaseAgent  # noqa: E402
+from continuum.agent.config import AgentMemoryConfig  # noqa: E402
+from continuum.temporal import (  # noqa: E402
     ApprovalDecision,
     WorkflowInput,
     get_agent_registry,

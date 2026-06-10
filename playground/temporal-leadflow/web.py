@@ -50,10 +50,10 @@ from schemas import RankedLeadList
 from temporal.campaign import build_workflow_input
 from temporal.worker import setup_registry, start_worker, stop_worker
 
-from orchestrator import LogLevel, setup_logging
-from orchestrator.temporal.client import TemporalClient
-from orchestrator.temporal.human_in_loop import HumanInLoopManager
-from orchestrator.temporal.workflows.agent_workflow import AgentWorkflow
+from continuum import LogLevel, setup_logging
+from continuum.temporal.client import TemporalClient
+from continuum.temporal.human_in_loop import HumanInLoopManager
+from continuum.temporal.workflows.agent_workflow import AgentWorkflow
 
 setup_logging(level=LogLevel.INFO)
 
@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
     cfg = _app_config
     client = TemporalClient()
     try:
-        from orchestrator.temporal.config import TemporalConfig
+        from continuum.temporal.config import TemporalConfig
 
         tc = TemporalConfig(
             host=cfg.temporal_host,

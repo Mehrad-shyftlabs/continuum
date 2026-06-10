@@ -25,7 +25,7 @@ import pytest
 
 def _make_server(name: str = "test-server"):
     """In-process MCP server with two simple tools."""
-    from orchestrator.tools.mcp import MCPServerFunction
+    from continuum.tools.mcp import MCPServerFunction
 
     def greet(user: str) -> str:
         """Greet a user."""
@@ -39,7 +39,7 @@ def _make_server(name: str = "test-server"):
 
 
 async def _make_executor(server, namespace_tools: bool = False):
-    from orchestrator.tools.executor import ToolExecutor
+    from continuum.tools.executor import ToolExecutor
 
     executor = ToolExecutor(
         tool_registry={server: None},
@@ -59,7 +59,7 @@ class TestToolExecution:
 
     @pytest.mark.asyncio
     async def test_call_tool_returns_result(self):
-        from orchestrator.llm.types import FunctionCall, ToolCall
+        from continuum.llm.types import FunctionCall, ToolCall
 
         server = _make_server()
         executor = await _make_executor(server)
@@ -74,7 +74,7 @@ class TestToolExecution:
 
     @pytest.mark.asyncio
     async def test_call_add_tool(self):
-        from orchestrator.llm.types import FunctionCall, ToolCall
+        from continuum.llm.types import FunctionCall, ToolCall
 
         server = _make_server()
         executor = await _make_executor(server)
@@ -89,8 +89,8 @@ class TestToolExecution:
 
     @pytest.mark.asyncio
     async def test_unknown_tool_raises(self):
-        from orchestrator.llm.types import FunctionCall, ToolCall
-        from orchestrator.tools.exceptions import MCPToolError
+        from continuum.llm.types import FunctionCall, ToolCall
+        from continuum.tools.exceptions import MCPToolError
 
         server = _make_server()
         executor = await _make_executor(server)
@@ -163,10 +163,10 @@ class TestMcpServersDeadField:
 
     @pytest.mark.asyncio
     async def test_raises_on_run(self):
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.exceptions import AgentConfigurationError
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.tools.mcp import MCPServerFunction
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.exceptions import AgentConfigurationError
+        from continuum.agent.runner import AgentRunner
+        from continuum.tools.mcp import MCPServerFunction
 
         server = MCPServerFunction("s", [])
         agent = BaseAgent(name="bad-agent", mcp_servers=[server])
@@ -181,9 +181,9 @@ class TestMcpServersDeadField:
     @pytest.mark.asyncio
     async def test_no_error_when_tool_executor_also_set(self):
         """If both mcp_servers and tool_executor are set, no AgentConfigurationError for mcp_servers."""
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.exceptions import AgentConfigurationError
-        from orchestrator.agent.runner import AgentRunner
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.exceptions import AgentConfigurationError
+        from continuum.agent.runner import AgentRunner
 
         server = _make_server()
         executor = await _make_executor(server)
@@ -216,9 +216,9 @@ class TestPolicyEnforcement:
 
     @pytest.mark.asyncio
     async def test_deny_policy_blocks_mcp_tool(self):
-        from orchestrator.agent.exceptions import ToolAccessDeniedError
-        from orchestrator.llm.types import FunctionCall, ToolCall
-        from orchestrator.security.policy import AccessPolicy, PolicyStore
+        from continuum.agent.exceptions import ToolAccessDeniedError
+        from continuum.llm.types import FunctionCall, ToolCall
+        from continuum.security.policy import AccessPolicy, PolicyStore
 
         server = _make_server()
         executor = await _make_executor(server)
@@ -243,8 +243,8 @@ class TestPolicyEnforcement:
 
     @pytest.mark.asyncio
     async def test_allow_policy_passes_mcp_tool(self):
-        from orchestrator.llm.types import FunctionCall, ToolCall
-        from orchestrator.security.policy import AccessPolicy, PolicyStore
+        from continuum.llm.types import FunctionCall, ToolCall
+        from continuum.security.policy import AccessPolicy, PolicyStore
 
         server = _make_server()
         executor = await _make_executor(server)
@@ -278,10 +278,10 @@ class TestToolContextConfig:
 
     @pytest.mark.asyncio
     async def test_captures_session_id_from_tool_result(self):
-        from orchestrator.llm.types import FunctionCall, ToolCall
-        from orchestrator.tools.executor import ToolExecutor
-        from orchestrator.tools.mcp import MCPServerFunction
-        from orchestrator.tools.types import ToolContextConfig, ToolContextVariable
+        from continuum.llm.types import FunctionCall, ToolCall
+        from continuum.tools.executor import ToolExecutor
+        from continuum.tools.mcp import MCPServerFunction
+        from continuum.tools.types import ToolContextConfig, ToolContextVariable
 
         def create_session() -> dict:
             """Create a session and return session_id."""
@@ -308,10 +308,10 @@ class TestToolContextConfig:
 
     @pytest.mark.asyncio
     async def test_injects_captured_value_into_next_call(self):
-        from orchestrator.llm.types import FunctionCall, ToolCall
-        from orchestrator.tools.executor import ToolExecutor
-        from orchestrator.tools.mcp import MCPServerFunction
-        from orchestrator.tools.types import ToolContextConfig, ToolContextVariable
+        from continuum.llm.types import FunctionCall, ToolCall
+        from continuum.tools.executor import ToolExecutor
+        from continuum.tools.mcp import MCPServerFunction
+        from continuum.tools.types import ToolContextConfig, ToolContextVariable
 
         received_args = {}
 
@@ -365,8 +365,8 @@ class TestGetToolDefinitionsBeforeInit:
     """get_tool_definitions() raises RuntimeError if called before initialize()."""
 
     def test_raises_before_initialize(self):
-        from orchestrator.tools.executor import ToolExecutor
-        from orchestrator.tools.mcp import MCPServerFunction
+        from continuum.tools.executor import ToolExecutor
+        from continuum.tools.mcp import MCPServerFunction
 
         server = MCPServerFunction("s", [])
         executor = ToolExecutor(tool_registry={server: None})
@@ -384,7 +384,7 @@ class TestGetToolDefinitionsBeforeInit:
 
     def test_no_error_when_no_registry_config(self):
         """Empty executor with no servers — empty list is valid."""
-        from orchestrator.tools.executor import ToolExecutor
+        from continuum.tools.executor import ToolExecutor
 
         executor = ToolExecutor()
         defs = executor.get_tool_definitions()

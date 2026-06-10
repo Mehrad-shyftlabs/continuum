@@ -23,8 +23,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from pydantic import BaseModel  # noqa: E402
 
-from orchestrator.agent import AgentRunner, BaseAgent, Handoff  # noqa: E402
-from orchestrator.agent.config import AgentMemoryConfig  # noqa: E402
+from continuum.agent import AgentRunner, BaseAgent, Handoff  # noqa: E402
+from continuum.agent.config import AgentMemoryConfig  # noqa: E402
 
 NO_MEM = AgentMemoryConfig(search_memories=False, store_memories=False)
 results: dict[str, bool] = {}
@@ -151,8 +151,8 @@ async def t3_handoffs() -> None:
 # --------------------------------------------------------------------------
 async def t4_memory_via_gateway() -> None:
     print("\n=== T4: Memory fact extraction via Smart Inference (auto/cheap) ===")
-    from orchestrator.memory.config import MemoryConfig
-    from orchestrator.memory.providers.mem0 import Mem0Provider
+    from continuum.memory.config import MemoryConfig
+    from continuum.memory.providers.mem0 import Mem0Provider
 
     llm = MemoryConfig().to_mem0_config()["llm"]["config"]
     print(f"  memory LLM model={llm['model']!r} base_url={llm.get('openai_base_url')!r}")
@@ -179,7 +179,7 @@ async def t4_memory_via_gateway() -> None:
 
 # --------------------------------------------------------------------------
 async def main() -> int:
-    from orchestrator import LogLevel, setup_logging
+    from continuum import LogLevel, setup_logging
 
     setup_logging(level=LogLevel.WARNING)  # quiet — we assert on returned values
     await t1_structured_output()

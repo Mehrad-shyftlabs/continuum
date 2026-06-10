@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from orchestrator.agent.trace import (
+from continuum.agent.trace import (
     SCHEMA_VERSION,
     DecisionStep,
     DecisionTrace,

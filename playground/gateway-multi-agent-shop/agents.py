@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from orchestrator import AgentConfig, AgentMemoryConfig, BaseAgent
+from continuum import AgentConfig, AgentMemoryConfig, BaseAgent
 
 
 def make_search_agent(

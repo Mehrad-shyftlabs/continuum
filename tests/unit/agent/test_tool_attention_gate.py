@@ -16,8 +16,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from orchestrator.agent.services.tool_service import ToolService
-from orchestrator.llm.types import FunctionCall, ToolCall
+from continuum.agent.services.tool_service import ToolService
+from continuum.llm.types import FunctionCall, ToolCall
 
 # ---------------------------------------------------------------------------
 # Helpers

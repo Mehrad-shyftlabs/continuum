@@ -85,7 +85,7 @@ async def run_health_check(
     Returns:
         Health check results dictionary
     """
-    from orchestrator.core.health import get_health_checker
+    from continuum.core.health import get_health_checker
 
     checker = get_health_checker()
 

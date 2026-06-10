@@ -17,8 +17,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orchestrator.agent.exceptions import MaxTurnsExceededError
-from orchestrator.agent.types import AgentResponse, ResponseStatus, RunState
+from continuum.agent.exceptions import MaxTurnsExceededError
+from continuum.agent.types import AgentResponse, ResponseStatus, RunState
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -26,8 +26,8 @@ from orchestrator.agent.types import AgentResponse, ResponseStatus, RunState
 
 
 def _make_agent(name="test-agent", log_to_session=True):
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
 
     return BaseAgent(
         name=name,
@@ -45,10 +45,10 @@ def _make_run_state(messages=None):
 
 
 def _make_finalizer():
-    from orchestrator.agent.execution.run_finalizer import RunFinalizer
-    from orchestrator.agent.execution.run_lifecycle import RunLifecycle
-    from orchestrator.agent.services.context_service import ContextService
-    from orchestrator.agent.services.session_service import SessionService
+    from continuum.agent.execution.run_finalizer import RunFinalizer
+    from continuum.agent.execution.run_lifecycle import RunLifecycle
+    from continuum.agent.services.context_service import ContextService
+    from continuum.agent.services.session_service import SessionService
 
     sess_svc = MagicMock(spec=SessionService)
     sess_svc.save_messages = AsyncMock()
@@ -77,18 +77,18 @@ def _metrics_patch():
     m = MagicMock()
     m.record_latency = MagicMock()
     m.track_tokens = MagicMock()
-    return patch("orchestrator.observability.metrics.get_metrics_collector", return_value=m)
+    return patch("continuum.observability.metrics.get_metrics_collector", return_value=m)
 
 
 def _make_runner_with_executor(executor_mock, finalizer_mock=None):
-    from orchestrator.agent.runner import AgentRunner
+    from continuum.agent.runner import AgentRunner
 
     llm = MagicMock()
     llm.is_enabled = True
     sc = MagicMock()
     sc.is_enabled = True
 
-    with patch("orchestrator.agent.runner.get_container") as mock_container:
+    with patch("continuum.agent.runner.get_container") as mock_container:
         container = MagicMock()
         container.llm_client = llm
         container.memory_client = MagicMock()
@@ -110,8 +110,8 @@ def _make_runner_with_executor(executor_mock, finalizer_mock=None):
 
 
 def _stub_prepare_run(runner, run_state):
-    from orchestrator.agent.types import PrepareRunResult
-    from orchestrator.agent.utils.context_utils import create_run_context
+    from continuum.agent.types import PrepareRunResult
+    from continuum.agent.utils.context_utils import create_run_context
 
     ctx = create_run_context(session_id="sess-1", max_turns=4)
     result = PrepareRunResult(
@@ -149,7 +149,7 @@ class TestFinalizerSessionGuard:
     async def test_skips_save_messages_on_max_turns_reached(self):
         finalizer, sess_svc, ctx_svc, _ = _make_finalizer()
         agent = _make_agent()
-        from orchestrator.agent.utils.context_utils import create_run_context
+        from continuum.agent.utils.context_utils import create_run_context
 
         ctx = create_run_context(session_id="sess-1")
         rs = _make_run_state()
@@ -168,8 +168,8 @@ class TestFinalizerSessionGuard:
     async def test_run_state_still_marked_completed_on_max_turns(self):
         finalizer, _, ctx_svc, _ = _make_finalizer()
         agent = _make_agent()
-        from orchestrator.agent.types import RunStatus
-        from orchestrator.agent.utils.context_utils import create_run_context
+        from continuum.agent.types import RunStatus
+        from continuum.agent.utils.context_utils import create_run_context
 
         ctx = create_run_context(session_id="sess-1")
         rs = _make_run_state()
@@ -188,7 +188,7 @@ class TestFinalizerSessionGuard:
     async def test_tracing_ends_on_max_turns(self):
         finalizer, _, _, lifecycle = _make_finalizer()
         agent = _make_agent()
-        from orchestrator.agent.utils.context_utils import create_run_context
+        from continuum.agent.utils.context_utils import create_run_context
 
         ctx = create_run_context(session_id="sess-1")
         rs = _make_run_state()
@@ -206,7 +206,7 @@ class TestFinalizerSessionGuard:
     async def test_save_messages_called_normally_on_success(self):
         finalizer, sess_svc, _, _ = _make_finalizer()
         agent = _make_agent()
-        from orchestrator.agent.utils.context_utils import create_run_context
+        from continuum.agent.utils.context_utils import create_run_context
 
         ctx = create_run_context(session_id="sess-1")
         rs = _make_run_state()

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 from pydantic import BaseModel
 
-from orchestrator.llm.config import LLMConfig
+from continuum.llm.config import LLMConfig
 
 logger = logging.getLogger(__name__)
 

@@ -1,10 +1,10 @@
 # Continuum Documentation
 
 Reference documentation for the **Continuum** agentic framework
-(`shyftlabs-continuum` on PyPI, importable as `orchestrator`).
+(`shyftlabs-continuum` on PyPI, importable as `continuum`).
 
 > **Note**: every example in these docs has been verified against the
-> actual source under `src/orchestrator/`. Imports, parameter names,
+> actual source under `src/continuum/`. Imports, parameter names,
 > defaults, and signatures match the codebase as of the latest
 > release.
 
@@ -36,15 +36,15 @@ If you've never used Continuum before, read in this order:
 
 | Module | Doc | What it gives you |
 |---|---|---|
-| `orchestrator.agent` | [agent.md](agent.md) | `BaseAgent`, `AgentRunner`, 9 workflow patterns, handoffs |
-| `orchestrator.llm` | [llm.md](llm.md) | `LLMClient`, provider routing, structured outputs, compression |
-| `orchestrator.memory` | [memory.md](memory.md) | mem0 + Qdrant long-term memory; `IntelligentMemoryClient` |
-| `orchestrator.session` | [session.md](session.md) | Redis-backed conversation history |
-| `orchestrator.tools` | [tools.md](tools.md) | MCP servers (Stdio/SSE/StreamableHTTP), `ToolExecutor`, artifacts |
-| `orchestrator.observability` | [observability.md](observability.md) | Langfuse tracing, metrics, error reporter |
-| `orchestrator.core` | [core.md](core.md) | `Container`, `OrchestratorLifecycle`, health checks |
-| `orchestrator.temporal` | [temporal/](temporal/) | Durable workflows, approval gates |
-| `orchestrator.config`, `protocols`, `exceptions` | [core.md §7-§8](core.md) | Settings, runtime-checkable protocols, exception hierarchy |
+| `continuum.agent` | [agent.md](agent.md) | `BaseAgent`, `AgentRunner`, 9 workflow patterns, handoffs |
+| `continuum.llm` | [llm.md](llm.md) | `LLMClient`, provider routing, structured outputs, compression |
+| `continuum.memory` | [memory.md](memory.md) | mem0 + Qdrant long-term memory; `IntelligentMemoryClient` |
+| `continuum.session` | [session.md](session.md) | Redis-backed conversation history |
+| `continuum.tools` | [tools.md](tools.md) | MCP servers (Stdio/SSE/StreamableHTTP), `ToolExecutor`, artifacts |
+| `continuum.observability` | [observability.md](observability.md) | Langfuse tracing, metrics, error reporter |
+| `continuum.core` | [core.md](core.md) | `Container`, `OrchestratorLifecycle`, health checks |
+| `continuum.temporal` | [temporal/](temporal/) | Durable workflows, approval gates |
+| `continuum.config`, `protocols`, `exceptions` | [core.md §7-§8](core.md) | Settings, runtime-checkable protocols, exception hierarchy |
 
 ---
 
@@ -108,9 +108,9 @@ mentions any of the following, they are stale:
   with direct provider SDKs.
 - **`SessionClient.add_message(session_id, role=..., content=...)`** —
   the real signature is `add_message(session_id, message: ChatMessage)`.
-- **`from orchestrator.agent import RouterAgent, create_router_agent`
+- **`from continuum.agent import RouterAgent, create_router_agent`
   with a `Route(target=...)`** — the field is `Route(agent_name=..., description=...)`.
-- **`from orchestrator.memory import MemoryClient` with
+- **`from continuum.memory import MemoryClient` with
   `client.add(text, user_id=...)`** — works, but `add()` accepts strings,
   lists of strings, OR lists of `{role,content}` dicts; the messages-style
   is the recommended path.

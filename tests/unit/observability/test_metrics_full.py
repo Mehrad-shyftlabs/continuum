@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orchestrator.observability.metrics import (
+from continuum.observability.metrics import (
     CompositeExporter,
     JSONFileExporter,
     LatencyMetric,
@@ -225,7 +225,7 @@ class TestMetricsCollectorReportToTrace:
 
 
 class TestMetricsCollectorReportToProviders:
-    @patch("orchestrator.observability.provider_manager.get_provider_manager")
+    @patch("continuum.observability.provider_manager.get_provider_manager")
     def test_report_to_providers(self, mock_get_pm):
         logger.info("MetricsCollectorReportToProviders: report to providers")
         mock_pm = MagicMock()
@@ -237,7 +237,7 @@ class TestMetricsCollectorReportToProviders:
         mc.track_tokens("llm", prompt_tokens=100, completion_tokens=50)
         mc.track_error("op", ValueError("err"))
 
-        with patch("orchestrator.observability.metrics.MetricsCollector.report_to_providers"):
+        with patch("continuum.observability.metrics.MetricsCollector.report_to_providers"):
             mc.report_to_providers("trace-123")
 
     def test_report_to_providers_basic(self):
@@ -263,7 +263,7 @@ class TestMetricsCollectorAsync:
 class TestGlobalFunctions:
     def test_get_metrics_collector_singleton(self):
         logger.info("GlobalFunctions: get metrics collector singleton")
-        import orchestrator.observability.metrics as mod
+        import continuum.observability.metrics as mod
 
         old = mod._global_metrics_collector
         mod._global_metrics_collector = None
@@ -276,7 +276,7 @@ class TestGlobalFunctions:
 
     def test_initialize_metrics_collector(self):
         logger.info("GlobalFunctions: initialize metrics collector")
-        import orchestrator.observability.metrics as mod
+        import continuum.observability.metrics as mod
 
         old = mod._global_metrics_collector
         try:
@@ -287,7 +287,7 @@ class TestGlobalFunctions:
 
     def test_reset_metrics_func(self):
         logger.info("GlobalFunctions: reset metrics func")
-        import orchestrator.observability.metrics as mod
+        import continuum.observability.metrics as mod
 
         old = mod._global_metrics_collector
         mod._global_metrics_collector = None
@@ -301,7 +301,7 @@ class TestGlobalFunctions:
 
     def test_get_metrics_summary_func(self):
         logger.info("GlobalFunctions: get metrics summary func")
-        import orchestrator.observability.metrics as mod
+        import continuum.observability.metrics as mod
 
         old = mod._global_metrics_collector
         mod._global_metrics_collector = None

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from orchestrator.agent.trace import (
+from continuum.agent.trace import (
     DecisionStep,
     DecisionTrace,
     StepKind,

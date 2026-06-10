@@ -9,12 +9,12 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from orchestrator.agent.base import BaseAgent
-from orchestrator.agent.config import AgentConfig
-from orchestrator.agent.execution.executor import Executor
-from orchestrator.agent.trace import StepKind
-from orchestrator.agent.trace.recorder import TraceRecorder
-from orchestrator.agent.types import RunContext, RunState
+from continuum.agent.base import BaseAgent
+from continuum.agent.config import AgentConfig
+from continuum.agent.execution.executor import Executor
+from continuum.agent.trace import StepKind
+from continuum.agent.trace.recorder import TraceRecorder
+from continuum.agent.types import RunContext, RunState
 
 
 def _usage(p: int = 10, c: int = 5) -> SimpleNamespace:
@@ -181,9 +181,9 @@ async def test_return_to_parent_restores_parent_stack() -> None:
     continuation steps must be stamped with A's stack — not B's. The executor
     recomputes the stack from run_state each turn (and passes it per record
     call), so once B is popped the parent's steps carry the parent's stack."""
-    from orchestrator.agent.config import AgentMemoryConfig
-    from orchestrator.agent.types import AgentResponse as _AR
-    from orchestrator.agent.types import Handoff, HandoffResult, ResponseStatus
+    from continuum.agent.config import AgentMemoryConfig
+    from continuum.agent.types import AgentResponse as _AR
+    from continuum.agent.types import Handoff, HandoffResult, ResponseStatus
 
     agent_a = BaseAgent(
         name="agent-a",

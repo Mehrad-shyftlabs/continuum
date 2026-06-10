@@ -7,8 +7,8 @@ tests/integration/test_trace_store_redis.py — no fakes here.
 
 from __future__ import annotations
 
-from orchestrator.agent.trace import DecisionStep, DecisionTrace, StepKind
-from orchestrator.agent.trace.store import (
+from continuum.agent.trace import DecisionStep, DecisionTrace, StepKind
+from continuum.agent.trace.store import (
     InMemoryTraceStore,
     NullTraceStore,
     RedisTraceStore,

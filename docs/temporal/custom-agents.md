@@ -5,7 +5,7 @@ execution time. Any `BaseAgent` works — including workflow agents like
 `SequentialAgent` or `RouterAgent` — as long as it's registered before
 the worker spins up an activity.
 
-`from orchestrator.temporal import (
+`from continuum.temporal import (
     AgentRegistry, get_agent_registry, reset_agent_registry,
 )`
 
@@ -14,8 +14,8 @@ the worker spins up an activity.
 ## 1 · Register agents
 
 ```python
-from orchestrator.agent import BaseAgent
-from orchestrator.temporal import get_agent_registry
+from continuum.agent import BaseAgent
+from continuum.temporal import get_agent_registry
 
 registry = get_agent_registry()                    # thread-safe singleton
 
@@ -63,8 +63,8 @@ If you want activities to share a memory client, session client, or
 custom container, supply a `runner_factory`:
 
 ```python
-from orchestrator.agent import AgentRunner
-from orchestrator.core.container import Container, ContainerConfig
+from continuum.agent import AgentRunner
+from continuum.core.container import Container, ContainerConfig
 
 container = Container(ContainerConfig(enable_memory=True, enable_session=True))
 
@@ -86,7 +86,7 @@ Workflow agents (`SequentialAgent`, `RouterAgent`, etc.) are themselves
 `BaseAgent` subclasses, so they register the same way:
 
 ```python
-from orchestrator.agent import create_sequential_agent, BaseAgent
+from continuum.agent import create_sequential_agent, BaseAgent
 
 researcher = BaseAgent(name="researcher", instructions="…")
 writer     = BaseAgent(name="writer",     instructions="…")
@@ -130,7 +130,7 @@ to do based on its retry policy and step config.
 
 ## 6 · Exception: `AgentNotRegisteredError`
 
-`from orchestrator.temporal import AgentNotRegisteredError`
+`from continuum.temporal import AgentNotRegisteredError`
 
 Raised when a workflow references an unknown `agent_name`. Carries
 `agent_name` and `available_agents` in its context dict for fast
@@ -171,7 +171,7 @@ because Temporal replays history deterministically.
 ### Tests
 
 ```python
-from orchestrator.temporal import reset_agent_registry
+from continuum.temporal import reset_agent_registry
 
 def setup_function():
     reset_agent_registry()

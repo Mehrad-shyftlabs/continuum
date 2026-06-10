@@ -13,8 +13,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from mcp.types import TextContent, Tool
 
-from orchestrator.tools.types import ToolContextConfig
-from orchestrator.tools.util import MCPUtil
+from continuum.tools.types import ToolContextConfig
+from continuum.tools.util import MCPUtil
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -62,7 +62,7 @@ def _disabled_provider_manager():
 class TestUseStructuredContentFlag:
     @pytest.mark.asyncio
     @patch(
-        "orchestrator.observability.provider_manager.get_provider_manager",
+        "continuum.observability.provider_manager.get_provider_manager",
         return_value=_disabled_provider_manager(),
     )
     async def test_flag_false_uses_content_not_structured(self, _mock_pm):
@@ -82,7 +82,7 @@ class TestUseStructuredContentFlag:
 
     @pytest.mark.asyncio
     @patch(
-        "orchestrator.observability.provider_manager.get_provider_manager",
+        "continuum.observability.provider_manager.get_provider_manager",
         return_value=_disabled_provider_manager(),
     )
     async def test_flag_true_uses_structured_content(self, _mock_pm):
@@ -102,7 +102,7 @@ class TestUseStructuredContentFlag:
 
     @pytest.mark.asyncio
     @patch(
-        "orchestrator.observability.provider_manager.get_provider_manager",
+        "continuum.observability.provider_manager.get_provider_manager",
         return_value=_disabled_provider_manager(),
     )
     async def test_flag_true_no_structured_content_falls_back_to_content(self, _mock_pm):
@@ -121,7 +121,7 @@ class TestUseStructuredContentFlag:
 
     @pytest.mark.asyncio
     @patch(
-        "orchestrator.observability.provider_manager.get_provider_manager",
+        "continuum.observability.provider_manager.get_provider_manager",
         return_value=_disabled_provider_manager(),
     )
     async def test_artifact_always_captures_structured_content(self, _mock_pm):
@@ -191,7 +191,7 @@ class TestNamespaceTools:
     @pytest.mark.asyncio
     async def test_namespace_false_raises_on_duplicate_names(self):
         """With namespace_tools=False (default), duplicate tool names raise MCPError."""
-        from orchestrator.tools.exceptions import MCPError
+        from continuum.tools.exceptions import MCPError
 
         server_a = _make_list_tools_server("server-a", ["search"])
         server_b = _make_list_tools_server("server-b", ["search"])
@@ -214,8 +214,8 @@ class TestNamespaceTools:
     @pytest.mark.asyncio
     async def test_executor_namespace_true_stores_prefixed_keys(self):
         """ToolExecutor with namespace_tools=True stores registry keys with server prefix."""
-        from orchestrator.tools.executor import ToolExecutor
-        from orchestrator.tools.mcp import MCPServerFunction
+        from continuum.tools.executor import ToolExecutor
+        from continuum.tools.mcp import MCPServerFunction
 
         server = MCPServerFunction(
             name="my-server",
@@ -235,8 +235,8 @@ class TestNamespaceTools:
     @pytest.mark.asyncio
     async def test_executor_namespace_false_stores_plain_keys(self):
         """ToolExecutor default (namespace_tools=False) stores plain tool names."""
-        from orchestrator.tools.executor import ToolExecutor
-        from orchestrator.tools.mcp import MCPServerFunction
+        from continuum.tools.executor import ToolExecutor
+        from continuum.tools.mcp import MCPServerFunction
 
         server = MCPServerFunction(
             name="my-server",

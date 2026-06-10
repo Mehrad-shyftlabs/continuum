@@ -147,8 +147,8 @@ def real_milvus():
 @pytest.fixture
 def real_llm_client():
     """Real LLMClient configured from .env."""
-    from orchestrator.llm.client import LLMClient
-    from orchestrator.llm.config import LLMConfig
+    from continuum.llm.client import LLMClient
+    from continuum.llm.config import LLMConfig
 
     model = os.getenv("DEFAULT_LLM_MODEL", "gemini/gemini-2.5-flash")
     client = LLMClient(
@@ -166,7 +166,7 @@ def real_llm_client():
 @pytest.fixture
 def container():
     """Get a fresh container instance."""
-    from orchestrator.core.container import get_container, reset_container
+    from continuum.core.container import get_container, reset_container
 
     reset_container()
     c = get_container()

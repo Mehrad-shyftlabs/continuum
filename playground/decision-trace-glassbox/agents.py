@@ -36,20 +36,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from orchestrator import AgentConfig, AgentMemoryConfig, BaseAgent, Handoff
-from orchestrator.agent.config import ParallelConfig, RouterConfig
-from orchestrator.agent.types import MergeStrategy, Route, TerminationType
-from orchestrator.agent.workflow import (
+from continuum import AgentConfig, AgentMemoryConfig, BaseAgent, Handoff
+from continuum.agent.config import ParallelConfig, RouterConfig
+from continuum.agent.types import MergeStrategy, Route, TerminationType
+from continuum.agent.workflow import (
     create_planner_agent,
     create_reflection_agent,
     create_scatter_agent,
     create_supervised_agent,
 )
-from orchestrator.agent.workflow.debate import DebateAgent
-from orchestrator.agent.workflow.loop import create_loop_agent
-from orchestrator.agent.workflow.parallel import ParallelAgent
-from orchestrator.agent.workflow.router import RouterAgent
-from orchestrator.agent.workflow.sequential import SequentialAgent
+from continuum.agent.workflow.debate import DebateAgent
+from continuum.agent.workflow.loop import create_loop_agent
+from continuum.agent.workflow.parallel import ParallelAgent
+from continuum.agent.workflow.router import RouterAgent
+from continuum.agent.workflow.sequential import SequentialAgent
 
 _MEM = AgentMemoryConfig(search_memories=False, store_memories=False)
 _CFG = AgentConfig(log_to_session=False, session_history_turns=0)
@@ -164,7 +164,7 @@ def build_sequential(tools, te, model):
 
 
 def __seq_cfg():
-    from orchestrator.agent.config import SequentialConfig
+    from continuum.agent.config import SequentialConfig
     return SequentialConfig(pipeline_context_max_chars=None)
 
 

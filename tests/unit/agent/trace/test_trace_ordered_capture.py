@@ -5,9 +5,9 @@ one deterministic, contiguous, re-numbered, segmentable trace.
 
 from __future__ import annotations
 
-from orchestrator.agent.trace.recorder import TraceRecorder
-from orchestrator.agent.trace.types import StepKind
-from orchestrator.agent.workflow._forkable import segment_by_markers
+from continuum.agent.trace.recorder import TraceRecorder
+from continuum.agent.trace.types import StepKind
+from continuum.agent.workflow._forkable import segment_by_markers
 
 
 def _branch(root: str, agent: str, n: int) -> TraceRecorder:

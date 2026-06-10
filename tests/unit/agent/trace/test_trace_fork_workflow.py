@@ -12,11 +12,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from orchestrator.agent.interfaces.forkable import Forkable
-from orchestrator.agent.runner import AgentRunner
-from orchestrator.agent.trace.recorder import TraceRecorder
-from orchestrator.agent.trace.types import DecisionStep, DecisionTrace, StepKind
-from orchestrator.agent.types import AgentResponse, ResponseStatus
+from continuum.agent.interfaces.forkable import Forkable
+from continuum.agent.runner import AgentRunner
+from continuum.agent.trace.recorder import TraceRecorder
+from continuum.agent.trace.types import DecisionStep, DecisionTrace, StepKind
+from continuum.agent.types import AgentResponse, ResponseStatus
 
 
 class _FakeForkable:
@@ -42,8 +42,8 @@ def test_fake_orchestrator_satisfies_protocol() -> None:
 
 async def test_fork_delegates_to_forkable(monkeypatch) -> None:
     # In-memory trace store so we can seed a parent run without Redis.
-    from orchestrator.agent.trace import config as trace_config
-    from orchestrator.config import settings
+    from continuum.agent.trace import config as trace_config
+    from continuum.config import settings
 
     monkeypatch.setattr(settings, "decision_trace_store", "memory")
     monkeypatch.setattr(settings, "decision_trace_enabled", True)
@@ -68,8 +68,8 @@ async def test_fork_delegates_to_forkable(monkeypatch) -> None:
 async def test_fork_rejects_return_to_parent_child(monkeypatch) -> None:
     """Forking a step inside a return-to-parent handoff fails clearly instead of
     silently returning the child's partial answer."""
-    from orchestrator.agent.trace import config as trace_config
-    from orchestrator.config import settings
+    from continuum.agent.trace import config as trace_config
+    from continuum.config import settings
 
     monkeypatch.setattr(settings, "decision_trace_store", "memory")
     monkeypatch.setattr(settings, "decision_trace_enabled", True)

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from orchestrator.agent.trace import StepKind
-from orchestrator.agent.trace.recorder import TraceRecorder
+from continuum.agent.trace import StepKind
+from continuum.agent.trace.recorder import TraceRecorder
 
 
 def test_records_scripted_order_query_run() -> None:
@@ -53,7 +53,7 @@ def test_handoff_appends_to_chain() -> None:
 
 
 def test_span_id_stamped_from_context(monkeypatch) -> None:
-    monkeypatch.setattr("orchestrator.agent.trace.recorder.get_current_span_id", lambda: "span-xyz")
+    monkeypatch.setattr("continuum.agent.trace.recorder.get_current_span_id", lambda: "span-xyz")
     rec = TraceRecorder("r", "a")
     rec.record_llm_call("a", 1, output="hi")
     assert rec.trace.steps[0].span_id == "span-xyz"
@@ -77,7 +77,7 @@ def test_last_step_id_helper() -> None:
 def test_new_step_kinds_and_recorders() -> None:
     """MEMORY_WRITE / GUARDRAIL / WORKFLOW_STEP kinds exist and their recorder
     helpers produce steps of the right kind that round-trip."""
-    from orchestrator.agent.trace.types import DecisionTrace
+    from continuum.agent.trace.types import DecisionTrace
 
     rec = TraceRecorder(run_id="run_k", root_agent="wf")
 

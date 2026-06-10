@@ -40,8 +40,8 @@ repos:
   - repo: local
     hooks:
       - id: mypy
-        name: mypy (src/orchestrator)
-        entry: mypy src/orchestrator
+        name: mypy (src/continuum)
+        entry: mypy src/continuum
         language: system
         types: [python]
         pass_filenames: false

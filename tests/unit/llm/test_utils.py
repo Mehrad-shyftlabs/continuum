@@ -3,7 +3,7 @@
 import logging
 from unittest.mock import MagicMock, patch  # patch used in TestValidateJsonSchemaConfig
 
-from orchestrator.llm.utils import (
+from continuum.llm.utils import (
     check_json_schema_support,
     check_response_format_support,
     supports_tools_with_json_mode,
@@ -74,7 +74,7 @@ class TestValidateJsonSchemaConfig:
         agent.enable_json_mode = True
         agent.model = "old-model"
         agent.json_schema = None
-        with patch("orchestrator.llm.utils.check_response_format_support", return_value=False):
+        with patch("continuum.llm.utils.check_response_format_support", return_value=False):
             valid, err = validate_json_schema_config(agent)
         assert valid is False
         assert "does not support" in err
@@ -86,8 +86,8 @@ class TestValidateJsonSchemaConfig:
         agent.model = "gpt-4"
         agent.json_schema = {"name": "test"}
         with (
-            patch("orchestrator.llm.utils.check_response_format_support", return_value=True),
-            patch("orchestrator.llm.utils.check_json_schema_support", return_value=False),
+            patch("continuum.llm.utils.check_response_format_support", return_value=True),
+            patch("continuum.llm.utils.check_json_schema_support", return_value=False),
         ):
             valid, err = validate_json_schema_config(agent)
         assert valid is False
@@ -99,8 +99,8 @@ class TestValidateJsonSchemaConfig:
         agent.model = "gpt-4o-2024-08-06"
         agent.json_schema = {"name": "test"}
         with (
-            patch("orchestrator.llm.utils.check_response_format_support", return_value=True),
-            patch("orchestrator.llm.utils.check_json_schema_support", return_value=True),
+            patch("continuum.llm.utils.check_response_format_support", return_value=True),
+            patch("continuum.llm.utils.check_json_schema_support", return_value=True),
         ):
             valid, err = validate_json_schema_config(agent)
         assert valid is True

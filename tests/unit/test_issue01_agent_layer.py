@@ -21,14 +21,14 @@ class TestCircuitBreaker:
     """Test that the circuit breaker state transitions are atomic."""
 
     def test_closed_state_allows_calls(self):
-        from orchestrator.agent.utils.circuit_breaker import CircuitBreaker
+        from continuum.agent.utils.circuit_breaker import CircuitBreaker
 
         cb = CircuitBreaker(threshold=3, cooldown=1)
         # Should not raise
         cb.check()
 
     def test_opens_after_threshold_failures(self):
-        from orchestrator.agent.utils.circuit_breaker import (
+        from continuum.agent.utils.circuit_breaker import (
             CircuitBreaker,
             CircuitBreakerOpen,
         )
@@ -40,7 +40,7 @@ class TestCircuitBreaker:
             cb.check()
 
     def test_half_open_after_cooldown(self):
-        from orchestrator.agent.utils.circuit_breaker import CircuitBreaker
+        from continuum.agent.utils.circuit_breaker import CircuitBreaker
 
         cb = CircuitBreaker(threshold=1, cooldown=1)
         cb.record_failure()
@@ -50,7 +50,7 @@ class TestCircuitBreaker:
 
     def test_concurrent_check_is_safe(self):
         """Multiple threads calling check() simultaneously should not corrupt state."""
-        from orchestrator.agent.utils.circuit_breaker import CircuitBreaker
+        from continuum.agent.utils.circuit_breaker import CircuitBreaker
 
         cb = CircuitBreaker(threshold=1, cooldown=1)
         cb.record_failure()
@@ -82,7 +82,7 @@ class TestCircuitBreaker:
 
 class TestRunStateThreadSafety:
     def test_push_pop_agent_stack(self):
-        from orchestrator.agent.types import RunState
+        from continuum.agent.types import RunState
 
         state = RunState(run_id="test-run")
         state.push_agent("agent-a")
@@ -93,13 +93,13 @@ class TestRunStateThreadSafety:
         assert state.get_agent_stack_snapshot() == ["agent-a"]
 
     def test_pop_empty_returns_none(self):
-        from orchestrator.agent.types import RunState
+        from continuum.agent.types import RunState
 
         state = RunState(run_id="test-run")
         assert state.pop_agent() is None
 
     def test_concurrent_push(self):
-        from orchestrator.agent.types import RunState
+        from continuum.agent.types import RunState
 
         state = RunState(run_id="test-run")
         errors = []
@@ -128,7 +128,7 @@ class TestRunStateThreadSafety:
 
 class TestTokenUsage:
     def test_add_with_none_values(self):
-        from orchestrator.agent.types import TokenUsage
+        from continuum.agent.types import TokenUsage
 
         a = TokenUsage(prompt_tokens=10, completion_tokens=5, total_tokens=15)
         b = TokenUsage(prompt_tokens=None, completion_tokens=None, total_tokens=None)
@@ -138,7 +138,7 @@ class TestTokenUsage:
         assert result.total_tokens == 15
 
     def test_add_normal(self):
-        from orchestrator.agent.types import TokenUsage
+        from continuum.agent.types import TokenUsage
 
         a = TokenUsage(prompt_tokens=100, completion_tokens=50, total_tokens=150)
         b = TokenUsage(prompt_tokens=200, completion_tokens=100, total_tokens=300)
@@ -154,7 +154,7 @@ class TestTokenUsage:
 
 class TestAgentResponseErrorFactory:
     def test_error_response_creates_valid_response(self):
-        from orchestrator.agent.types import AgentResponse, ResponseStatus
+        from continuum.agent.types import AgentResponse, ResponseStatus
 
         resp = AgentResponse.error_response(
             error="something failed",
@@ -173,7 +173,7 @@ class TestAgentResponseErrorFactory:
 
 class TestBaseAgentClone:
     def test_clone_deep_copies_tools(self):
-        from orchestrator.agent.base import BaseAgent
+        from continuum.agent.base import BaseAgent
 
         original = BaseAgent(name="orig", tools=[{"name": "tool1"}])
         cloned = original.clone(name="cloned")
@@ -183,7 +183,7 @@ class TestBaseAgentClone:
         assert len(original.tools) == 1
 
     def test_clone_deep_copies_metadata(self):
-        from orchestrator.agent.base import BaseAgent
+        from continuum.agent.base import BaseAgent
 
         original = BaseAgent(name="orig", metadata={"key": [1, 2, 3]})
         cloned = original.clone()
@@ -203,9 +203,9 @@ class TestValidationUtils:
         """Agent without input_schema should pass validation."""
         import asyncio
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.types import RunContext
-        from orchestrator.agent.utils.validation_utils import validate_input
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.types import RunContext
+        from continuum.agent.utils.validation_utils import validate_input
 
         agent = BaseAgent(name="test")
         ctx = RunContext(run_id="r1")
@@ -220,7 +220,7 @@ class TestValidationUtils:
 
 class TestSecretsRedaction:
     def test_redact_dict_handles_circular_reference(self):
-        from orchestrator.utils.secrets import redact_dict
+        from continuum.utils.secrets import redact_dict
 
         d: dict = {"key": "value"}
         d["self"] = d  # circular reference
@@ -230,7 +230,7 @@ class TestSecretsRedaction:
         assert result["self"] == {"_redacted": "[CIRCULAR REFERENCE]"}
 
     def test_redact_dict_max_depth_redacts(self):
-        from orchestrator.utils.secrets import redact_dict
+        from continuum.utils.secrets import redact_dict
 
         deep = {"a": {"b": {"c": {"d": {"e": {"f": "secret"}}}}}}
         result = redact_dict(deep, max_depth=2)
@@ -238,7 +238,7 @@ class TestSecretsRedaction:
         assert "_redacted" in str(result)
 
     def test_redact_sensitive_key(self):
-        from orchestrator.utils.secrets import redact_dict
+        from continuum.utils.secrets import redact_dict
 
         data = {"api_key": "sk-abc123456789", "name": "test"}
         result = redact_dict(data)

@@ -12,8 +12,8 @@ import uuid
 
 import pytest
 
-from orchestrator.llm.types import ChatMessage
-from orchestrator.session.client import SessionClient
+from continuum.llm.types import ChatMessage
+from continuum.session.client import SessionClient
 
 pytestmark = pytest.mark.integration
 

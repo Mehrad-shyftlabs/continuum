@@ -9,9 +9,9 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from orchestrator.agent.base import BaseAgent
-from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-from orchestrator.agent.services.session_service import SessionService
+from continuum.agent.base import BaseAgent
+from continuum.agent.config import AgentConfig, AgentMemoryConfig
+from continuum.agent.services.session_service import SessionService
 
 
 def _agent_storing() -> BaseAgent:

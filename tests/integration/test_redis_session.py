@@ -14,8 +14,8 @@ pytestmark = pytest.mark.integration
 @pytest.fixture
 async def session_provider():
     """Create a real Redis session provider."""
-    from orchestrator.session.config import SessionConfig
-    from orchestrator.session.providers.redis import RedisSessionProvider
+    from continuum.session.config import SessionConfig
+    from continuum.session.providers.redis import RedisSessionProvider
 
     config = SessionConfig(
         enabled=True,
@@ -42,7 +42,7 @@ class TestRedisSessionIntegration:
         assert sid == f"test-sess-{test_id}"
 
     async def test_add_and_retrieve_messages(self, session_provider, test_id):
-        from orchestrator.llm.types import ChatMessage
+        from continuum.llm.types import ChatMessage
 
         sid = await session_provider.get_or_create_session(session_id=f"msg-sess-{test_id}")
 
@@ -68,7 +68,7 @@ class TestRedisSessionIntegration:
 
     async def test_malformed_json_in_messages_skipped(self, session_provider, test_id):
         """Verify that malformed JSON entries in the message list are skipped gracefully."""
-        from orchestrator.llm.types import ChatMessage
+        from continuum.llm.types import ChatMessage
 
         sid = f"corrupt-sess-{test_id}"
         await session_provider.get_or_create_session(session_id=sid)
@@ -91,7 +91,7 @@ class TestRedisSessionIntegration:
 
     async def test_sliding_window_trims_oldest(self, session_provider, test_id):
         """Test sliding window actually trims old messages."""
-        from orchestrator.llm.types import ChatMessage
+        from continuum.llm.types import ChatMessage
 
         # Override max_messages for this test
         session_provider._config.max_messages = 5

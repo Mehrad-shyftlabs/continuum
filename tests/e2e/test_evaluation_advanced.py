@@ -28,8 +28,8 @@ class TestMultiCriteriaEvaluation:
         """Each criterion should get its own score."""
         _skip_if_no_api_key()
 
-        from orchestrator.evaluation.evaluator_agent import EvaluatorAgent
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.evaluator_agent import EvaluatorAgent
+        from continuum.evaluation.types import EvalCase
 
         evaluator = EvaluatorAgent(
             name="multi-judge",
@@ -67,8 +67,8 @@ class TestMultiCriteriaEvaluation:
         """A partially correct response should get varying scores per criterion."""
         _skip_if_no_api_key()
 
-        from orchestrator.evaluation.evaluator_agent import EvaluatorAgent
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.evaluator_agent import EvaluatorAgent
+        from continuum.evaluation.types import EvalCase
 
         evaluator = EvaluatorAgent(
             name="mixed-judge",
@@ -116,8 +116,8 @@ class TestCustomRubrics:
         """Custom rubrics should influence how the evaluator scores."""
         _skip_if_no_api_key()
 
-        from orchestrator.evaluation.evaluator_agent import EvaluatorAgent
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.evaluator_agent import EvaluatorAgent
+        from continuum.evaluation.types import EvalCase
 
         evaluator = EvaluatorAgent(
             name="rubric-judge",
@@ -176,8 +176,8 @@ class TestEvaluatorWithContext:
         """Evaluator should check if response is grounded in provided context."""
         _skip_if_no_api_key()
 
-        from orchestrator.evaluation.evaluator_agent import EvaluatorAgent
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.evaluator_agent import EvaluatorAgent
+        from continuum.evaluation.types import EvalCase
 
         evaluator = EvaluatorAgent(
             name="context-judge",
@@ -229,8 +229,8 @@ class TestEvaluatorConsistency:
         """Obviously correct answers should consistently score high."""
         _skip_if_no_api_key()
 
-        from orchestrator.evaluation.evaluator_agent import EvaluatorAgent
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.evaluator_agent import EvaluatorAgent
+        from continuum.evaluation.types import EvalCase
 
         evaluator = EvaluatorAgent(
             name="consistency-judge",
@@ -265,8 +265,8 @@ class TestEvaluatorConsistency:
         """Obviously wrong answers should consistently score low."""
         _skip_if_no_api_key()
 
-        from orchestrator.evaluation.evaluator_agent import EvaluatorAgent
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.evaluator_agent import EvaluatorAgent
+        from continuum.evaluation.types import EvalCase
 
         evaluator = EvaluatorAgent(
             name="wrong-judge",
@@ -310,8 +310,8 @@ class TestEvaluatorEdgeCases:
         """Evaluator should handle empty/minimal responses."""
         _skip_if_no_api_key()
 
-        from orchestrator.evaluation.evaluator_agent import EvaluatorAgent
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.evaluator_agent import EvaluatorAgent
+        from continuum.evaluation.types import EvalCase
 
         evaluator = EvaluatorAgent(
             name="empty-judge",
@@ -334,8 +334,8 @@ class TestEvaluatorEdgeCases:
         """Evaluator should handle very long responses."""
         _skip_if_no_api_key()
 
-        from orchestrator.evaluation.evaluator_agent import EvaluatorAgent
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.evaluator_agent import EvaluatorAgent
+        from continuum.evaluation.types import EvalCase
 
         evaluator = EvaluatorAgent(
             name="long-judge",
@@ -372,8 +372,8 @@ class TestEvaluatorEdgeCases:
         """Evaluator should still score when there's no expected output."""
         _skip_if_no_api_key()
 
-        from orchestrator.evaluation.evaluator_agent import EvaluatorAgent
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.evaluator_agent import EvaluatorAgent
+        from continuum.evaluation.types import EvalCase
 
         evaluator = EvaluatorAgent(
             name="no-expected-judge",

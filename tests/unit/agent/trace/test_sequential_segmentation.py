@@ -6,10 +6,10 @@ No LLM, no network — builds a trace by hand.
 
 from __future__ import annotations
 
-from orchestrator.agent.base import BaseAgent
-from orchestrator.agent.config import AgentConfig
-from orchestrator.agent.trace.recorder import TraceRecorder
-from orchestrator.agent.workflow.sequential import SequentialAgent
+from continuum.agent.base import BaseAgent
+from continuum.agent.config import AgentConfig
+from continuum.agent.trace.recorder import TraceRecorder
+from continuum.agent.workflow.sequential import SequentialAgent
 
 
 def _agent(name: str) -> BaseAgent:

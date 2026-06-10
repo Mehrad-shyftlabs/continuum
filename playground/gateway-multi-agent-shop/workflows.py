@@ -25,7 +25,7 @@ from agents import (
 )
 from config import WorkflowShopConfig, default_config
 
-from orchestrator import (
+from continuum import (
     AgentConfig,
     AgentMemoryConfig,
     AgentMemoryScope,
@@ -38,14 +38,14 @@ from orchestrator import (
     ToolExecutor,
     get_logger,
 )
-from orchestrator.agent.config import (
+from continuum.agent.config import (
     ParallelConfig,
     PlanningConfig,
     ReflectionConfig,
     RouterConfig,
     SequentialConfig,
 )
-from orchestrator.agent.types import (
+from continuum.agent.types import (
     AgentResponse,
     MergeStrategy,
     ResponseStatus,
@@ -53,18 +53,18 @@ from orchestrator.agent.types import (
     TerminationConfig,
     TerminationType,
 )
-from orchestrator.agent.workflow.debate import DebateAgent
-from orchestrator.agent.workflow.loop import LoopAgent
-from orchestrator.agent.workflow.parallel import ParallelAgent
-from orchestrator.agent.workflow.planner import PlannerAgent
-from orchestrator.agent.workflow.reflection import ReflectionAgent
-from orchestrator.agent.workflow.router import RouterAgent
-from orchestrator.agent.workflow.scatter import ScatterAgent
-from orchestrator.agent.workflow.sequential import SequentialAgent
-from orchestrator.agent.workflow.supervised import SupervisedConfig, SupervisedSequentialAgent
-from orchestrator.core.container import get_container
-from orchestrator.core.lifecycle import get_lifecycle_manager
-from orchestrator.tools.types import ToolContextConfig, ToolContextVariable
+from continuum.agent.workflow.debate import DebateAgent
+from continuum.agent.workflow.loop import LoopAgent
+from continuum.agent.workflow.parallel import ParallelAgent
+from continuum.agent.workflow.planner import PlannerAgent
+from continuum.agent.workflow.reflection import ReflectionAgent
+from continuum.agent.workflow.router import RouterAgent
+from continuum.agent.workflow.scatter import ScatterAgent
+from continuum.agent.workflow.sequential import SequentialAgent
+from continuum.agent.workflow.supervised import SupervisedConfig, SupervisedSequentialAgent
+from continuum.core.container import get_container
+from continuum.core.lifecycle import get_lifecycle_manager
+from continuum.tools.types import ToolContextConfig, ToolContextVariable
 
 logger = get_logger(__name__)
 
@@ -198,7 +198,7 @@ class _BaseWorkflow:
 
         try:
             if self._use_direct_execute:
-                from orchestrator.agent.utils.context_utils import create_run_context
+                from continuum.agent.utils.context_utils import create_run_context
 
                 ctx = create_run_context(
                     session_id=session_id,
@@ -269,7 +269,7 @@ class ParallelCoordinatorAgent(BaseAgent):
     async def execute(
         self, input_text: str, runner: Any, context: Any, llm_client: Any = None
     ) -> AgentResponse:
-        from orchestrator.agent.utils.context_utils import create_run_context
+        from continuum.agent.utils.context_utils import create_run_context
 
         context.suppress_session_log = True
         parallel_ctx = create_run_context(
@@ -428,13 +428,13 @@ class ScatterCoordinatorAgent(BaseAgent):
     async def execute(
         self, input_text: str, runner: Any, context: Any, llm_client: Any = None
     ) -> AgentResponse:
-        from orchestrator.agent.utils.context_utils import create_run_context
-        from orchestrator.config import settings
-        from orchestrator.llm.config import LLMConfig
+        from continuum.agent.utils.context_utils import create_run_context
+        from continuum.config import settings
+        from continuum.llm.config import LLMConfig
 
         if llm_client is None:
             try:
-                from orchestrator.core.container import get_container
+                from continuum.core.container import get_container
 
                 llm_client = get_container().llm_client
             except Exception:
@@ -759,7 +759,7 @@ class RouterShop(_BaseWorkflow):
                     logger.warning(f"Session init failed: {e}")
 
         try:
-            from orchestrator.core.container import get_container as _gc
+            from continuum.core.container import get_container as _gc
 
             llm = _gc().llm_client
             agent_name = await self._agent.route(message, llm_client=llm)

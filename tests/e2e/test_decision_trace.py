@@ -19,13 +19,13 @@ from tests.e2e.conftest import skip_on_api_error as _skip_on_api_error
 @pytest.fixture
 def trace_enabled(monkeypatch):
     """Turn the feature on against the real Redis backend for this test."""
-    from orchestrator.config import settings
+    from continuum.config import settings
 
     monkeypatch.setattr(settings, "decision_trace_enabled", True)
     monkeypatch.setattr(settings, "decision_trace_detail", "full")
     monkeypatch.setattr(settings, "decision_trace_store", "redis")
 
-    from orchestrator.agent.trace import config as trace_config
+    from continuum.agent.trace import config as trace_config
 
     trace_config.get_trace_store.cache_clear()
     yield
@@ -38,11 +38,11 @@ class TestDecisionTraceE2E:
         """A real run attaches a decision trace and persists it to real Redis."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.trace.config import get_trace_store
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.trace.config import get_trace_store
+        from continuum.agent.types import RunContext
 
         agent = BaseAgent(
             name="trace-e2e-agent",

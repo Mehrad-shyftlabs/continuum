@@ -148,7 +148,7 @@ await runner.save_turn(session_id, user_input, top_level_agent_response.content)
 
 ### Built-in workflow implementations
 
-Built-in workflow agents are provided in `src/orchestrator/agent/workflow/`:
+Built-in workflow agents are provided in `src/continuum/agent/workflow/`:
 
 ```
 sequential.py  parallel.py  loop.py  reflection.py
@@ -232,7 +232,7 @@ conversation → extraction_prompt extracts facts → stored in mem0
 Get `memory_client` from the container:
 
 ```python
-from orchestrator.core.container import get_container
+from continuum.core.container import get_container
 memory_client = get_container().memory_client
 ```
 

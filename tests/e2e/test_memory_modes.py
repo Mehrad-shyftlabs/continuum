@@ -30,7 +30,7 @@ def _uid() -> str:
 async def _cleanup_memory(user_id: str):
     """Best-effort cleanup of memory for a user."""
     try:
-        from orchestrator.memory.client import MemoryClient
+        from continuum.memory.client import MemoryClient
 
         client = MemoryClient()
         await client.delete_all(user_id=user_id)
@@ -41,7 +41,7 @@ async def _cleanup_memory(user_id: str):
 async def _cleanup_session(session_id: str):
     """Best-effort cleanup of session."""
     try:
-        from orchestrator.session.client import SessionClient
+        from continuum.session.client import SessionClient
 
         client = SessionClient()
         client.initialize()
@@ -63,9 +63,9 @@ class TestMemoryDisabled:
         """Agent without memory cannot recall info from previous runs."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
 
         agent = BaseAgent(
             name="forgetful-agent",
@@ -107,11 +107,11 @@ class TestLongTermMemory:
         """Agent should recall a fact pre-stored in long-term memory."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import MemoryScope
-        from orchestrator.memory.client import MemoryClient
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import MemoryScope
+        from continuum.memory.client import MemoryClient
 
         uid = _uid()
 
@@ -162,11 +162,11 @@ class TestLongTermMemory:
         """Agent should recall multiple facts pre-stored in long-term memory."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import MemoryScope
-        from orchestrator.memory.client import MemoryClient
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import MemoryScope
+        from continuum.memory.client import MemoryClient
 
         uid = _uid()
 
@@ -225,10 +225,10 @@ class TestShortTermSessionMemory:
         """Agent should remember earlier messages in the same session."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.session.client import SessionClient
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.session.client import SessionClient
 
         agent = BaseAgent(
             name="session-memory-agent",
@@ -289,10 +289,10 @@ class TestShortTermSessionMemory:
         """With a small session_history_limit, old messages are dropped."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.session.client import SessionClient
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.session.client import SessionClient
 
         agent = BaseAgent(
             name="limited-history-agent",
@@ -363,10 +363,10 @@ class TestMemoryUserIsolationE2E:
         """User A's stored memories should not affect User B's responses."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import MemoryScope
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import MemoryScope
 
         uid_a = _uid()
         uid_b = _uid()
@@ -426,12 +426,12 @@ class TestCombinedMemory:
         """Agent should combine session history and long-term memory."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import MemoryScope
-        from orchestrator.memory.client import MemoryClient
-        from orchestrator.session.client import SessionClient
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import MemoryScope
+        from continuum.memory.client import MemoryClient
+        from continuum.session.client import SessionClient
 
         uid = _uid()
 
@@ -515,11 +515,11 @@ class TestContradictingMemories:
         """Agent should handle contradicting memories and prefer newer info."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import MemoryScope
-        from orchestrator.memory.client import MemoryClient
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import MemoryScope
+        from continuum.memory.client import MemoryClient
 
         uid = _uid()
         mem_client = MemoryClient()
@@ -578,14 +578,14 @@ class TestMemoryWithToolAgent:
 
         from mcp.types import CallToolResult, TextContent, Tool
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import MemoryScope
-        from orchestrator.memory.client import MemoryClient
-        from orchestrator.tools.executor import ToolExecutor
-        from orchestrator.tools.types import ToolContextConfig
-        from orchestrator.tools.util import MCPUtil
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import MemoryScope
+        from continuum.memory.client import MemoryClient
+        from continuum.tools.executor import ToolExecutor
+        from continuum.tools.types import ToolContextConfig
+        from continuum.tools.util import MCPUtil
 
         uid = _uid()
 
@@ -703,13 +703,13 @@ class TestMemoryEvaluation:
         """Agent with memory should give better answers than without."""
         _skip_if_no_api_key()
 
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-        from orchestrator.agent.runner import AgentRunner
-        from orchestrator.agent.types import MemoryScope
-        from orchestrator.evaluation.evaluator_agent import EvaluatorAgent
-        from orchestrator.evaluation.types import EvalCase
-        from orchestrator.memory.client import MemoryClient
+        from continuum.agent.base import BaseAgent
+        from continuum.agent.config import AgentConfig, AgentMemoryConfig
+        from continuum.agent.runner import AgentRunner
+        from continuum.agent.types import MemoryScope
+        from continuum.evaluation.evaluator_agent import EvaluatorAgent
+        from continuum.evaluation.types import EvalCase
+        from continuum.memory.client import MemoryClient
 
         uid = _uid()
 

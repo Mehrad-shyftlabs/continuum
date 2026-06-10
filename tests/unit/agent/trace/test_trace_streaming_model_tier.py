@@ -10,17 +10,17 @@ from types import SimpleNamespace
 
 import pytest
 
-from orchestrator.agent.base import BaseAgent
-from orchestrator.agent.config import AgentConfig, AgentMemoryConfig, RouterConfig
-from orchestrator.agent.runner import AgentRunner
-from orchestrator.agent.trace.types import StepKind
-from orchestrator.agent.types import EventType, Route
+from continuum.agent.base import BaseAgent
+from continuum.agent.config import AgentConfig, AgentMemoryConfig, RouterConfig
+from continuum.agent.runner import AgentRunner
+from continuum.agent.trace.types import StepKind
+from continuum.agent.types import EventType, Route
 
 
 @pytest.fixture
 def trace_on(monkeypatch):
-    from orchestrator.agent.trace import config as trace_config
-    from orchestrator.config import settings
+    from continuum.agent.trace import config as trace_config
+    from continuum.config import settings
 
     monkeypatch.setattr(settings, "decision_trace_enabled", True)
     monkeypatch.setattr(settings, "decision_trace_detail", "full")
@@ -32,7 +32,7 @@ def trace_on(monkeypatch):
 
 
 async def test_model_tier_streaming_captures_trace(trace_on, monkeypatch) -> None:
-    import orchestrator.agent.runner as runner_mod
+    import continuum.agent.runner as runner_mod
 
     # Force the smart-layer streaming branch and stub its streamer + tier parsing.
     monkeypatch.setattr(runner_mod.app_settings, "smart_layer_enabled", True, raising=False)
@@ -72,7 +72,7 @@ async def test_model_tier_streaming_captures_trace(trace_on, monkeypatch) -> Non
     live_kinds = [d["kind"] for d in decision_events]
     assert "routing" in live_kinds and "llm_call" in live_kinds, live_kinds
 
-    from orchestrator.agent.trace.config import get_trace_store
+    from continuum.agent.trace.config import get_trace_store
 
     trace = await get_trace_store().get(run_id)
     assert trace is not None, "model_tier streaming run persisted no trace"

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from orchestrator.agent.config import RouterConfig, apply_llm_route_env_overrides
+from continuum.agent.config import RouterConfig, apply_llm_route_env_overrides
 
 
 @pytest.fixture
 def clear_overrides(monkeypatch):
     """Ensure llm_route_* don't leak from real .env during tests."""
-    import orchestrator.config as oc
+    import continuum.config as oc
 
     s = oc.settings
     for name in (
@@ -29,7 +29,7 @@ def clear_overrides(monkeypatch):
 
 
 def test_apply_llm_route_env_overrides_full(monkeypatch, clear_overrides):
-    import orchestrator.config as oc
+    import continuum.config as oc
 
     s = oc.settings
     monkeypatch.setattr(s, "llm_route_tier_classifier", "qwen")
@@ -49,7 +49,7 @@ def test_apply_llm_route_env_overrides_full(monkeypatch, clear_overrides):
 
 
 def test_local_router_model_applied_for_qwen_local_only(monkeypatch, clear_overrides):
-    import orchestrator.config as oc
+    import continuum.config as oc
 
     s = oc.settings
     monkeypatch.setattr(s, "llm_route_tier_classifier", "qwen_local")
@@ -64,7 +64,7 @@ def test_local_router_model_applied_for_qwen_local_only(monkeypatch, clear_overr
 
 
 def test_apply_llm_route_local_router_env(monkeypatch, clear_overrides):
-    import orchestrator.config as oc
+    import continuum.config as oc
 
     s = oc.settings
     monkeypatch.setattr(s, "llm_route_local_router_api_base", "http://127.0.0.1:11434/v1")
@@ -78,7 +78,7 @@ def test_apply_llm_route_local_router_env(monkeypatch, clear_overrides):
 
 
 def test_heuristic_shortcut_false_from_env(monkeypatch, clear_overrides):
-    import orchestrator.config as oc
+    import continuum.config as oc
 
     s = oc.settings
     monkeypatch.setattr(s, "llm_route_tier_classifier_heuristic_shortcut", False)
@@ -91,7 +91,7 @@ def test_heuristic_shortcut_false_from_env(monkeypatch, clear_overrides):
 
 def test_router_model_env_not_applied_for_gpt_4o_mini(monkeypatch, clear_overrides):
     """LLM_ROUTE_ROUTER_MODEL must not set tier_classifier_llm_model when mode is OpenAI classifier."""
-    import orchestrator.config as oc
+    import continuum.config as oc
 
     s = oc.settings
     monkeypatch.setattr(s, "llm_route_router_model", "Qwen/Qwen3-4B-Instruct-2507:fastest")
@@ -104,7 +104,7 @@ def test_router_model_env_not_applied_for_gpt_4o_mini(monkeypatch, clear_overrid
 
 
 def test_invalid_classifier_env_ignored(monkeypatch, clear_overrides):
-    import orchestrator.config as oc
+    import continuum.config as oc
 
     s = oc.settings
     monkeypatch.setattr(s, "llm_route_tier_classifier", "not_a_mode")

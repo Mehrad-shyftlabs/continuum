@@ -5,8 +5,8 @@ from the matched route's dispatch_priority after routing.
 
 from __future__ import annotations
 
-from orchestrator.agent.types import Route, RunContext
-from orchestrator.agent.workflow.router import RouterAgent
+from continuum.agent.types import Route, RunContext
+from continuum.agent.workflow.router import RouterAgent
 
 
 def _make_context():

@@ -17,13 +17,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orchestrator.agent.types import AgentResponse, ResponseStatus
-from orchestrator.agent.utils.context_utils import create_run_context
+from continuum.agent.types import AgentResponse, ResponseStatus
+from continuum.agent.utils.context_utils import create_run_context
 
 
 def _make_agent(name="sub", log_to_session=True):
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
 
     return BaseAgent(
         name=name,
@@ -53,7 +53,7 @@ def _patch_span_scope():
     mock_span.__aexit__ = AsyncMock(return_value=False)
 
     return patch(
-        "orchestrator.observability.trace_context.SpanScope",
+        "continuum.observability.trace_context.SpanScope",
         return_value=mock_span,
     )
 
@@ -65,7 +65,7 @@ def _patch_span_scope():
 
 class TestSequentialTransparency:
     async def test_session_logging_suppressed_during_execution(self):
-        from orchestrator.agent.workflow.sequential import SequentialAgent
+        from continuum.agent.workflow.sequential import SequentialAgent
 
         # Capture the run-context flag that actually gates session logging.
         suppress_values_during_run: list[bool] = []
@@ -97,7 +97,7 @@ class TestSequentialTransparency:
         )
 
     async def test_log_to_session_restored_after_execution(self):
-        from orchestrator.agent.workflow.sequential import SequentialAgent
+        from continuum.agent.workflow.sequential import SequentialAgent
 
         agent_a = _make_agent("a", log_to_session=True)
         agent_b = _make_agent("b", log_to_session=True)
@@ -117,9 +117,9 @@ class TestSequentialTransparency:
         assert agent_b.config.log_to_session is True
 
     async def test_log_to_session_restored_even_on_exception(self):
-        from orchestrator.agent.config import SequentialConfig
-        from orchestrator.agent.types import FailStrategy
-        from orchestrator.agent.workflow.sequential import SequentialAgent
+        from continuum.agent.config import SequentialConfig
+        from continuum.agent.types import FailStrategy
+        from continuum.agent.workflow.sequential import SequentialAgent
 
         agent_a = _make_agent("a", log_to_session=True)
 
@@ -143,7 +143,7 @@ class TestSequentialTransparency:
         assert agent_a.config.log_to_session is True
 
     async def test_save_turn_called_once_with_final_output(self):
-        from orchestrator.agent.workflow.sequential import SequentialAgent
+        from continuum.agent.workflow.sequential import SequentialAgent
 
         agent_a = _make_agent("a")
         agent_b = _make_agent("b")
@@ -171,7 +171,7 @@ class TestSequentialTransparency:
         assert call_kwargs.kwargs["assistant_message"] == "step2 final"
 
     async def test_save_turn_not_called_without_session_id(self):
-        from orchestrator.agent.workflow.sequential import SequentialAgent
+        from continuum.agent.workflow.sequential import SequentialAgent
 
         agent_a = _make_agent("a")
         runner = MagicMock()
@@ -188,7 +188,7 @@ class TestSequentialTransparency:
         runner.save_turn.assert_not_called()
 
     async def test_pipeline_context_injected_from_step_3(self):
-        from orchestrator.agent.workflow.sequential import SequentialAgent
+        from continuum.agent.workflow.sequential import SequentialAgent
 
         # The implementation injects only the *background* steps
         # (pipeline_history[:-1]), excluding the immediately preceding step,
@@ -232,7 +232,7 @@ class TestSequentialTransparency:
         assert "b: output-b" not in injected
 
     async def test_pipeline_context_cleaned_from_metadata_after_run(self):
-        from orchestrator.agent.workflow.sequential import SequentialAgent
+        from continuum.agent.workflow.sequential import SequentialAgent
 
         agent_a = _make_agent("a")
         runner = MagicMock()
@@ -256,7 +256,7 @@ class TestSequentialTransparency:
 
 class TestParallelTransparency:
     async def test_session_logging_suppressed_during_execution(self):
-        from orchestrator.agent.workflow.parallel import ParallelAgent
+        from continuum.agent.workflow.parallel import ParallelAgent
 
         suppress_values: list[bool] = []
         agent_a = _make_agent("a", log_to_session=True)
@@ -285,7 +285,7 @@ class TestParallelTransparency:
         assert all(v is True for v in suppress_values)
 
     async def test_log_to_session_restored_after_execution(self):
-        from orchestrator.agent.workflow.parallel import ParallelAgent
+        from continuum.agent.workflow.parallel import ParallelAgent
 
         agent_a = _make_agent("a", log_to_session=True)
         agent_b = _make_agent("b", log_to_session=True)
@@ -305,7 +305,7 @@ class TestParallelTransparency:
         assert agent_b.config.log_to_session is True
 
     async def test_save_turn_called_once(self):
-        from orchestrator.agent.workflow.parallel import ParallelAgent
+        from continuum.agent.workflow.parallel import ParallelAgent
 
         agent_a = _make_agent("a")
         agent_b = _make_agent("b")
@@ -332,8 +332,8 @@ class TestParallelTransparency:
 
 class TestLoopTransparency:
     async def test_session_logging_suppressed_during_loop(self):
-        from orchestrator.agent.types import TerminationConfig, TerminationType
-        from orchestrator.agent.workflow.loop import LoopAgent
+        from continuum.agent.types import TerminationConfig, TerminationType
+        from continuum.agent.workflow.loop import LoopAgent
 
         suppress_values: list[bool] = []
         sub = _make_agent("looper", log_to_session=True)
@@ -373,8 +373,8 @@ class TestLoopTransparency:
         assert all(v is True for v in suppress_values)
 
     async def test_log_to_session_restored_after_loop(self):
-        from orchestrator.agent.types import TerminationConfig, TerminationType
-        from orchestrator.agent.workflow.loop import LoopAgent
+        from continuum.agent.types import TerminationConfig, TerminationType
+        from continuum.agent.workflow.loop import LoopAgent
 
         sub = _make_agent("looper", log_to_session=True)
         runner = MagicMock()

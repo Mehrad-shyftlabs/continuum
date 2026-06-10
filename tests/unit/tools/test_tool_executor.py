@@ -7,8 +7,8 @@ Covers:
 
 from __future__ import annotations
 
-from orchestrator.tools.executor import ToolExecutor
-from orchestrator.tools.types import ToolContextConfig, ToolContextVariable
+from continuum.tools.executor import ToolExecutor
+from continuum.tools.types import ToolContextConfig, ToolContextVariable
 
 # ---------------------------------------------------------------------------
 # _resolve_json_path

@@ -11,8 +11,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from orchestrator.agent.types import AgentResponse, FailStrategy, MergeStrategy, ResponseStatus
-from orchestrator.agent.workflow.dag import DAGAgent, DAGCycleError, DAGStageError, create_dag_agent
+from continuum.agent.types import AgentResponse, FailStrategy, MergeStrategy, ResponseStatus
+from continuum.agent.workflow.dag import DAGAgent, DAGCycleError, DAGStageError, create_dag_agent
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -31,8 +31,8 @@ def _mock_response(content: str) -> AgentResponse:
 
 
 def _make_agent(name: str):
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
 
     return BaseAgent(
         name=name,
@@ -60,11 +60,11 @@ def _patch_span():
     mock_span.set_error = MagicMock()
     mock_span.__aenter__ = AsyncMock(return_value=mock_span)
     mock_span.__aexit__ = AsyncMock(return_value=False)
-    return patch("orchestrator.observability.trace_context.SpanScope", return_value=mock_span)
+    return patch("continuum.observability.trace_context.SpanScope", return_value=mock_span)
 
 
 def _make_context():
-    from orchestrator.agent.types import RunContext
+    from continuum.agent.types import RunContext
 
     return RunContext(run_id="test-run")
 
@@ -101,7 +101,7 @@ class TestDAGConstruction:
             dag._validate_no_cycles()
 
     def test_no_stages_raises_on_execute(self):
-        from orchestrator.agent.exceptions import AgentConfigurationError
+        from continuum.agent.exceptions import AgentConfigurationError
 
         dag = DAGAgent(name="dag")
         runner = MagicMock()
@@ -357,3 +357,43 @@ class TestDAGFailStrategy:
 
         assert resp.status == ResponseStatus.SUCCESS
         assert "good_ok" in resp.content
+
+
+# ---------------------------------------------------------------------------
+# memory_agent propagation
+# ---------------------------------------------------------------------------
+
+
+class TestDAGMemoryAgent:
+    @pytest.mark.asyncio
+    async def test_save_turn_agent_is_none_by_default(self):
+        dag = DAGAgent(name="dag")
+        dag.add_stage("a", _make_agent("a"))
+        runner = _make_runner({"a": "result"})
+        ctx = _make_context()
+        ctx.session_id = "sess-1"
+        with _patch_span():
+            await dag.execute("input", runner, ctx)
+        runner.save_turn.assert_called_once()
+        assert runner.save_turn.call_args.kwargs["agent"] is None
+
+    @pytest.mark.asyncio
+    async def test_save_turn_uses_memory_agent_when_set(self):
+        mem_agent = _make_agent("mem")
+        dag = DAGAgent(name="dag", memory_agent=mem_agent)
+        dag.add_stage("a", _make_agent("a"))
+        runner = _make_runner({"a": "result"})
+        ctx = _make_context()
+        ctx.session_id = "sess-1"
+        with _patch_span():
+            await dag.execute("input", runner, ctx)
+        assert runner.save_turn.call_args.kwargs["agent"] is mem_agent
+
+    def test_create_dag_agent_passes_memory_agent(self):
+        mem_agent = _make_agent("mem")
+        dag = create_dag_agent(
+            name="pipeline",
+            stages=[("a", _make_agent("a"), [])],
+            memory_agent=mem_agent,
+        )
+        assert dag.memory_agent is mem_agent

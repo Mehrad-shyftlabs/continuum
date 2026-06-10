@@ -17,7 +17,7 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
-    from orchestrator.temporal.types import (
+    from continuum.temporal.types import (
         AgentActivityParams, AgentActivityResult, WorkflowResult,
     )
 
@@ -67,7 +67,7 @@ class TranslationFanoutWorkflow:
 ### Register with the worker
 
 ```python
-from orchestrator.temporal import get_worker_manager, get_temporal_client
+from continuum.temporal import get_worker_manager, get_temporal_client
 
 worker = get_worker_manager(get_temporal_client(), get_agent_registry())
 worker.register_workflow(TranslationFanoutWorkflow)

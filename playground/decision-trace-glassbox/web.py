@@ -35,7 +35,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-from orchestrator import (
+from continuum import (
     AgentRunner,
     LogLevel,
     MCPServerStreamableHttp,
@@ -45,11 +45,11 @@ from orchestrator import (
     get_logger,
     setup_logging,
 )
-from orchestrator.agent.trace import diff_traces
-from orchestrator.agent.trace.types import TraceDetail
-from orchestrator.agent.utils.context_utils import create_run_context
-from orchestrator.core.container import get_container
-from orchestrator.core.lifecycle import get_lifecycle_manager
+from continuum.agent.trace import diff_traces
+from continuum.agent.trace.types import TraceDetail
+from continuum.agent.utils.context_utils import create_run_context
+from continuum.core.container import get_container
+from continuum.core.lifecycle import get_lifecycle_manager
 
 setup_logging(level=LogLevel.INFO)
 logger = get_logger(__name__)
@@ -88,8 +88,8 @@ state = _State()
 
 
 def _enable_trace_settings() -> None:
-    from orchestrator.agent.trace import config as trace_config
-    from orchestrator.config import settings
+    from continuum.agent.trace import config as trace_config
+    from continuum.config import settings
 
     settings.decision_trace_enabled = True
     settings.decision_trace_detail = default_config.decision_trace_detail
@@ -186,7 +186,7 @@ def _register_run(run_id, mode, label, query, final, *, parent=None, from_step=N
 
 
 async def _trace_dict(run_id: str):
-    from orchestrator.agent.trace.config import get_trace_store
+    from continuum.agent.trace.config import get_trace_store
 
     trace = await get_trace_store().get(run_id)
     return trace.to_dict(TraceDetail.FULL) if trace else None
@@ -359,7 +359,7 @@ async def branch(req: BranchRequest):
 async def diff(before: str, after: str):
     if nr := _not_ready():
         return nr
-    from orchestrator.agent.trace.config import get_trace_store
+    from continuum.agent.trace.config import get_trace_store
 
     store = get_trace_store()
     a = await store.get(before)

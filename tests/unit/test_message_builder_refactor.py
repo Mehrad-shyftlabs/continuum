@@ -9,12 +9,12 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from orchestrator.agent.utils.context_utils import create_run_context
+from continuum.agent.utils.context_utils import create_run_context
 
 
 def _make_agent(system_prompt=None, session_history_turns=None, react_mode=False):
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
 
     return BaseAgent(
         name="builder-agent",
@@ -30,7 +30,7 @@ def _make_agent(system_prompt=None, session_history_turns=None, react_mode=False
 
 
 def _make_builder(history=None):
-    from orchestrator.agent.execution.message_builder import MessageBuilder
+    from continuum.agent.execution.message_builder import MessageBuilder
 
     mem_svc = MagicMock()
     mem_svc.retrieve_memories = AsyncMock(return_value=[])
@@ -47,7 +47,7 @@ class TestReturnsTuple:
         agent = _make_agent()
         ctx = create_run_context()
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             result = await builder.prepare_messages(agent, "hello", ctx)
 
         assert isinstance(result, tuple)
@@ -61,7 +61,7 @@ class TestReturnsTuple:
         agent = _make_agent(system_prompt="system instructions")
         ctx = create_run_context()
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             messages, index = await builder.prepare_messages(agent, "user question", ctx)
 
         assert messages[index]["role"] == "user"
@@ -73,7 +73,7 @@ class TestReturnsTuple:
         agent = _make_agent(system_prompt="Be helpful.")
         ctx = create_run_context()
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             messages, index = await builder.prepare_messages(agent, "hi", ctx)
 
         assert index >= 1
@@ -87,7 +87,7 @@ class TestPipelineContextInjection:
         ctx = create_run_context()
         ctx.metadata["pipeline_context"] = "Step 1 output: the sky is blue."
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             messages, _ = await builder.prepare_messages(agent, "next question", ctx)
 
         system_contents = [m["content"] for m in messages if m["role"] == "system"]
@@ -98,7 +98,7 @@ class TestPipelineContextInjection:
         agent = _make_agent()
         ctx = create_run_context()  # metadata = {}
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             messages, _ = await builder.prepare_messages(agent, "q", ctx)
 
         # Should not inject any pipeline context message
@@ -115,7 +115,7 @@ class TestPipelineContextInjection:
         ctx = create_run_context()
         ctx.metadata["pipeline_context"] = "step context"
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             messages, index = await builder.prepare_messages(agent, "q", ctx)
 
         pipeline_idx = next(
@@ -133,7 +133,7 @@ class TestHandoffSkipsHistory:
         ctx = create_run_context(session_id="sess-1")
         ctx.is_handoff = True
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             await builder.prepare_messages(agent, "handoff input", ctx)
 
         sess_svc.get_conversation_history.assert_not_called()
@@ -148,7 +148,7 @@ class TestHandoffSkipsHistory:
         ctx = create_run_context(session_id="sess-1")
         ctx.is_handoff = False
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             messages, _ = await builder.prepare_messages(agent, "new question", ctx)
 
         sess_svc.get_conversation_history.assert_called_once()
@@ -162,7 +162,7 @@ class TestHandoffSkipsHistory:
         agent = _make_agent()
         ctx = create_run_context()  # no session_id
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             await builder.prepare_messages(agent, "q", ctx)
 
         sess_svc.get_conversation_history.assert_not_called()
@@ -174,7 +174,7 @@ class TestHistoryLimitDefault:
         agent = _make_agent(session_history_turns=None)
         ctx = create_run_context(session_id="sess-1")
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             await builder.prepare_messages(agent, "q", ctx)
 
         sess_svc.get_conversation_history.assert_called_once_with("sess-1", limit=20)
@@ -184,7 +184,7 @@ class TestHistoryLimitDefault:
         agent = _make_agent(session_history_turns=5)
         ctx = create_run_context(session_id="sess-1")
 
-        with patch("orchestrator.observability.decorators.observe", lambda **kw: lambda f: f):
+        with patch("continuum.observability.decorators.observe", lambda **kw: lambda f: f):
             await builder.prepare_messages(agent, "q", ctx)
 
         sess_svc.get_conversation_history.assert_called_once_with("sess-1", limit=5)

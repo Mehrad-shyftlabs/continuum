@@ -78,7 +78,7 @@ Before opening a PR:
 
 1. **Tests pass locally** — `pytest`
 2. **Lint passes** — `ruff check .`
-3. **Type-check passes** — `mypy src/orchestrator`
+3. **Type-check passes** — `mypy src/continuum`
 4. **Docs updated** if user-facing
 5. **`CHANGELOG.md` updated** under `## [Unreleased]` if user-facing
 6. **Every commit is signed off** (`git commit -s`)
@@ -94,6 +94,28 @@ Fill in the PR template — *what / why / how tested*.
 
 Maintainers may request changes, suggest alternatives, or decline a PR. Decisions come with a reason — see [`MAINTAINERS.md`](MAINTAINERS.md) for tone and escalation.
 
+## Releasing (maintainers)
+
+Releases are cut from `main` and published to PyPI automatically via GitHub Actions
++ **PyPI Trusted Publishing** (OIDC — no stored token). The full, canonical guide is
+[`docs/versioning.md`](docs/versioning.md); the short version:
+
+1. Land the change on `dev` (normal PR), then open a `dev` → `main` release PR.
+2. Bump `version` in [`pyproject.toml`](pyproject.toml) — the single source of truth
+   (`continuum.__version__` is read from package metadata, never hardcoded) — and add a
+   `CHANGELOG.md` entry. SemVer: feature → MINOR, bug fix → PATCH.
+3. Tag the merged commit `vX.Y.Z` (matching `pyproject.toml`) and publish a GitHub
+   Release from it:
+   ```bash
+   git switch main && git pull
+   git tag v0.3.0 && git push origin v0.3.0   # then create the Release in the GitHub UI
+   ```
+4. [`release.yml`](.github/workflows/release.yml) verifies the tag matches the version,
+   builds, runs `twine check`, and publishes via OIDC. A mismatched tag fails the build
+   instead of shipping a bad release.
+
+PyPI versions are **immutable** — never reuse a number; ship the next patch instead.
+
 ## Local setup
 
 ```bash
@@ -107,7 +129,7 @@ pre-commit install                          # ruff lint+format on commit
 pre-commit install --hook-type pre-push     # mypy on push
 
 cp .env.template .env       # add your provider keys
-docker compose up -d        # Redis · Milvus · Langfuse
+continuum up                # start local infra (Redis + Qdrant); `continuum up full` adds Langfuse · Temporal · Milvus
 
 pytest                      # run the test suite
 ```
@@ -119,7 +141,7 @@ pytest                      # run the test suite
 ```bash
 ruff check .            # lint
 ruff format .           # format
-mypy src/orchestrator   # type-check
+mypy src/continuum      # type-check
 pre-commit run --all-files   # everything, across the whole repo
 ```
 

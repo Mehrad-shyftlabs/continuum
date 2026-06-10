@@ -22,14 +22,14 @@ from tests.e2e.conftest import skip_on_api_error as _skip_on_api_error
 
 @pytest.fixture
 def trace_checkpoint_enabled(monkeypatch):
-    from orchestrator.config import settings
+    from continuum.config import settings
 
     monkeypatch.setattr(settings, "decision_trace_enabled", True)
     monkeypatch.setattr(settings, "decision_trace_detail", "full")
     monkeypatch.setattr(settings, "decision_trace_store", "redis")
     monkeypatch.setattr(settings, "decision_trace_checkpoint", True)
 
-    from orchestrator.agent.trace import config as trace_config
+    from continuum.agent.trace import config as trace_config
 
     trace_config.get_trace_store.cache_clear()
     yield
@@ -37,10 +37,10 @@ def trace_checkpoint_enabled(monkeypatch):
 
 
 def _build_runner():
-    from orchestrator.agent.base import BaseAgent
-    from orchestrator.agent.config import AgentConfig, AgentMemoryConfig
-    from orchestrator.agent.runner import AgentRunner
-    from orchestrator.agent.types import Handoff
+    from continuum.agent.base import BaseAgent
+    from continuum.agent.config import AgentConfig, AgentMemoryConfig
+    from continuum.agent.runner import AgentRunner
+    from continuum.agent.types import Handoff
 
     _mem = AgentMemoryConfig(search_memories=False, store_memories=False)
     _cfg = AgentConfig(log_to_session=False, session_history_turns=0)
@@ -78,8 +78,8 @@ class TestMultiAgentTraceE2E:
     async def test_handoff_capture_and_non_root_fork(self, trace_checkpoint_enabled):
         _skip_if_no_api_key()
 
-        from orchestrator.agent.trace.config import get_trace_store
-        from orchestrator.agent.types import RunContext
+        from continuum.agent.trace.config import get_trace_store
+        from continuum.agent.types import RunContext
 
         runner, triage = _build_runner()
         store = get_trace_store()

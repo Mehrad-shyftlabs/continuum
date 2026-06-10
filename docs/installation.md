@@ -1,7 +1,7 @@
 # Installation & Configuration
 
 Continuum is distributed as `shyftlabs-continuum` on PyPI and
-importable as `orchestrator`. This doc covers both **library
+importable as `continuum`. This doc covers both **library
 consumers** (who `pip install` the package) and **framework
 contributors** (working in this repository).
 
@@ -38,7 +38,7 @@ git clone https://github.com/bhavik-shyftlabs/continuum.git
 cd continuum
 
 cp .env.template .env                      # add OPENAI_API_KEY
-docker compose up -d                       # Redis (:6380) + Milvus (:19530)
+continuum up full                          # Redis · Qdrant · Langfuse · Temporal · Milvus (all tiers)
 
 python3.13 -m venv .venv
 source .venv/bin/activate
@@ -57,10 +57,10 @@ $ pip show shyftlabs-continuum
 Name: shyftlabs-continuum
 ```
 
-Importable as `orchestrator`:
+Importable as `continuum`:
 
 ```python
-from orchestrator.agent import BaseAgent, AgentRunner
+from continuum.agent import BaseAgent, AgentRunner
 ```
 
 Runtime dependencies (declared in `pyproject.toml`):
@@ -228,15 +228,15 @@ RAG / handoff flows; does not need to appear in `.env` to work.
 ## 5 · Verifying installation
 
 ```bash
-python -c "import orchestrator; print('orchestrator imports OK')"
-python -c "from orchestrator.agent import BaseAgent, AgentRunner; print('agent imports OK')"
-python -c "from orchestrator.llm.providers import get_provider; print('providers OK')"
+python -c "import continuum; print('continuum imports OK')"
+python -c "from continuum.agent import BaseAgent, AgentRunner; print('agent imports OK')"
+python -c "from continuum.llm.providers import get_provider; print('providers OK')"
 ```
 
 Smoke-test with infra:
 
 ```bash
-docker compose up -d
+continuum up
 python -m playground.sdk_feature_test
 ```
 
@@ -250,10 +250,10 @@ Missing credentials` means infra is fine but `OPENAI_API_KEY` isn't set
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `ModuleNotFoundError: orchestrator` | venv not active | `source .venv/bin/activate` |
+| `ModuleNotFoundError: continuum` | venv not active | `source .venv/bin/activate` |
 | `Failed to initialize mem0: Missing credentials` | mem0 needs OpenAI for embeddings | set `OPENAI_API_KEY` or `MEMORY_ENABLED=false` |
-| `redis.exceptions.ConnectionError` | Redis not running / wrong port | `docker compose ps`; check `SESSION_REDIS_PORT=6380` |
-| Vector store collection not found | Stale volume after schema change | `docker compose down -v && docker compose up -d` |
+| `redis.exceptions.ConnectionError` | Redis not running / wrong port | `continuum status`; check `SESSION_REDIS_PORT=6380` |
+| Vector store collection not found | Stale volume after schema change | `continuum down -v && continuum up` |
 | `aiohttp` deprecation warnings | Older aiohttp | `pip install "aiohttp>=3.13.2" --upgrade` |
 | Imports work but tools never fire | Forgot `await server.connect()` or `executor.initialize()` | Add the missing `await` |
 | `add_message() got an unexpected keyword argument 'role'` | Old API | Pass a `ChatMessage` object — see [`session.md`](session.md) |

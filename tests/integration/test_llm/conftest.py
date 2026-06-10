@@ -11,8 +11,8 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from orchestrator.config import settings
-from orchestrator.llm import LLMClient, LLMConfig
+from continuum.config import settings
+from continuum.llm import LLMClient, LLMConfig
 
 
 # Override pytest-asyncio's event_loop fixture to be session-scoped

@@ -12,7 +12,7 @@ import logging
 
 import pytest
 
-from orchestrator.memory import (
+from continuum.memory import (
     BaseMemoryProvider,
     MemoryAddResult,
     MemoryClient,
@@ -25,7 +25,7 @@ from orchestrator.memory import (
     MemoryScope,
     MemorySearchResult,
 )
-from orchestrator.memory.providers import (
+from continuum.memory.providers import (
     create_provider,
     get_provider_class,
     is_mem0_available,
@@ -227,7 +227,7 @@ class TestMemoryConfig:
         # Pin the gateway off so this exercises the direct per-provider path
         # regardless of the developer's .env (see test_to_mem0_config_gateway
         # for the Smart Gateway routing path).
-        from orchestrator.config import settings
+        from continuum.config import settings
 
         monkeypatch.setattr(settings, "smart_gateway_url", None)
         monkeypatch.setattr(settings, "smart_gateway_api_key", None)
@@ -287,7 +287,7 @@ class TestMemoryConfig:
     def test_to_mem0_config_milvus(self, monkeypatch):
         """Test conversion to mem0 config format with milvus (direct fallback)."""
         logger.info("Test conversion to mem0 config format with milvus")
-        from orchestrator.config import settings
+        from continuum.config import settings
 
         monkeypatch.setattr(settings, "smart_gateway_url", None)
         monkeypatch.setattr(settings, "smart_gateway_api_key", None)
@@ -348,7 +348,7 @@ class TestMemoryConfig:
         MEMORY_LLM_MODEL.
         """
         logger.info("Test memory LLM routes through Smart Gateway")
-        from orchestrator.config import settings
+        from continuum.config import settings
 
         monkeypatch.setattr(settings, "smart_gateway_url", "https://gw.example.test/v1")
         monkeypatch.setattr(settings, "smart_gateway_api_key", "gw-key-123")

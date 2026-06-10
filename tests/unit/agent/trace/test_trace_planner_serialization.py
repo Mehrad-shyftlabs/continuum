@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import json
 
-from orchestrator.agent.base import BaseAgent
-from orchestrator.agent.trace.recorder import TraceRecorder
-from orchestrator.agent.trace.types import DecisionTrace, StepKind
-from orchestrator.agent.utils.context_utils import create_run_context
-from orchestrator.agent.workflow.planner import PlannerAgent
+from continuum.agent.base import BaseAgent
+from continuum.agent.trace.recorder import TraceRecorder
+from continuum.agent.trace.types import DecisionTrace, StepKind
+from continuum.agent.utils.context_utils import create_run_context
+from continuum.agent.workflow.planner import PlannerAgent
 
 
 def test_planner_plan_marker_survives_json_roundtrip() -> None:

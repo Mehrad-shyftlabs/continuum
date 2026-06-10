@@ -23,8 +23,8 @@ A Python 3.13 agentic framework by ShyftLabs. Provides:
 
 Distributed as a Python package — `pip install shyftlabs-continuum`
 (or `pip install -e .` from a checkout). Importable as
-`from orchestrator import ...` — the wheel name on disk is
-`shyftlabs-continuum`, the import name is `orchestrator`.
+`from continuum import ...` — the wheel name on disk is
+`shyftlabs-continuum`, the import name is `continuum`.
 
 ---
 
@@ -36,7 +36,7 @@ continuum/
 ├── .claude/skills/continuum-*                        # 13 invocable skills
 ├── README.md                                         # project overview
 ├── pyproject.toml                                    # package metadata
-├── src/orchestrator/                                 # framework source
+├── src/continuum/                                 # framework source
 │   ├── agent/, llm/, memory/, session/, tools/,
 │   │   observability/, core/, evaluation/, temporal/
 │   ├── config.py, protocols.py, exceptions.py
@@ -74,10 +74,10 @@ starter examples; this repo is the source of truth.
 ### Imports
 
 ```python
-from orchestrator.agent import BaseAgent, AgentRunner
-from orchestrator.agent.config import AgentConfig, AgentMemoryConfig, RunnerConfig
-from orchestrator.agent.types import Handoff, MemoryScope, RunContext, EventType
-from orchestrator.agent.workflow import (
+from continuum.agent import BaseAgent, AgentRunner
+from continuum.agent.config import AgentConfig, AgentMemoryConfig, RunnerConfig
+from continuum.agent.types import Handoff, MemoryScope, RunContext, EventType
+from continuum.agent.workflow import (
     RouterAgent, SequentialAgent, ParallelAgent, LoopAgent,
     ReflectionAgent, PlannerAgent, DebateAgent, ScatterAgent,
     SupervisedSequentialAgent,
@@ -85,13 +85,13 @@ from orchestrator.agent.workflow import (
     create_planner_agent, create_debate_agent,
     create_scatter_agent, create_supervised_agent,
 )
-from orchestrator.core.container import Container, ContainerConfig, get_container
-from orchestrator.core.lifecycle import OrchestratorLifecycle, get_lifecycle_manager
-from orchestrator.tools import (
+from continuum.core.container import Container, ContainerConfig, get_container
+from continuum.core.lifecycle import OrchestratorLifecycle, get_lifecycle_manager
+from continuum.tools import (
     MCPServerStdio, MCPServerSse, MCPServerStreamableHttp,
     ToolExecutor, MCPUtil,
 )
-from orchestrator.observability import observe
+from continuum.observability import observe
 ```
 
 ### BaseAgent
@@ -242,7 +242,7 @@ All workflow agents are themselves `BaseAgent` subclasses, so they nest.
 - The runner expects an **async event loop**. Use `asyncio.run(main())`.
 - `BaseAgent.name` must match `[A-Za-z0-9_-]+` — handoff resolution uses it.
 - For MCP servers, **always `await server.connect()` before passing to an agent**.
-- The provider router in `orchestrator.llm.providers.get_provider` keys off
+- The provider router in `continuum.llm.providers.get_provider` keys off
   the model string prefix:
   - `gemini/` or `google/` → Gemini
   - `claude/`, `anthropic/`, or starts with `claude-` → Anthropic
@@ -272,10 +272,10 @@ When the participant asks a topical question, point them at the right doc.
 
 - Start from `playground/memory-modes-demo/` or `playground/sdk_feature_test/`
   and incrementally add memory/tools/handoffs.
-- Use `docker compose ps` to confirm Redis + Qdrant are healthy before running memory examples.
-- For tracing, run `docker compose up -d langfuse` (or full Langfuse stack) and visit `http://localhost:3000`.
+- Use `continuum status` to confirm Redis + Qdrant are healthy before running memory examples.
+- For tracing, run `continuum up standard` (adds the Langfuse stack) and visit `http://localhost:3000`.
 - For durable workflows, install the temporal extra (`pip install -e ".[temporal]"`),
-  run `docker compose --profile temporal up -d`, and visit `http://localhost:8080`.
+  run `continuum up full` (adds Temporal + Milvus), and visit `http://localhost:8233`.
 - If you change `.env`, re-source / restart the venv shell — pydantic-settings reads on import.
 - Editable install for development: `pip install -e ".[dev,temporal,eval]"`.
 - Run the test suite with `pytest -m unit` (or `-m integration` once infra is up).
@@ -305,7 +305,7 @@ following `EventType` values. Match on `event.type`; payload lives in
 | `LOOP_ITERATION` | LoopAgent completed an iteration | `iteration`, `output` |
 
 ```python
-from orchestrator.agent.types import EventType
+from continuum.agent.types import EventType
 
 async for ev in runner.run_stream(agent, "..."):
     if ev.type == EventType.CONTENT_DELTA:
@@ -319,7 +319,7 @@ async for ev in runner.run_stream(agent, "..."):
 ## Memory CRUD reference
 
 ```python
-from orchestrator.memory import MemoryClient
+from continuum.memory import MemoryClient
 
 client = MemoryClient()                                  # uses env defaults
 
@@ -382,18 +382,18 @@ Hooks are sync. Async hooks are not awaited.
 ## Common error patterns
 
 ```python
-from orchestrator.agent import (
+from continuum.agent import (
     AgentExecutionError, MaxTurnsExceededError, AgentToolError,
     HandoffNotAllowedError, HandoffDepthExceededError,
     HandoffTargetNotFoundError,
 )
-from orchestrator.llm import (
+from continuum.llm import (
     LLMAuthenticationError, LLMRateLimitError, LLMTimeoutError,
     LLMContextLengthError, LLMServiceUnavailableError,
     LLMFallbackExhaustedError,
 )
-from orchestrator.memory import MemoryConfigurationError
-from orchestrator.session import SessionMessageLimitError
+from continuum.memory import MemoryConfigurationError
+from continuum.session import SessionMessageLimitError
 
 try:
     resp = await runner.run(agent, "...", user_id="u1", session_id="s1")
@@ -412,7 +412,7 @@ except AgentExecutionError as e:
 ```
 
 `HandoffCycleDetectedError` exists but is **not** re-exported from
-`orchestrator.agent` — import from `orchestrator.agent.exceptions`
+`continuum.agent` — import from `continuum.agent.exceptions`
 directly when needed.
 
 ---
@@ -423,10 +423,10 @@ Auto-runs before each LLM call when context approaches the threshold.
 Override per-agent:
 
 ```python
-from orchestrator.llm.context_management import (
+from continuum.llm.context_management import (
     ContextManagementConfig, CompressionStrategy,
 )
-from orchestrator.agent.config import AgentConfig
+from continuum.agent.config import AgentConfig
 
 agent = BaseAgent(
     name="long-context",
@@ -473,8 +473,8 @@ await runner.run(agent, "...", metadata={"tier": "enterprise"})
 - `Route(target=..., description=...)` — the field is `agent_name=...`.
 - `create_debate_agent(pro_agent=, con_agent=, judge_agent=)` — factory takes string `pro_stance` / `con_stance` / `judge_instructions`.
 - `create_reflection_agent(critic=…, max_iterations=…)` — no `critic` kwarg; use `max_reflections`.
-- `create_debate_agent`, `create_scatter_agent`, `create_supervised_agent` from `orchestrator.agent` — they're in `orchestrator.agent.workflow`.
-- `ToolExecutorConfig` from `orchestrator.tools` — import from `orchestrator.tools.executor`.
+- `create_debate_agent`, `create_scatter_agent`, `create_supervised_agent` from `continuum.agent` — they're in `continuum.agent.workflow`.
+- `ToolExecutorConfig` from `continuum.tools` — import from `continuum.tools.executor`.
 - `report_error(e, context={...})` — `context` is a short string; dict goes in `metadata=`.
 - `ObservationContext` with `async with` or `capture_output=True` — sync `with` only; no such kwarg.
 - `obs.update_metadata(...)` — method is `add_metadata(...)`.

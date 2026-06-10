@@ -25,10 +25,10 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 import config  # noqa: F401 — side effect: sets os.environ gateway vars
 
-from orchestrator import AgentRunner, BaseAgent, LogLevel, RunnerConfig, get_logger, setup_logging
-from orchestrator.config import settings
-from orchestrator.core.container import get_container
-from orchestrator.core.lifecycle import get_lifecycle_manager
+from continuum import AgentRunner, BaseAgent, LogLevel, RunnerConfig, get_logger, setup_logging
+from continuum.config import settings
+from continuum.core.container import get_container
+from continuum.core.lifecycle import get_lifecycle_manager
 
 logger = get_logger(__name__)
 

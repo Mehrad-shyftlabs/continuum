@@ -10,17 +10,17 @@ from __future__ import annotations
 
 import pytest
 
-from orchestrator.agent.base import BaseAgent
-from orchestrator.agent.interfaces.forkable import Forkable
-from orchestrator.agent.trace.recorder import TraceRecorder
-from orchestrator.agent.types import (
+from continuum.agent.base import BaseAgent
+from continuum.agent.interfaces.forkable import Forkable
+from continuum.agent.trace.recorder import TraceRecorder
+from continuum.agent.types import (
     AgentResponse,
     ResponseStatus,
     TerminationConfig,
     TerminationType,
 )
-from orchestrator.agent.utils.context_utils import create_run_context
-from orchestrator.agent.workflow.loop import LoopAgent
+from continuum.agent.utils.context_utils import create_run_context
+from continuum.agent.workflow.loop import LoopAgent
 
 
 def _make_loop() -> LoopAgent:

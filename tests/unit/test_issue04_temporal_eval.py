@@ -23,10 +23,10 @@ class TestRetryPolicyExplicit:
     @pytest.mark.parametrize(
         "module_path",
         [
-            "orchestrator.temporal.workflows.agent_workflow",
-            "orchestrator.temporal.workflows.sequential_workflow",
-            "orchestrator.temporal.workflows.parallel_workflow",
-            "orchestrator.temporal.workflows.loop_workflow",
+            "continuum.temporal.workflows.agent_workflow",
+            "continuum.temporal.workflows.sequential_workflow",
+            "continuum.temporal.workflows.parallel_workflow",
+            "continuum.temporal.workflows.loop_workflow",
         ],
     )
     def test_retry_policy_has_backoff(self, module_path):
@@ -47,20 +47,20 @@ class TestRetryPolicyExplicit:
 
 class TestStepValidation:
     def test_parse_step_valid_agent(self):
-        from orchestrator.temporal.types import AgentStep, parse_step
+        from continuum.temporal.types import AgentStep, parse_step
 
         step = parse_step({"type": "agent", "agent_name": "test-agent"})
         assert isinstance(step, AgentStep)
         assert step.agent_name == "test-agent"
 
     def test_parse_step_unknown_type_raises(self):
-        from orchestrator.temporal.types import parse_step
+        from continuum.temporal.types import parse_step
 
         with pytest.raises(ValueError, match="Unknown step type"):
             parse_step({"type": "invalid_type"})
 
     def test_parse_step_missing_type_raises(self):
-        from orchestrator.temporal.types import parse_step
+        from continuum.temporal.types import parse_step
 
         with pytest.raises(ValueError, match="Unknown step type: None"):
             parse_step({"agent_name": "test"})
@@ -73,14 +73,14 @@ class TestStepValidation:
 
 class TestConditionalStepConfigurable:
     def test_default_values(self):
-        from orchestrator.temporal.types import ConditionalStep
+        from continuum.temporal.types import ConditionalStep
 
         step = ConditionalStep(condition_agent="cond-agent")
         assert step.timeout == 300
         assert step.retries == 3
 
     def test_custom_values(self):
-        from orchestrator.temporal.types import ConditionalStep
+        from continuum.temporal.types import ConditionalStep
 
         step = ConditionalStep(
             condition_agent="cond-agent",
@@ -100,26 +100,26 @@ class TestConditionalStepConfigurable:
 
 class TestEvaluatorJsonParsing:
     def test_valid_json_parses(self):
-        from orchestrator.evaluation.evaluator_agent import _parse_json_response
+        from continuum.evaluation.evaluator_agent import _parse_json_response
 
         result = _parse_json_response('{"score": 0.9, "passed": true, "reasoning": "Good"}')
         assert result["score"] == 0.9
 
     def test_json_in_markdown_block(self):
-        from orchestrator.evaluation.evaluator_agent import _parse_json_response
+        from continuum.evaluation.evaluator_agent import _parse_json_response
 
         text = 'Here is my evaluation:\n{"score": 0.5, "passed": false, "reasoning": "Partial"}\n'
         result = _parse_json_response(text)
         assert result["score"] == 0.5
 
     def test_invalid_json_raises_parse_error(self):
-        from orchestrator.evaluation.evaluator_agent import _parse_json_response, _ParseError
+        from continuum.evaluation.evaluator_agent import _parse_json_response, _ParseError
 
         with pytest.raises(_ParseError, match="Could not extract valid JSON"):
             _parse_json_response("This is not JSON at all")
 
     def test_empty_string_raises_parse_error(self):
-        from orchestrator.evaluation.evaluator_agent import _parse_json_response, _ParseError
+        from continuum.evaluation.evaluator_agent import _parse_json_response, _ParseError
 
         with pytest.raises(_ParseError):
             _parse_json_response("")
@@ -136,7 +136,7 @@ class TestRagasThresholdConfigurable:
         # Can't instantiate without ragas installed, test the dataclass fields
         import dataclasses
 
-        from orchestrator.evaluation.ragas_eval import RagasEvaluator
+        from continuum.evaluation.ragas_eval import RagasEvaluator
 
         fields = {f.name for f in dataclasses.fields(RagasEvaluator)}
         assert "pass_threshold" in fields
@@ -150,7 +150,7 @@ class TestRagasThresholdConfigurable:
 
 class TestSecretsRedaction:
     def test_circular_reference_handled(self):
-        from orchestrator.utils.secrets import redact_dict
+        from continuum.utils.secrets import redact_dict
 
         d: dict = {"name": "test", "api_key": "sk-secret123"}
         d["loop"] = d
@@ -159,7 +159,7 @@ class TestSecretsRedaction:
         assert "****" in result["api_key"]
 
     def test_max_depth_returns_redacted_placeholder(self):
-        from orchestrator.utils.secrets import redact_dict
+        from continuum.utils.secrets import redact_dict
 
         deep = {"l1": {"l2": {"l3": {"l4": {"l5": {"l6": {"api_key": "secret"}}}}}}}
         result = redact_dict(deep, max_depth=3)
@@ -168,7 +168,7 @@ class TestSecretsRedaction:
         assert "_redacted" in inner
 
     def test_normal_redaction_works(self):
-        from orchestrator.utils.secrets import redact_dict
+        from continuum.utils.secrets import redact_dict
 
         data = {
             "username": "admin",
@@ -188,8 +188,8 @@ class TestSecretsRedaction:
 
 class TestRegistryThreadSafety:
     def test_concurrent_register_and_get(self):
-        from orchestrator.agent.base import BaseAgent
-        from orchestrator.temporal.registry import AgentRegistry
+        from continuum.agent.base import BaseAgent
+        from continuum.temporal.registry import AgentRegistry
 
         registry = AgentRegistry()
         errors = []
@@ -230,19 +230,19 @@ class TestRegistryThreadSafety:
 
 class TestEvalCaseContextValidation:
     def test_string_context_coerced_to_list(self):
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.types import EvalCase
 
         case = EvalCase(input_text="test", context="single string")
         assert case.context == ["single string"]
 
     def test_list_context_accepted(self):
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.types import EvalCase
 
         case = EvalCase(input_text="test", context=["a", "b"])
         assert case.context == ["a", "b"]
 
     def test_invalid_context_raises(self):
-        from orchestrator.evaluation.types import EvalCase
+        from continuum.evaluation.types import EvalCase
 
         with pytest.raises(TypeError, match="must be a list"):
             EvalCase(input_text="test", context=123)
@@ -255,7 +255,7 @@ class TestEvalCaseContextValidation:
 
 class TestAgentActivityResultNullSafety:
     def test_from_response_with_none_usage(self):
-        from orchestrator.temporal.types import AgentActivityResult
+        from continuum.temporal.types import AgentActivityResult
 
         class FakeResponse:
             content = "hello"
@@ -270,7 +270,7 @@ class TestAgentActivityResultNullSafety:
         assert result.content == "hello"
 
     def test_from_response_with_partial_usage(self):
-        from orchestrator.temporal.types import AgentActivityResult
+        from continuum.temporal.types import AgentActivityResult
 
         class FakeUsage:
             prompt_tokens = 10
@@ -298,7 +298,7 @@ class TestAgentActivityResultNullSafety:
 
 class TestWaitStepValidation:
     def test_valid_duration(self):
-        from orchestrator.temporal.types import WaitStep
+        from continuum.temporal.types import WaitStep
 
         step = WaitStep(duration_seconds=60)
         assert step.duration_seconds == 60
@@ -306,7 +306,7 @@ class TestWaitStepValidation:
     def test_zero_duration_rejected(self):
         from pydantic import ValidationError
 
-        from orchestrator.temporal.types import WaitStep
+        from continuum.temporal.types import WaitStep
 
         with pytest.raises(ValidationError):
             WaitStep(duration_seconds=0)
@@ -314,13 +314,13 @@ class TestWaitStepValidation:
     def test_negative_duration_rejected(self):
         from pydantic import ValidationError
 
-        from orchestrator.temporal.types import WaitStep
+        from continuum.temporal.types import WaitStep
 
         with pytest.raises(ValidationError):
             WaitStep(duration_seconds=-5)
 
     def test_max_duration_accepted(self):
-        from orchestrator.temporal.types import WaitStep
+        from continuum.temporal.types import WaitStep
 
         step = WaitStep(duration_seconds=86400 * 7)  # 7 days
         assert step.duration_seconds == 86400 * 7
@@ -328,7 +328,7 @@ class TestWaitStepValidation:
     def test_over_max_duration_rejected(self):
         from pydantic import ValidationError
 
-        from orchestrator.temporal.types import WaitStep
+        from continuum.temporal.types import WaitStep
 
         with pytest.raises(ValidationError):
             WaitStep(duration_seconds=86400 * 7 + 1)
@@ -341,7 +341,7 @@ class TestWaitStepValidation:
 
 class TestWorkflowInputPayloadSize:
     def test_normal_input_accepted(self):
-        from orchestrator.temporal.types import WorkflowInput
+        from continuum.temporal.types import WorkflowInput
 
         wi = WorkflowInput(steps=[], initial_input="Hello world")
         assert wi.initial_input == "Hello world"
@@ -349,7 +349,7 @@ class TestWorkflowInputPayloadSize:
     def test_oversized_input_rejected(self):
         from pydantic import ValidationError
 
-        from orchestrator.temporal.types import WorkflowInput
+        from continuum.temporal.types import WorkflowInput
 
         huge = "x" * 2_000_001
         with pytest.raises(ValidationError):

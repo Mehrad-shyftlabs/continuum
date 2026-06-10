@@ -13,7 +13,7 @@ let you observe or extend everything.
 
 ```python
 import asyncio
-from orchestrator.agent import BaseAgent, AgentRunner
+from continuum.agent import BaseAgent, AgentRunner
 
 async def main():
     agent = BaseAgent(
@@ -36,7 +36,7 @@ asyncio.run(main())
 
 ## 2 · `BaseAgent`
 
-`from orchestrator.agent import BaseAgent`
+`from continuum.agent import BaseAgent`
 
 A `@dataclass` describing an agent. Every parameter has a sensible
 default — only `name` is required.
@@ -90,7 +90,7 @@ default — only `name` is required.
 Sugar for the common case:
 
 ```python
-from orchestrator.agent import create_agent, MemoryScope
+from continuum.agent import create_agent, MemoryScope
 
 agent = create_agent(
     name="support",
@@ -111,7 +111,7 @@ Wrap one agent as a callable tool for another agent (multi-agent
 delegation without explicit handoffs):
 
 ```python
-from orchestrator.agent import agent_as_tool
+from continuum.agent import agent_as_tool
 
 researcher_tool = agent_as_tool(researcher, description="Research a topic")
 writer = BaseAgent(name="writer", tools=[researcher_tool], ...)
@@ -121,7 +121,7 @@ writer = BaseAgent(name="writer", tools=[researcher_tool], ...)
 
 ## 3 · `AgentRunner`
 
-`from orchestrator.agent import AgentRunner`
+`from continuum.agent import AgentRunner`
 
 ```python
 runner = AgentRunner(
@@ -157,7 +157,7 @@ response: AgentResponse = await runner.run(
 ### `run_stream()`
 
 ```python
-from orchestrator.agent import EventType
+from continuum.agent import EventType
 
 async for event in runner.run_stream(agent, "Tell me a story"):
     if event.type == EventType.CONTENT_DELTA:
@@ -201,7 +201,7 @@ A circuit breaker guards the loop (`circuit_breaker_threshold` /
 
 ## 4 · Configuration dataclasses
 
-All importable from `orchestrator.agent`.
+All importable from `continuum.agent`.
 
 ### `AgentMemoryConfig`
 
@@ -283,7 +283,7 @@ All importable from `orchestrator.agent`.
 
 ## 5 · Types
 
-All importable from `orchestrator.agent`.
+All importable from `continuum.agent`.
 
 ### Enums
 
@@ -305,8 +305,8 @@ class RunStatus(str, Enum):
     PENDING / RUNNING / WAITING_FOR_INPUT / WAITING_FOR_TOOL
     HANDOFF_PENDING / PAUSED / COMPLETED / FAILED / CANCELLED
 
-class MemoryScope(str, Enum):           # NB: this is the enum re-exported from `orchestrator.agent`
-    SHARED / USER / AGENT / CONVERSATION # `orchestrator.memory.scopes.MemoryScope` is a dataclass — different type
+class MemoryScope(str, Enum):           # NB: this is the enum re-exported from `continuum.agent`
+    SHARED / USER / AGENT / CONVERSATION # `continuum.memory.scopes.MemoryScope` is a dataclass — different type
 
 class MergeStrategy(str, Enum):
     CONCATENATE / LLM_SUMMARIZE / STRUCTURED / FIRST_SUCCESS
@@ -398,7 +398,7 @@ dataclass.
 Pipe agents — each one's output feeds the next.
 
 ```python
-from orchestrator.agent import create_sequential_agent, FailStrategy
+from continuum.agent import create_sequential_agent, FailStrategy
 
 pipeline = create_sequential_agent(
     name="content-pipeline",
@@ -413,7 +413,7 @@ pipeline = create_sequential_agent(
 Run agents concurrently, merge results.
 
 ```python
-from orchestrator.agent import create_parallel_agent, MergeStrategy, FailStrategy
+from continuum.agent import create_parallel_agent, MergeStrategy, FailStrategy
 
 fanout = create_parallel_agent(
     name="fanout",
@@ -429,7 +429,7 @@ fanout = create_parallel_agent(
 Run an inner agent in a loop until a termination condition fires.
 
 ```python
-from orchestrator.agent import create_loop_agent, TerminationType
+from continuum.agent import create_loop_agent, TerminationType
 
 iterate = create_loop_agent(
     name="iterate-until-done",
@@ -446,7 +446,7 @@ iterate = create_loop_agent(
 Run, critique, retry — until a critic agent passes the output.
 
 ```python
-from orchestrator.agent import create_reflection_agent
+from continuum.agent import create_reflection_agent
 
 self_improving = create_reflection_agent(
     name="self-improving",
@@ -465,7 +465,7 @@ a query-specific critique prompt programmatically.
 LLM-driven routing to one of several specialists.
 
 ```python
-from orchestrator.agent import create_router_agent
+from continuum.agent import create_router_agent
 
 router = create_router_agent(
     name="triage",
@@ -492,7 +492,7 @@ Decompose a goal into steps and execute them. Two modes:
 - **Agent-pool**: an LLM picks a specialist from `agents=[...]` for each step
 
 ```python
-from orchestrator.agent import create_planner_agent, FailStrategy
+from continuum.agent import create_planner_agent, FailStrategy
 
 planner = create_planner_agent(
     name="planner",
@@ -512,7 +512,7 @@ planner = create_planner_agent(
 Pro / con / judge synthesis pattern.
 
 ```python
-from orchestrator.agent import create_debate_agent
+from continuum.agent import create_debate_agent
 
 debate = create_debate_agent(
     name="debate",
@@ -534,7 +534,7 @@ LLM splits the input into N focused sub-tasks (one per branch),
 runs all branches concurrently, merges results.
 
 ```python
-from orchestrator.agent import create_scatter_agent, MergeStrategy
+from continuum.agent import create_scatter_agent, MergeStrategy
 
 scatter = create_scatter_agent(
     name="scatter",
@@ -553,7 +553,7 @@ Sequential pipeline with an LLM quality gate per step. If a step scores
 below `quality_threshold` it retries up to `max_retries`.
 
 ```python
-from orchestrator.agent import create_supervised_agent
+from continuum.agent import create_supervised_agent
 
 supervised = create_supervised_agent(
     name="supervised",
@@ -572,7 +572,7 @@ supervised = create_supervised_agent(
 Define them on the source agent:
 
 ```python
-from orchestrator.agent import Handoff, HistorySummarizationMode
+from continuum.agent import Handoff, HistorySummarizationMode
 
 triage = BaseAgent(
     name="triage",
@@ -606,7 +606,7 @@ detects when the LLM invokes it, summarizes history per the
 overflow, missing targets, and disallowed handoffs all raise typed
 exceptions (see Section 9).
 
-`HandoffManager` (`from orchestrator.agent import HandoffManager`)
+`HandoffManager` (`from continuum.agent import HandoffManager`)
 exposes `validate_handoff()`, `detect_cycle()`, and `prepare_handoff()`
 if you want to drive handoffs manually.
 
@@ -614,7 +614,7 @@ if you want to drive handoffs manually.
 
 ## 8 · State persistence
 
-`from orchestrator.agent import RunStateManager,
+`from continuum.agent import RunStateManager,
 get_global_state_manager, initialize_global_state_manager`
 
 If `RunnerConfig.persist_state=True` (default), `RunState` is written to
@@ -627,7 +627,7 @@ manager uses the same Redis instance configured for sessions.
 ## 9 · Exception hierarchy
 
 All inherit from `OrchestratorError`. Importable from
-`orchestrator.agent`.
+`continuum.agent`.
 
 ```
 AgentError                                    # base for agent errors
@@ -644,7 +644,7 @@ HandoffError(message, from_agent, to_agent, handoff_id, ...)
 ├── HandoffTargetNotFoundError(from_agent, to_agent, ...)
 └── HandoffCycleDetectedError(from_agent, to_agent, agent_stack, ...)
    # NOTE: HandoffCycleDetectedError is not re-exported from
-   # orchestrator.agent — import it from orchestrator.agent.exceptions.
+   # continuum.agent — import it from continuum.agent.exceptions.
 
 WorkflowError(message, workflow_type, step, ...)
 ├── SequentialWorkflowError(failed_agent=None, ...)
@@ -701,7 +701,7 @@ plan = resp.structured_output         # Plan instance
 **RAG injection**
 
 ```python
-from orchestrator.agent.config import AgentConfig
+from continuum.agent.config import AgentConfig
 
 agent = BaseAgent(
     name="rag-agent",
@@ -745,8 +745,8 @@ async for ev in runner.run_stream(agent, "..."):
   (`runner.register_agent(target)` or via `agent_registry={...}`),
   otherwise you get `HandoffTargetNotFoundError`.
 - **`MemoryScope` namespace**: the enum exported from
-  `orchestrator.agent` is the one you pass to `AgentMemoryConfig`. The
-  *dataclass* `MemoryScope` lives in `orchestrator.memory.scopes` and
+  `continuum.agent` is the one you pass to `AgentMemoryConfig`. The
+  *dataclass* `MemoryScope` lives in `continuum.memory.scopes` and
   isn't interchangeable.
 - **Hook signatures**: hooks are sync-style callables. Async hooks are
   not awaited.
