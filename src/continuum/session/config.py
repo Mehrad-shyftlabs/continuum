@@ -6,9 +6,13 @@ Provides configuration classes for session management settings.
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from continuum.config import settings
+
+# Safe minimum pool size — a configured value below this is raised to it so the
+# pool can never be accidentally under-provisioned.
+_MIN_REDIS_CONNECTIONS = 10
 
 
 class SessionConfig(BaseModel):
@@ -78,9 +82,15 @@ class SessionConfig(BaseModel):
 
     # Connection Pool Configuration
     redis_max_connections: int = Field(
-        default=10,
-        description="Maximum Redis connections in pool",
+        default_factory=lambda: settings.session_redis_max_connections,
+        description="Maximum Redis connections in pool (floored at the safe minimum)",
     )
+
+    @field_validator("redis_max_connections")
+    @classmethod
+    def _enforce_connection_floor(cls, v: int) -> int:
+        # A value below the safe minimum is raised to it; higher values are honored.
+        return max(v, _MIN_REDIS_CONNECTIONS)
 
     # Session Behavior
     ttl_seconds: int = Field(

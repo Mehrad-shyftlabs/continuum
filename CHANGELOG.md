@@ -40,6 +40,7 @@ and Continuum adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Fixed
 - The published wheel now includes the `continuum` console-script entry point. `0.2.2` on PyPI was built before the CLI landed and shipped without the `continuum` command; `pip install shyftlabs-continuum` now provides `continuum up` / `status` / `down` as documented in the README.
 
+
 ## [0.2.2] — 2026-06
 
 ### Fixed

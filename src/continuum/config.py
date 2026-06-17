@@ -189,6 +189,9 @@ class Settings(BaseSettings):
     session_redis_password: str | None = None  # Redis password (matches docker-compose default)
     session_redis_db: int = 0  # Redis database number
     session_redis_ssl: bool = False  # Enable SSL/TLS for Redis
+    session_redis_max_connections: int = (
+        10  # Redis pool size (configurable via env; floored at the safe minimum)
+    )
     session_ttl_seconds: int = 86400 * 7  # Session TTL: 7 days (configurable)
     session_max_messages: int = 1000  # Maximum messages per session (configurable, for scalability)
     session_key_prefix: str = "orchestrator:session"  # Redis key prefix for sessions
