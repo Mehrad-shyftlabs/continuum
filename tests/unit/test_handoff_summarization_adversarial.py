@@ -1,5 +1,5 @@
 """
-Adversarial integration tests for handoff history summarization.
+Adversarial unit tests for handoff history summarization.
 
 Covers the issue #25 requirement to exercise *every* summarization mode used when
 one agent hands off to another:
@@ -23,8 +23,7 @@ Hostile angles probed here:
   - deepcopy isolation: a returned message must not alias the input
 
 These are pure-Python paths (no external service), but the SUMMARY LLM path is
-driven with an injected fake async client so nothing real is contacted. Marked
-@pytest.mark.integration per the issue's deliverable convention.
+driven with an injected fake async client so nothing real is contacted.
 
 FIXED DEFECTS (these were originally asserted as xfail(strict=True); the fix in
 ``_find_turn_boundary`` guards ``n_turns <= 0`` by returning ``len(messages)``,
@@ -42,16 +41,12 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
-import pytest
-
 from continuum.agent.handoff.history import (
     HistorySummarizer,
     _find_turn_boundary,
     summarize_conversation,
 )
 from continuum.agent.types import HistorySummarizationMode as Mode
-
-pytestmark = pytest.mark.integration
 
 
 # --------------------------------------------------------------------------- #

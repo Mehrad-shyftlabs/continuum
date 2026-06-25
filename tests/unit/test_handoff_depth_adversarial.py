@@ -1,5 +1,5 @@
 """
-Adversarial integration tests for handoff depth limiting and cycle detection.
+Adversarial unit tests for handoff depth limiting and cycle detection.
 
 The story: agents can hand off to each other — triage → billing → refund etc.
 Every hand-off pushes a name onto agent_stack. The HandoffExecutor checks that
@@ -25,8 +25,6 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from continuum.agent.base import BaseAgent
 from continuum.agent.execution.handoff_executor import HandoffExecutor
 from continuum.agent.handoff.manager import HandoffManager
@@ -35,9 +33,6 @@ from continuum.agent.types import (
     RunState,
     generate_run_id,
 )
-
-pytestmark = pytest.mark.integration
-
 
 # --------------------------------------------------------------------------- #
 # Helpers

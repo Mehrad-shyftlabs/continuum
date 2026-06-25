@@ -1,5 +1,5 @@
 """
-Adversarial integration tests for agent_stack cleanup on handoff FAILURE.
+Adversarial unit tests for agent_stack cleanup on handoff FAILURE.
 
 Issue under test:
     "agent_stack not popped on handoff failure → unbounded growth on repeated
@@ -35,16 +35,11 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from continuum.agent.base import BaseAgent
 from continuum.agent.execution.executor import Executor
 from continuum.agent.execution.handoff_executor import HandoffExecutor
 from continuum.agent.handoff.manager import HandoffManager
 from continuum.agent.types import Handoff, RunContext, RunState, generate_run_id
-
-pytestmark = pytest.mark.integration
-
 
 # --------------------------------------------------------------------------- #
 # Helpers
