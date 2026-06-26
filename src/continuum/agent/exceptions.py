@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from continuum.exceptions import OrchestratorError
+from continuum.exceptions import OrchestratorError, PolicyDeniedError
 
 
 class AgentError(OrchestratorError):
@@ -117,6 +117,28 @@ class MaxTurnsExceededError(AgentError):
             self.context["current_turn"] = current_turn
 
 
+class StructuredOutputError(AgentError):
+    """Raised when an agent with ``output_schema`` cannot produce a valid instance.
+
+    Only raised when the agent opts in via ``output_schema_strict=True``. By
+    default structured-output failures are soft: ``structured_output`` is left
+    ``None`` and ``AgentResponse.structured_output_error`` carries the reason.
+    """
+
+    def __init__(
+        self,
+        schema_name: str,
+        reason: str,
+        **kwargs: Any,
+    ):
+        message = f"Could not produce structured output for schema '{schema_name}': {reason}"
+        super().__init__(message, **kwargs)
+        self.schema_name = schema_name
+        self.reason = reason
+        self.context["schema_name"] = schema_name
+        self.context["reason"] = reason
+
+
 # =============================================================================
 # Handoff Errors
 # =============================================================================
@@ -212,6 +234,34 @@ class HandoffCycleDetectedError(HandoffError):
         self.context["cycle_path"] = cycle_path
 
 
+class HandoffLoopError(HandoffError):
+    """
+    Raised when an agent hands off to the same target repeatedly without making
+    progress — a likely handoff loop (common when a routing agent keeps
+    re-routing under the default ``return_to_parent=True``).
+
+    Caught early with a clear message instead of silently burning turns until
+    ``MaxTurnsExceededError``.
+    """
+
+    def __init__(
+        self,
+        from_agent: str,
+        to_agent: str,
+        count: int,
+        **kwargs: Any,
+    ):
+        message = (
+            f"Handoff loop detected: '{from_agent}' handed off to '{to_agent}' "
+            f"{count} times in a row without resolving. This usually means a routing "
+            f"agent keeps re-routing. Set return_to_parent=False on the handoff so the "
+            f"target's response is returned directly, or adjust the agent's instructions."
+        )
+        super().__init__(message, from_agent=from_agent, to_agent=to_agent, **kwargs)
+        self.count = count
+        self.context["consecutive_handoffs"] = count
+
+
 # =============================================================================
 # Tool Errors
 # =============================================================================
@@ -237,8 +287,9 @@ class AgentToolError(AgentError):
             self.context["tool_args"] = tool_args
 
 
-class ToolAccessDeniedError(AgentToolError):
-    """Raised when an access policy denies a tool call."""
+class ToolAccessDeniedError(AgentToolError, PolicyDeniedError):
+    """Raised when an access policy denies a tool call. Expected governance
+    outcome (see :class:`PolicyDeniedError`), not a failure."""
 
     def __init__(
         self,
@@ -260,8 +311,9 @@ class ToolAccessDeniedError(AgentToolError):
             self.context["denial_message"] = denial_message
 
 
-class MemoryAccessDeniedError(AgentError):
-    """Raised when an access policy denies a memory read or write."""
+class MemoryAccessDeniedError(AgentError, PolicyDeniedError):
+    """Raised when an access policy denies a memory read or write. Expected
+    governance outcome (see :class:`PolicyDeniedError`), not a failure."""
 
     def __init__(
         self,
@@ -279,6 +331,35 @@ class MemoryAccessDeniedError(AgentError):
             self.context["scope"] = scope
         if policy_name:
             self.context["policy_name"] = policy_name
+
+
+class ModelAccessDeniedError(AgentError, PolicyDeniedError):
+    """Raised when an access policy denies routing a run to a model/provider.
+
+    Enforced in LLMClient.chat(): a run tainted with a data label (e.g. "pii")
+    can be blocked from a model via `deny(subjects=["pii"], resources=["llm:..."])`.
+    Expected governance outcome (see :class:`PolicyDeniedError`), not a failure.
+    """
+
+    def __init__(
+        self,
+        model: str,
+        policy_name: str | None = None,
+        subject: str | None = None,
+        denial_message: str = "",
+        **kwargs: Any,
+    ):
+        message = f"Access denied: model '{model}' is blocked by policy"
+        if policy_name:
+            message += f" '{policy_name}'"
+        super().__init__(message, **kwargs)
+        self.context["model"] = model
+        if policy_name:
+            self.context["policy_name"] = policy_name
+        if subject:
+            self.context["subject"] = subject
+        if denial_message:
+            self.context["denial_message"] = denial_message
 
 
 # =============================================================================

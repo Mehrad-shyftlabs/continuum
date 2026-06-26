@@ -19,8 +19,13 @@ from continuum.agent.exceptions import (
     AgentError,
     AgentExecutionError,
     MaxTurnsExceededError,
+    StructuredOutputError,
 )
-from continuum.agent.execution.executor import Executor, _enrich_config_for_gateway
+from continuum.agent.execution.executor import (
+    _MAX_STRUCTURED_OUTPUT_RETRIES,
+    Executor,
+    _enrich_config_for_gateway,
+)
 from continuum.agent.execution.handoff_executor import HandoffExecutor
 from continuum.agent.execution.message_builder import MessageBuilder
 from continuum.agent.execution.run_finalizer import RunFinalizer
@@ -57,14 +62,29 @@ from continuum.agent.types import (
 from continuum.agent.utils.circuit_breaker import CircuitBreaker, CircuitBreakerOpen
 from continuum.agent.utils.context_utils import create_run_context
 from continuum.agent.utils.message_utils import message_to_dict
-from continuum.agent.utils.validation_utils import validate_input
+from continuum.agent.utils.validation_utils import (
+    apply_output_scanners,
+    last_user_prompt,
+    validate_input,
+)
 from continuum.agent.workflow.router import RouterAgent
 from continuum.config import settings
 from continuum.config import settings as app_settings
 from continuum.core.container import Container, get_container
 from continuum.llm.config import LLMConfig
+from continuum.llm.structured_output import (
+    coerce_and_validate,
+    is_pydantic_schema,
+    schema_prompt,
+    to_openai_response_format,
+)
 from continuum.logging import get_logger
 from continuum.tools.tool_attention.router import _tool_name
+from continuum.utils.sanitization import (
+    InvalidIdentifierError,
+    validate_conversation_id,
+    validate_user_id,
+)
 
 if TYPE_CHECKING:
     from continuum.llm import LLMClient
@@ -281,15 +301,34 @@ class AgentRunner:
         if agent.name not in self._agent_registry:
             self.register_agent(agent)
 
-        if context is None:
-            context = create_run_context(
-                session_id=session_id,
-                conversation_id=conversation_id,
-                user_id=user_id,
-                trace_id=trace_id,
-                max_turns=max_turns or agent.config.max_turns,
-                metadata=metadata or {},
-                tags=tags or [],
+        # Validate the scope identifiers at the SDK boundary. This is the one
+        # place every runner.run()/run_stream() call passes through, so it
+        # guards memory scoping regardless of which app calls in. Validation
+        # runs for a caller-supplied context too — otherwise a hand-built
+        # RunContext could smuggle raw, unvalidated ids past this check.
+        try:
+            if context is None:
+                context = create_run_context(
+                    session_id=session_id,
+                    conversation_id=validate_conversation_id(conversation_id),
+                    user_id=validate_user_id(user_id),
+                    trace_id=trace_id,
+                    max_turns=max_turns or agent.config.max_turns,
+                    metadata=metadata or {},
+                    tags=tags or [],
+                )
+            else:
+                context.user_id = validate_user_id(context.user_id)
+                context.conversation_id = validate_conversation_id(context.conversation_id)
+        except InvalidIdentifierError as e:
+            return PrepareRunResult(
+                success=False,
+                error_response=AgentResponse(
+                    content=str(e),
+                    agent_name=agent.name,
+                    status=ResponseStatus.ERROR,
+                    error=str(e),
+                ),
             )
 
         if agent.input_schema is not None:
@@ -357,12 +396,19 @@ class AgentRunner:
         if agent.on_start:
             agent.on_start(agent, {"context": context, "input": input})
 
-        messages, user_message_index = await self._message_builder.prepare_messages(
-            agent,
-            input,
-            context,
-            tool_context_state=tool_context_state,
-        )
+        # Publish the policy context around message prep too: prepare_messages can
+        # trigger proactive context compression, which makes its own llm_client.chat()
+        # call for summarization. Without this, that call would run before run()'s
+        # ambient publish and bypass the model-routing gate.
+        from continuum.security.policy_context import use_active_policy
+
+        with use_active_policy(getattr(agent, "policy_store", None), agent.name, context):
+            messages, user_message_index = await self._message_builder.prepare_messages(
+                agent,
+                input,
+                context,
+                tool_context_state=tool_context_state,
+            )
         run_state.messages = [message_to_dict(m) for m in messages]
 
         return PrepareRunResult(
@@ -423,6 +469,13 @@ class AgentRunner:
                 error=str(e),
             )
 
+        # Publish the run's policy context so EVERY llm_client.chat() in this run
+        # — smart-layer triage, workflow orchestration, and the executor — is
+        # gated by the data-label model-routing policy, not just execute_loop.
+        # execute_loop re-publishes per-agent on handoffs (nested set/reset).
+        from continuum.security.policy_context import reset_active_policy, set_active_policy
+
+        _policy_token = set_active_policy(getattr(agent, "policy_store", None), agent.name, ctx)
         try:
             messages = list(run_state.messages) if run_state.messages else []
 
@@ -550,6 +603,8 @@ class AgentRunner:
                 trace_id=ctx.trace_id,
                 original_error=e,
             ) from e
+        finally:
+            reset_active_policy(_policy_token)
 
     # =========================================================================
     # Fork (time-travel: replay a run from a step with an edit)
@@ -619,6 +674,9 @@ class AgentRunner:
         if isinstance(orchestrator, Forkable):
             resume_ctx = create_run_context(max_turns=orchestrator.config.max_turns)
             resume_ctx.disable_memory_writes = True  # a fork is a hypothetical replay
+            # Seed the forked run's taint from the resume step so the gates
+            # (model-routing/telemetry) enforce as they did on the parent.
+            resume_ctx.data_labels = set(step.data_labels or [])
             return await orchestrator.resume_from(
                 parent_trace=parent,
                 from_step=from_step,
@@ -690,6 +748,9 @@ class AgentRunner:
 
         ctx = create_run_context(max_turns=target.config.max_turns)
         ctx.disable_memory_writes = True  # a fork is a hypothetical replay
+        # Seed the forked run's taint from the resume step so a replayed run is
+        # gated like the original (prefix taint isn't lost on fork).
+        ctx.data_labels = set(step.data_labels or [])
         ctx.recorder = TraceRecorder(
             ctx.run_id, target.name, parent.user_query, checkpoint=checkpoint_enabled()
         )
@@ -702,15 +763,22 @@ class AgentRunner:
         run_state.current_agent = target.name
         run_state.messages = list(messages)
 
-        response = await self._executor.execute_loop(
-            agent=target, messages=messages, context=ctx, run_state=run_state
-        )
-        if target.on_end:
-            target.on_end(target, {"context": ctx, "response": response})
+        # Publish the ambient policy for the replay so the forward LLM calls are
+        # model-routing-gated and the decision-trace persist honors the run's
+        # data labels — fork seeds ctx.data_labels but does not run through
+        # AgentRunner.run's publish, so without this the gates would be bypassed.
+        from continuum.security.policy_context import use_active_policy
 
-        await self._finalizer.finalize(
-            target, ctx, run_state, response, 0, None, start_time, run_state.messages
-        )
+        with use_active_policy(getattr(target, "policy_store", None), target.name, ctx):
+            response = await self._executor.execute_loop(
+                agent=target, messages=messages, context=ctx, run_state=run_state
+            )
+            if target.on_end:
+                target.on_end(target, {"context": ctx, "response": response})
+
+            await self._finalizer.finalize(
+                target, ctx, run_state, response, 0, None, start_time, run_state.messages
+            )
         return response
 
     # =========================================================================
@@ -752,6 +820,64 @@ class AgentRunner:
         """
         await self._finalizer.persist_decision_trace(context, response)
 
+    async def _resolve_structured_output_stream(
+        self,
+        agent: BaseAgent,
+        base_messages: list[dict[str, Any]],
+        content: str | None,
+        ctx: RunContext,
+    ) -> tuple[Any, str | None]:
+        """Streaming counterpart of Executor._resolve_structured_output.
+
+        Tries the streamed content first. For no-tool agents that content was
+        schema-constrained, so it counts as the primary attempt and only
+        ``_MAX_STRUCTURED_OUTPUT_RETRIES`` blocking formatting calls follow; tool
+        agents' unconstrained content keeps the full ``1 +
+        _MAX_STRUCTURED_OUTPUT_RETRIES`` budget. Retries are non-streaming —
+        streaming a retry adds no value.
+        """
+        schema = agent.output_schema
+        assert schema is not None
+
+        obj, err = coerce_and_validate(content, schema)
+        if obj is not None:
+            return obj, None
+
+        # The constrained inline call (no-tool agents) already spent the primary
+        # attempt; tool agents' prose content did not, so they keep the full budget.
+        primary_already_spent = not agent.get_tools_for_llm()
+        format_calls = (1 + _MAX_STRUCTURED_OUTPUT_RETRIES) - (1 if primary_already_spent else 0)
+
+        prior, last_err = content, err
+        for _ in range(format_calls):
+            instruction = schema_prompt(schema)
+            if prior:
+                instruction += f"\n\nConvert the following into that JSON object:\n{prior}"
+            if last_err:
+                instruction += f"\n\nThe previous attempt was invalid ({last_err}). Return corrected JSON only."
+            fmt_messages = list(base_messages) + [{"role": "user", "content": instruction}]
+            cfg = _enrich_config_for_gateway(LLMConfig.from_agent_config(agent), ctx)
+            cfg = cfg.model_copy(update={"response_format": to_openai_response_format(schema)})
+            try:
+                resp = await self.llm_client.chat(
+                    messages=fmt_messages,
+                    tools=None,
+                    config=cfg,
+                    session_id=ctx.session_id,
+                    auto_session=False,
+                )
+            except Exception as e:
+                logger.warning(
+                    f"structured-output formatting call failed for agent {agent.name}: {e}"
+                )
+                last_err = f"formatting call failed: {e}"
+                break
+            obj, last_err = coerce_and_validate(resp.content, schema)
+            if obj is not None:
+                return obj, None
+            prior = resp.content
+        return None, last_err
+
     # =========================================================================
     # Run (streaming)
     # =========================================================================
@@ -768,7 +894,20 @@ class AgentRunner:
         trace_id: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> AsyncIterator[AgentEvent]:
-        """Run an agent with streaming output."""
+        """Run an agent with streaming output.
+
+        Note: this is an async generator that publishes the run's data-label
+        policy context (a contextvar) for its duration and resets it in a
+        ``finally``. If a consumer stops iterating early (``break``) without
+        closing the generator, that ``finally`` only runs on GC, so the policy
+        context can briefly linger in the calling task. To guarantee prompt
+        cleanup, wrap consumption in ``contextlib.aclosing``::
+
+            from contextlib import aclosing
+            async with aclosing(runner.run_stream(agent, input)) as stream:
+                async for event in stream:
+                    ...
+        """
         start_time = time.time()
 
         result = await self._prepare_run(
@@ -785,11 +924,16 @@ class AgentRunner:
         )
         if not result.success:
             _run_id = generate_run_id()
+            _err = (
+                result.error_response.error
+                if result.error_response and result.error_response.error
+                else "Input validation failed"
+            )
             yield AgentEvent(
                 type=EventType.RUN_ERROR,
                 agent_name=agent.name,
                 run_id=_run_id,
-                data={"error": "Input validation failed", "error_type": "ValidationError"},
+                data={"error": _err, "error_type": "ValidationError"},
                 trace_id=trace_id,
             )
             yield AgentEvent(
@@ -802,6 +946,7 @@ class AgentRunner:
             return
 
         ctx = result.context
+        assert ctx is not None  # _prepare_run always sets context on success
         run_state = result.run_state
 
         yield AgentEvent(
@@ -813,8 +958,19 @@ class AgentRunner:
         )
 
         turn = 0
+        # Publish the run's policy context so every llm_client.chat() in this
+        # streaming run is gated by the data-label model-routing policy.
+        from continuum.security.policy_context import reset_active_policy, set_active_policy
+
+        _policy_token = set_active_policy(getattr(agent, "policy_store", None), agent.name, ctx)
         try:
             messages = list(run_state.messages) if run_state.messages else []
+
+            # When output_scanners are configured, raw token deltas must NOT reach
+            # the client unredacted. We suppress per-token CONTENT_DELTA events and
+            # instead emit a single sanitized CONTENT_COMPLETE per turn. Agents with
+            # no scanners stream token-by-token as before.
+            scanners_active = bool(getattr(agent, "config", None) and agent.config.output_scanners)
 
             yield AgentEvent(
                 type=EventType.AGENT_START,
@@ -849,13 +1005,14 @@ class AgentRunner:
                             )
                         elif ev.kind == "content_delta" and ev.text:
                             content_parts.append(ev.text)
-                            yield AgentEvent(
-                                type=EventType.CONTENT_DELTA,
-                                agent_name=agent.name,
-                                run_id=ctx.run_id,
-                                data={"content": ev.text},
-                                trace_id=ctx.trace_id,
-                            )
+                            if not scanners_active:
+                                yield AgentEvent(
+                                    type=EventType.CONTENT_DELTA,
+                                    agent_name=agent.name,
+                                    run_id=ctx.run_id,
+                                    data={"content": ev.text},
+                                    trace_id=ctx.trace_id,
+                                )
                 except Exception as e_mt:
                     await self._finalizer.handle_error(agent, ctx, run_state, e_mt, start_time)
                     if isinstance(e_mt, AgentError):
@@ -869,6 +1026,8 @@ class AgentRunner:
                     ) from e_mt
 
                 content = "".join(content_parts)
+                if scanners_active:
+                    content = apply_output_scanners(agent, last_user_prompt(messages), content)
                 te = parse_product_tier(last_routing.get("tier"))
                 if te:
                     ctx.priority = tier_dispatch_priority(te)
@@ -929,6 +1088,7 @@ class AgentRunner:
                         usage=None,
                         snapshot=_snapshot,
                         agent_stack=_agent_stack,
+                        data_labels=ctx.data_labels,
                     )
                     if (_ds := latest_step_payload(ctx.recorder)) is not None:
                         yield AgentEvent(
@@ -994,6 +1154,19 @@ class AgentRunner:
                 else:
                     llm_messages = messages
 
+                # Structured output: constrain the FINAL-answer call to the schema
+                # for no-tool agents (every call is a final answer). Tool agents are
+                # NOT constrained here — they get a blocking formatting call after the
+                # loop (parity with the non-streaming executor).
+                _stream_config = _enrich_config_for_gateway(LLMConfig.from_agent_config(agent), ctx)
+                if is_pydantic_schema(agent.output_schema) and not agent.get_tools_for_llm():
+                    _stream_config = _stream_config.model_copy(
+                        update={"response_format": to_openai_response_format(agent.output_schema)}
+                    )
+                    llm_messages = llm_messages + [
+                        {"role": "system", "content": schema_prompt(agent.output_schema)}
+                    ]
+
                 content_parts: list[str] = []
                 tool_calls: list = []
                 last_seen_model: str | None = None
@@ -1001,14 +1174,14 @@ class AgentRunner:
                 async for chunk in self.llm_client.chat_stream(
                     messages=llm_messages,
                     tools=tools if tools else None,
-                    config=_enrich_config_for_gateway(LLMConfig.from_agent_config(agent), ctx),
+                    config=_stream_config,
                     trace_metadata={"session_id": session_id} if session_id else None,
                 ):
                     if chunk.model:
                         last_seen_model = chunk.model
                     if chunk.content:
                         content_parts.append(chunk.content)
-                        if "NEED_TOOL:" not in chunk.content:
+                        if "NEED_TOOL:" not in chunk.content and not scanners_active:
                             yield AgentEvent(
                                 type=EventType.CONTENT_DELTA,
                                 agent_name=agent.name,
@@ -1064,13 +1237,14 @@ class AgentRunner:
                                 last_seen_model = chunk.model
                             if chunk.content:
                                 content_parts.append(chunk.content)
-                                yield AgentEvent(
-                                    type=EventType.CONTENT_DELTA,
-                                    agent_name=agent.name,
-                                    run_id=ctx.run_id,
-                                    data={"content": chunk.content},
-                                    trace_id=ctx.trace_id,
-                                )
+                                if not scanners_active:
+                                    yield AgentEvent(
+                                        type=EventType.CONTENT_DELTA,
+                                        agent_name=agent.name,
+                                        run_id=ctx.run_id,
+                                        data={"content": chunk.content},
+                                        trace_id=ctx.trace_id,
+                                    )
                             if chunk.tool_calls:
                                 tool_calls = chunk.tool_calls
                         if last_seen_model and settings.smart_gateway_url:
@@ -1078,6 +1252,12 @@ class AgentRunner:
                         content = "".join(content_parts)
                 else:
                     pass  # CONTENT_DELTA already yielded live in the streaming loop above
+
+                # Redact output before it leaves the runner (deltas were suppressed
+                # above when scanners are active, so this is the client's first sight
+                # of the content).
+                if content and scanners_active:
+                    content = apply_output_scanners(agent, last_user_prompt(messages), content)
 
                 if content:
                     yield AgentEvent(
@@ -1104,6 +1284,7 @@ class AgentRunner:
                     usage=None,
                     snapshot=_snapshot,
                     agent_stack=_agent_stack,
+                    data_labels=ctx.data_labels,
                 )
                 if (_ds := latest_step_payload(ctx.recorder)) is not None:
                     yield AgentEvent(
@@ -1115,6 +1296,26 @@ class AgentRunner:
                     )
 
                 if tool_calls:
+                    # Pre-taint from the DECLARED labels of EVERY tool in this
+                    # streamed turn BEFORE gating/executing any of them. The
+                    # streaming loop runs tools sequentially via execute_tool_call,
+                    # so without this the tool gate would see the taint state at
+                    # each tool's turn — and a producer+exfil pair could bypass the
+                    # gate by listing the exfil tool first (it'd be checked before
+                    # the producer taints the run). Mirrors execute_tools_batch's
+                    # pre-taint so streaming and non-streaming gate identically
+                    # (order-independent). Declared provenance is known up front.
+                    if agent.config and agent.config.tool_data_labels:
+                        for _tc in tool_calls:
+                            _name = (
+                                _tc.function.name
+                                if hasattr(_tc, "function")
+                                else _tc.get("function", {}).get("name", "")
+                            )
+                            _labels = agent.config.tool_data_labels.get(_name)
+                            if _labels:
+                                ctx.taint(*_labels)
+
                     messages.append(
                         {
                             "role": "assistant",
@@ -1216,6 +1417,10 @@ class AgentRunner:
                             handoff_content = (
                                 handoff_result.response.content if handoff_result.response else ""
                             )
+                            if handoff_content and scanners_active:
+                                handoff_content = apply_output_scanners(
+                                    agent, last_user_prompt(messages), handoff_content
+                                )
                             messages.append(
                                 {
                                     "role": "tool",
@@ -1309,8 +1514,32 @@ class AgentRunner:
                     continue
                 break
 
+            # Structured output (parity with the non-streaming executor).
+            structured_output = None
+            structured_output_error = None
+            if is_pydantic_schema(agent.output_schema):
+                (
+                    structured_output,
+                    structured_output_error,
+                ) = await self._resolve_structured_output_stream(agent, messages, content, ctx)
+                if structured_output is None and agent.output_schema_strict:
+                    raise StructuredOutputError(
+                        schema_name=agent.output_schema.__name__,
+                        reason=structured_output_error or "no valid structured output",
+                        agent_name=agent.name,
+                        run_id=ctx.run_id,
+                        trace_id=ctx.trace_id,
+                    )
+                if structured_output is None:
+                    logger.warning(
+                        f"⚠️ structured_output unavailable for agent {agent.name}: "
+                        f"{structured_output_error}"
+                    )
+
             response = AgentResponse(
                 content=content,
+                structured_output=structured_output,
+                structured_output_error=structured_output_error,
                 run_id=ctx.run_id,
                 agent_name=agent.name,
                 status=ResponseStatus.SUCCESS,
@@ -1346,7 +1575,14 @@ class AgentRunner:
                 type=EventType.RUN_END,
                 agent_name=agent.name,
                 run_id=ctx.run_id,
-                data={"content": content, "turn_count": turn},
+                data={
+                    "content": content,
+                    "turn_count": turn,
+                    "structured_output": structured_output.model_dump()
+                    if structured_output
+                    else None,
+                    "structured_output_error": structured_output_error,
+                },
                 trace_id=ctx.trace_id,
             )
 
@@ -1377,3 +1613,13 @@ class AgentRunner:
                 trace_id=ctx.trace_id,
                 original_error=e,
             ) from e
+        finally:
+            try:
+                reset_active_policy(_policy_token)
+            except ValueError:
+                # Generator finalized in a different context than it started in
+                # (caller abandoned the stream without `aclosing()`, so the GC
+                # finalizer runs this `finally`). The token can't be reset across
+                # contexts; the per-task context copy means there's nothing to
+                # leak, so this is best-effort.
+                pass

@@ -9,7 +9,7 @@ Full inventory of every feature available in Continuum (updated at 2026-05-19 ),
 
 | Feature                       | Description                                                                                                                 |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Multi-provider support        | OpenAI, Anthropic, Google Gemini via native SDKs — not proxied                                                              |
+| Multi-provider support        | Provider-agnostic by design. Ships three native-SDK providers (OpenAI, Anthropic, Google Gemini — not proxied) plus an optional Smart Gateway that routes many more models through one endpoint. Every backend implements one small interface (`BaseProvider`) and returns a normalized response, so adding another is a self-contained adapter registered via `register_provider()` — not a framework change. |
 | Priority dispatcher           | Queues external API calls by request priority (1–10) under load                                                             |
 | Two-level dispatcher          | For self-hosted models (vLLM, SGLang): stage priority × request priority                                                    |
 | Smart layer / tier classifier | Routes to cheap vs. expensive models by query complexity; supports fixed rules, JSON classifier, remote Qwen, or local Qwen |
@@ -105,9 +105,9 @@ Full inventory of every feature available in Continuum (updated at 2026-05-19 ),
 | Feature                 | Description                                                                              |
 | ----------------------- | ---------------------------------------------------------------------------------------- |
 | PolicyStore             | Deny-overrides ACL engine; glob pattern matching on subject × resource                   |
-| AccessPolicy            | Resource prefixes: `tool:*`, `memory:*`, `data:*`                                        |
+| AccessPolicy            | Resource families: `llm:<model>`, `tool:<name>`, `memory:<scope>`, `telemetry`, `session` (glob or exact) |
 | ToolAccessDeniedError   | Policy denial surfaced to the LLM with a configurable message                            |
-| Data sensitivity labels | Taint labels (e.g. `pii`, `phi`) propagate through handoffs via `RunContext.data_labels` |
+| Data sensitivity labels | Taint labels (e.g. `pii`, `phi`) on `RunContext.data_labels` propagate forward through a run and are matched as extra policy subjects by `PolicyStore`. They gate access only when you configure a policy — add a **deny** `AccessPolicy` for the label as subject; with no policy store configured they have no effect. Enforced **end-to-end** across six sinks: model routing (`llm:<model>`), tool calls (`tool:<name>`), long-term memory (`memory:<scope>`), telemetry, session persistence, and the decision trace. Labels come only from declared producers (`tool_data_labels`, memory `scope_data_labels`, run-level `data_labels`, or `ctx.taint()`) — the SDK ships no PII detector. |
 | Input sanitization      | Injection detection at the system boundary                                               |
 | Secret utilities        | Utilities for safe handling of secrets and credentials                                   |
 

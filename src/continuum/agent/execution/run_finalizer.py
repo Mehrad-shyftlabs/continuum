@@ -6,6 +6,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from continuum.agent.types import ResponseStatus, RunStatus
+from continuum.agent.utils.validation_utils import apply_output_scanners, last_user_prompt
 from continuum.logging import get_logger
 from continuum.observability.metrics import get_metrics_collector
 
@@ -61,27 +62,13 @@ class RunFinalizer:
 
         await self._finalize_decision_trace(context, response)
 
-        # Run product output scanners (e.g. LLM Guard Sensitive/PII for TaxPilot).
+        # Run product output scanners (e.g. an LLM Guard Sensitive/PII scanner).
         # Scanners redact PII in response.content before it is saved to session or returned.
         # Fail-open: if a scanner crashes the response is still returned unmodified.
         if agent.config and agent.config.output_scanners and response.content:
-            prompt = ""
-            if messages:
-                # Use the last user message as the prompt context for output scanners
-                for m in reversed(messages):
-                    if m.get("role") == "user":
-                        prompt = str(m.get("content", ""))
-                        break
-            for scanner in agent.config.output_scanners:
-                try:
-                    sanitized, _, _ = scanner(prompt, response.content)
-                    response.content = sanitized
-                except Exception as e:
-                    logger.warning(
-                        "Output scanner %s failed (fail-open): %s",
-                        getattr(scanner, "__name__", repr(scanner)),
-                        e,
-                    )
+            response.content = apply_output_scanners(
+                agent, last_user_prompt(messages), response.content
+            )
 
         run_state.status = RunStatus.COMPLETED
         await self._context_service.save_run_state(run_state)
@@ -148,6 +135,7 @@ class RunFinalizer:
                 status=response.status.value,
                 completed_at=datetime.now(UTC),
             )
+            trace = self._gate_decision_trace(trace)
             await get_trace_store().save(trace)
 
             detail = trace_detail()
@@ -155,6 +143,27 @@ class RunFinalizer:
                 response.decision_trace = trace.to_dict(detail)
         except Exception as e:
             logger.warning("Decision trace finalization failed (ignored): %s", e)
+
+    @staticmethod
+    def _gate_decision_trace(trace: Any) -> Any:
+        """Redact trace content when the run's data labels deny ``telemetry``.
+
+        The decision trace is a persistence sink like Langfuse, so it honors the
+        same ``telemetry`` policy (a user who denied telemetry for restricted data
+        means the trace too). Reuses the ambient policy published for the run via
+        ``resolve_active_policy``, so no params need threading; labels are read
+        live. On deny, returns a content-redacted copy (skeleton preserved);
+        otherwise returns the trace unchanged.
+        """
+        from continuum.security.policy_context import resolve_active_policy
+
+        store, subject, labels = resolve_active_policy(None, None, None)
+        if store is None or subject is None or not labels:
+            return trace
+        decision = store.check([subject, *sorted(labels)], "telemetry")
+        if decision.allowed:
+            return trace
+        return trace.redacted_copy(policy_name=decision.policy_name)
 
     async def handle_error(
         self,
@@ -270,6 +279,7 @@ class RunFinalizer:
                 tool_execution_summary=context.metadata.get("tool_execution_summary"),
                 run_id=context.run_id,
                 disable_memory=context.disable_memory_writes,
+                data_labels=context.data_labels,
             )
         except Exception as e:
             logger.warning(f"Failed to save messages to session: {e}")

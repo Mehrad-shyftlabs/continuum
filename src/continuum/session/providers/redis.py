@@ -32,6 +32,7 @@ from continuum.session.types import (
     SessionMetadata,
     generate_session_id,
 )
+from continuum.utils.sanitization import validate_conversation_id, validate_user_id
 
 logger = get_logger(__name__)
 
@@ -138,13 +139,18 @@ class RedisSessionProvider(BaseSessionProvider):
                     "decode_responses": True,
                     "socket_connect_timeout": 5,
                     "socket_timeout": 5,
+                    # When all connections are in use, wait up to this many seconds for
+                    # one to free up instead of raising MaxConnectionsError immediately.
+                    "timeout": 5,
                 }
 
                 if self._config.redis_ssl:
                     conn_kwargs["ssl"] = True
 
-                # Create connection pool for better performance
-                self._pool = redis.ConnectionPool(**conn_kwargs)
+                # Use a BlockingConnectionPool so bursts above max_connections queue and
+                # wait for a free connection (up to `timeout`s) rather than dropping the
+                # request. Prevents silent write loss under concurrent load (S-001).
+                self._pool = redis.BlockingConnectionPool(**conn_kwargs)
 
                 # Create async Redis connection using pool
                 self._redis = redis.Redis(
@@ -208,9 +214,16 @@ class RedisSessionProvider(BaseSessionProvider):
         Namespace prefixes ("c:" / "u:") prevent collision between a bare
         user_id like "foo:bar" and a conversation_id="foo" + user_id="bar"
         pair, which would otherwise both produce the same key "foo:bar".
+
+        Raises:
+            InvalidIdentifierError: if user_id/conversation_id contain characters
+                unsafe for a Redis key fragment. An explicit session_id is trusted
+                as-is (internal handoff calls supply framework-generated ids).
         """
         if session_id:
             return session_id
+        user_id = validate_user_id(user_id)
+        conversation_id = validate_conversation_id(conversation_id)
         if conversation_id and user_id:
             return f"c:{conversation_id}:u:{user_id}"
         if user_id:
@@ -259,8 +272,8 @@ class RedisSessionProvider(BaseSessionProvider):
                 metadata.last_accessed_at = datetime.now(UTC)
                 messages_key = self._get_session_key(resolved_session_id)
                 async with self._redis.pipeline(transaction=True) as pipe:
-                    pipe.setex(
-                        metadata_key, self._config.ttl_seconds, json.dumps(metadata.to_dict())
+                    pipe.set(
+                        metadata_key, json.dumps(metadata.to_dict()), ex=self._config.ttl_seconds
                     )
                     pipe.expire(messages_key, self._config.ttl_seconds)
                     await pipe.execute()
@@ -369,6 +382,12 @@ class RedisSessionProvider(BaseSessionProvider):
 
             messages_key = self._get_session_key(session_id)
 
+            # Use the actual list length (atomic source of truth) for the limit
+            # check rather than the stored counter, which can drift under
+            # concurrent writes (read-modify-write race on message_count).
+            current_count = await self._redis.llen(messages_key)
+            session_metadata.message_count = current_count
+
             # Check message limit and apply strategy
             if session_metadata.message_count >= self._config.max_messages:
                 if self._config.message_limit_strategy == "error":
@@ -398,9 +417,6 @@ class RedisSessionProvider(BaseSessionProvider):
                         },
                     )
 
-            # Increment count for the new message
-            session_metadata.message_count += 1
-
             # Create session message with metadata (no trace_id/span_id - handled by @observe)
             session_message = SessionMessage(
                 message=message,
@@ -408,16 +424,19 @@ class RedisSessionProvider(BaseSessionProvider):
                 metadata=metadata or {},
             )
 
-            # Atomically write message, update metadata, and refresh both TTLs.
-            # Using a pipeline prevents a crash mid-sequence from leaving the
-            # messages list and metadata in an inconsistent state.
+            # Atomically write the message and refresh its TTL. RPUSH returns the
+            # new list length atomically, which we use as the authoritative
+            # message_count (no read-modify-write race under concurrency).
             message_json = json.dumps(session_message.to_dict())
-            metadata_json_updated = json.dumps(session_metadata.to_dict())
             async with self._redis.pipeline(transaction=True) as pipe:
                 pipe.rpush(messages_key, message_json)
-                pipe.setex(metadata_key, self._config.ttl_seconds, metadata_json_updated)
                 pipe.expire(messages_key, self._config.ttl_seconds)
-                await pipe.execute()
+                results = await pipe.execute()
+
+            # results[0] is the RPUSH return value = new list length
+            session_metadata.message_count = results[0]
+            metadata_json_updated = json.dumps(session_metadata.to_dict())
+            await self._redis.set(metadata_key, metadata_json_updated, ex=self._config.ttl_seconds)
 
             logger.debug(
                 f"Added message to session: {session_id}",
@@ -511,8 +530,10 @@ class RedisSessionProvider(BaseSessionProvider):
             session_metadata = SessionMetadata.from_dict(json.loads(metadata_json))
             session_metadata.last_accessed_at = datetime.now(UTC)
             async with self._redis.pipeline(transaction=True) as pipe:
-                pipe.setex(
-                    metadata_key, self._config.ttl_seconds, json.dumps(session_metadata.to_dict())
+                pipe.set(
+                    metadata_key,
+                    json.dumps(session_metadata.to_dict()),
+                    ex=self._config.ttl_seconds,
                 )
                 pipe.expire(messages_key, self._config.ttl_seconds)
                 await pipe.execute()
@@ -563,7 +584,12 @@ class RedisSessionProvider(BaseSessionProvider):
             if not metadata_json:
                 return None
 
-            return SessionMetadata.from_dict(json.loads(metadata_json))
+            metadata = SessionMetadata.from_dict(json.loads(metadata_json))
+            # message_count is derived from the actual list length (the single
+            # source of truth). The stored counter can drift under concurrent
+            # writes (read-modify-write race), so we always reconcile from LLEN.
+            metadata.message_count = await self._redis.llen(self._get_session_key(session_id))
+            return metadata
 
         except Exception as e:
             logger.error(f"Failed to get session metadata: {e}")
@@ -605,7 +631,7 @@ class RedisSessionProvider(BaseSessionProvider):
                 return False
 
             async with self._redis.pipeline(transaction=True) as pipe:
-                pipe.setex(metadata_key, self._config.ttl_seconds, json.dumps(metadata.to_dict()))
+                pipe.set(metadata_key, json.dumps(metadata.to_dict()), ex=self._config.ttl_seconds)
                 pipe.expire(messages_key, self._config.ttl_seconds)
                 await pipe.execute()
 
@@ -655,10 +681,10 @@ class RedisSessionProvider(BaseSessionProvider):
                 # add_message cannot slip in and leave the count permanently wrong.
                 async with self._redis.pipeline(transaction=True) as pipe:
                     pipe.delete(messages_key)
-                    pipe.setex(
+                    pipe.set(
                         metadata_key,
-                        self._config.ttl_seconds,
                         json.dumps(session_metadata.to_dict()),
+                        ex=self._config.ttl_seconds,
                     )
                     await pipe.execute()
             else:
