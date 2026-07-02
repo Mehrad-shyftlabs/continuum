@@ -202,6 +202,15 @@ class Settings(BaseSettings):
     # 'sync' regardless of this setting. Override per deployment via
     # SESSION_MEMORY_WRITE_MODE; set 'sync' for strict read-after-write.
     session_memory_write_mode: Literal["sync", "background"] = "background"
+    # What to do when Redis-backed session persistence is unavailable
+    # (unconfigured / unreachable at startup, or it fails mid-session):
+    #   'degrade' (default) — fall back to a non-durable in-memory store and keep
+    #             serving (good DX; dev/demo). The SessionClient exposes
+    #             ``persistence_degraded=True`` so it can be monitored/alerted.
+    #   'fail'    — raise SessionConnectionError instead of silently degrading.
+    #             Prefer in strict production where silently losing durability is
+    #             worse than failing loudly.
+    session_fallback_mode: Literal["degrade", "fail"] = "degrade"
 
     # -------------------------------------------------------------------------
     # Context Management Configuration (Dynamic Context Compression)
@@ -228,6 +237,10 @@ class Settings(BaseSettings):
     temporal_enabled: bool = False
     temporal_host: str = "localhost:7233"
     temporal_namespace: str = "default"
+    # Temporal Cloud / TLS connection (local docker needs neither). When an API
+    # key is set, TLS is implied. See TemporalConnector for mode inference.
+    temporal_tls: bool = False  # TEMPORAL_TLS — enable TLS (managed/cloud)
+    temporal_api_key: str | None = None  # TEMPORAL_API_KEY — Temporal Cloud API key
     temporal_task_queue: str = "orchestrator-agents"
     temporal_enable_human_in_loop: bool = True
     temporal_approval_timeout_seconds: int = 86400  # 24h default

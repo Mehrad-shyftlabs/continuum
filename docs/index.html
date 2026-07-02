@@ -1064,6 +1064,7 @@
     <a class="sidebar-link" onclick="scrollToAnchor('run-temporal-deploy')">Temporal Workers</a>
     <div class="sidebar-group-label">Safety</div>
     <a class="sidebar-link" onclick="scrollToAnchor('run-safety')">Input / Output Scanning</a>
+    <a class="sidebar-link" onclick="scrollToAnchor('run-data-labels')">Data-Label Enforcement</a>
     <a class="sidebar-link" onclick="scrollToAnchor('run-testing')">Testing Guide</a>
   </div>
 
@@ -1083,6 +1084,8 @@
     <a class="sidebar-link" onclick="scrollToAnchor('comp-temporal')">Temporal Integration</a>
     <a class="sidebar-link" onclick="scrollToAnchor('comp-hitl')">Human-in-the-Loop</a>
     <a class="sidebar-link" onclick="scrollToAnchor('comp-loop-workflow')">Loop Workflow</a>
+    <div class="sidebar-group-label">Connectors</div>
+    <a class="sidebar-link" onclick="scrollToAnchor('comp-connectors')">Connectors</a>
   </div>
 
   <!-- INTEGRATIONS sidebar -->
@@ -1189,7 +1192,7 @@
   <a class="anchor" id="home-hero"></a>
   <div class="landing-hero">
     <div class="landing-glow" aria-hidden="true"></div>
-    <span class="ph-kicker"><span class="dot"></span>Continuum Suite · v1.0.0</span>
+    <span class="ph-kicker"><span class="dot"></span>Continuum Suite · v1.1.0</span>
     <h1 class="landing-title grad-text">Continuum</h1>
     <p class="landing-sub">The agent platform. Build production AI agents on the open <strong>Framework</strong>, route every call through <strong>Aura</strong>, and govern the whole system with <strong>Provenance</strong>.</p>
     <div class="ph-meta">
@@ -1282,7 +1285,7 @@ response = <span class="kw">await</span> <span class="cls">AgentRunner</span>().
 
   <a class="anchor" id="home-intro"></a>
   <div class="product-hero">
-    <span class="ph-kicker"><span class="dot"></span>Continuum Suite · Open Source · v1.0.0</span>
+    <span class="ph-kicker"><span class="dot"></span>Continuum Suite · Open Source · v1.1.0</span>
     <h1 class="ph-title grad-text">Continuum Framework</h1>
     <p class="ph-sub">The open-source agent runtime for builders who ship. Production-grade reasoning, durable multi-agent workflows, two-tier memory, and full observability, out of the box.</p>
     <div class="ph-meta">
@@ -1338,6 +1341,11 @@ response = <span class="kw">await</span> <span class="cls">AgentRunner</span>().
       <h3>Production primitives</h3>
       <p>Dependency-injection container, health checks for every dependency, lifecycle hooks, FastAPI helpers, fakeredis for tests. Async-native, protocol-based, code-first.</p>
     </div>
+    <div class="card filled">
+      <div class="card-icon" style="color:#fff">⬡</div>
+      <h3>Pluggable connectors</h3>
+      <p>One uniform layer for every external service, Redis, vector store (Milvus/Qdrant), Temporal, Langfuse. Connect via API keys, local Docker, or a custom host; the connection <em>mode</em> is inferred automatically, and one call health-probes them all. Add a new service in a single file.</p>
+    </div>
   </div>
 
   <a class="anchor" id="home-quickstart"></a>
@@ -1378,7 +1386,7 @@ pip install shyftlabs-continuum</pre></div>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># Python 3.13 required</span>
 python3.13 -m venv .venv
 source .venv/bin/activate
-pip install shyftlabs-continuum                 <span class="cm"># latest release (v1.0.0)</span>
+pip install shyftlabs-continuum                 <span class="cm"># latest release (v1.1.0)</span>
 pip install <span class="str">"shyftlabs-continuum[temporal,eval]"</span>    <span class="cm"># optional extras</span></pre></div>
       <p style="margin:12px 0 6px;">Prefer to work from source? Clone <a href="https://github.com/shyftlabs/continuum" target="_blank" rel="noopener">the repository</a> and install it editable:</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>git clone https://github.com/shyftlabs/continuum.git
@@ -1511,7 +1519,7 @@ agent = <span class="cls">BaseAgent</span>(
 )
 </pre></div>
 
-  <p><code>BaseAgent</code> is a dataclass. Every field has a sensible default, only <code>name</code> and <code>instructions</code> are required in practice.</p>
+  <p><code>BaseAgent</code> is a dataclass. Every field has a sensible default — only <code>name</code> and <code>instructions</code> are required in practice.</p>
 
   <table class="param-table">
     <tr><th>Parameter</th><th>Type</th><th>Description</th></tr>
@@ -1524,11 +1532,11 @@ agent = <span class="cls">BaseAgent</span>(
     <tr><td>mcp_servers</td><td>list[MCPServer]</td><td>MCP servers whose tools are dynamically loaded</td></tr>
     <tr><td>handoffs</td><td>list[Handoff]</td><td>Agents this agent can delegate to</td></tr>
     <tr><td>memory_config</td><td>AgentMemoryConfig</td><td>Long-term memory search/store behavior</td></tr>
-    <tr><td>config</td><td>AgentConfig</td><td>Execution config, turns, timeouts, retries, react_mode</td></tr>
+    <tr><td>config</td><td>AgentConfig</td><td>Execution config — turns, timeouts, retries, react_mode</td></tr>
     <tr><td>output_schema</td><td>type[BaseModel] | None</td><td>Pydantic model for structured output</td></tr>
     <tr><td>input_schema</td><td>type[BaseModel] | None</td><td>Validates input before execution</td></tr>
     <tr><td>template_vars</td><td>dict</td><td>Static values injected into <code>{slot}</code> placeholders</td></tr>
-    <tr><td>examples</td><td>list[dict]</td><td>Few-shot examples, each needs <code>input</code> and <code>output</code> keys</td></tr>
+    <tr><td>examples</td><td>list[dict]</td><td>Few-shot examples — each needs <code>input</code> and <code>output</code> keys</td></tr>
     <tr><td>instruction_modifiers</td><td>list[Callable]</td><td>Dynamic prompt modifiers applied at runtime</td></tr>
     <tr><td>metadata</td><td>dict</td><td>Arbitrary key-value metadata</td></tr>
     <tr><td>tags</td><td>list[str]</td><td>Categorization tags for filtering / routing</td></tr>
@@ -1538,7 +1546,7 @@ agent = <span class="cls">BaseAgent</span>(
 
   <h3>Stateless vs Stateful</h3>
   <p>Based on your needs, your agent can be stateless or stateful; if stateless, disable long-term and short-term memories; if stateful, you may only need either long-term memories(Memory) or short-term memories(Session) or both, you can control them by setting the parameters in <code>AgentConfig</code> and <code>AgentMemoryConfig</code>.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># Stateless, no Redis, no mem0 calls (fastest for prototypes)</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># Stateless — no Redis, no mem0 calls (fastest for prototypes)</span>
 agent = <span class="cls">BaseAgent</span>(
     name=<span class="str">"stateless"</span>,
     instructions=<span class="str">"..."</span>,
@@ -1546,7 +1554,7 @@ agent = <span class="cls">BaseAgent</span>(
     config=<span class="cls">AgentConfig</span>(log_to_session=<span class="cls">False</span>, session_history_turns=<span class="num">0</span>),
 )
 
-<span class="cm"># Stateful, loads last 20 turns + long-term memories (default)</span>
+<span class="cm"># Stateful — loads last 20 turns + long-term memories (default)</span>
 agent = <span class="cls">BaseAgent</span>(
     name=<span class="str">"stateful"</span>,
     instructions=<span class="str">"..."</span>,
@@ -1557,20 +1565,20 @@ agent = <span class="cls">BaseAgent</span>(
 <p style="font-weight: bold; margin-bottom: 0.5rem;">Memory (default):</p>
       <ul style="list-style-type: disc; margin-left: 0; padding-left: 1.2rem; margin-bottom: 1rem; color: #374151;">
         <li style="margin-bottom: 0.5rem;">
-          <code>search_memories=True</code>, looks up <code>long-term memories</code> before responding
+          <code>search_memories=True</code> — looks up <code>long-term memories</code> before responding
         </li>
         <li>
-          <code>store_memories=True</code>, saves <code>long-term memories</code> after responding
+          <code>store_memories=True</code> — saves <code>long-term memories</code> after responding
         </li>
       </ul>
 
       <p style="font-weight: bold; margin-bottom: 0.5rem;">Session (default):</p>
       <ul style="list-style-type: disc; margin-left: 0; padding-left: 1.2rem; margin-bottom: 1.5rem; color: #374151;">
         <li style="margin-bottom: 0.5rem;">
-          <code>log_to_session=True</code>, saves to session history (<code>short-term memory</code>)
+          <code>log_to_session=True</code> — saves to session history (<code>short-term memory</code>)
         </li>
         <li>
-          <code>session_history_turns=None</code>, loads last 20 turns of history (<code>short-term memory</code>)
+          <code>session_history_turns=None</code> — loads last 20 turns of history (<code>short-term memory</code>)
         </li>
       </ul>
 
@@ -1578,7 +1586,7 @@ agent = <span class="cls">BaseAgent</span>(
   <table>
     <tr><th>Value</th><th>Behaviour</th></tr>
     <tr><td><code>None</code> (default)</td><td>Load last <strong>20</strong> turns from Redis</td></tr>
-    <tr><td><code>0</code></td><td><strong>Skip</strong> Redis entirely, load nothing</td></tr>
+    <tr><td><code>0</code></td><td><strong>Skip</strong> Redis entirely — load nothing</td></tr>
     <tr><td><code>5</code></td><td>Load last <strong>5</strong> turns from Redis</td></tr>
   </table>
 
@@ -1654,10 +1662,10 @@ review: <span class="cls">Review</span> = response.structured_output
 
   <a class="anchor" id="build-workflows"></a>
   <h2>Multi-Agent Workflows</h2>
-  <p>Continuum ships 9 built-in workflow patterns. Each has a class-based form and a factory shorthand. All patterns are composable, you can nest them or combine them with handoffs.</p>
+  <p>Continuum ships 9 built-in workflow patterns. Each has a class-based form and a factory shorthand. All patterns are composable — you can nest them or combine them with handoffs.</p>
 
   <div class="workflow-grid">
-    <div class="workflow-card"><div class="wf-name">Sequential</div><div class="wf-desc">Pipeline, each agent's output feeds the next</div></div>
+    <div class="workflow-card"><div class="wf-name">Sequential</div><div class="wf-desc">Pipeline — each agent's output feeds the next</div></div>
     <div class="workflow-card"><div class="wf-name">Parallel</div><div class="wf-desc">All agents run concurrently on the same input</div></div>
     <div class="workflow-card"><div class="wf-name">Loop</div><div class="wf-desc">Iterates until a termination condition is met</div></div>
     <div class="workflow-card"><div class="wf-name">Reflection</div><div class="wf-desc">Agent runs, critic evaluates, agent retries if needed</div></div>
@@ -1669,7 +1677,7 @@ review: <span class="cls">Review</span> = response.structured_output
 
   <a class="anchor" id="build-custom"></a>
   <h3>Custom Workflow</h3>
-  <p>We strongly recommend building custom workflows using <code>BaseAgent</code> directly for anything closely tied to your project's business logic. A custom agent gives you full control over the flow, session saving, and memory behaviour, you decide which sub-agents are stateless and which are stateful.</p>
+  <p>We strongly recommend building custom workflows using <code>BaseAgent</code> directly for anything closely tied to your project's business logic. A custom agent gives you full control over the flow, session saving, and memory behaviour — you decide which sub-agents are stateless and which are stateful.</p>
   <p><strong>Example: <code>ParallelCoordinatorAgent</code> in <code>playground/multi-agent-shop/workflows.py</code></strong></p>
   <p>Instead of using <code>ParallelAgent</code> directly, the playground defines a custom <code>BaseAgent</code> subclass that orchestrates parallel search and synthesis manually:</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">class</span> <span class="cls">ParallelCoordinatorAgent</span>(<span class="cls">BaseAgent</span>):
@@ -1701,13 +1709,13 @@ review: <span class="cls">Review</span> = response.structured_output
             assistant_message=final.content,
         )</pre></div>
 
-  <p>This gives the parallel workers a clean stateless context (no Redis calls) while the synthesiser still loads session history and memory, something the built-in <code>ParallelAgent</code> cannot do out of the box.</p>
+  <p>This gives the parallel workers a clean stateless context (no Redis calls) while the synthesiser still loads session history and memory — something the built-in <code>ParallelAgent</code> cannot do out of the box.</p>
 
   <a class="anchor" id="build-sequential"></a>
   <h3>Built-in Workflows</h3>
 
   <h4>Sequential Workflow</h4>
-  <p>Executes agents as a pipeline, each agent receives the previous agent's output.</p>
+  <p>Executes agents as a pipeline — each agent receives the previous agent's output.</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.workflow <span class="kw">import</span> <span class="cls">SequentialAgent</span>
 
 pipeline = <span class="cls">SequentialAgent</span>(
@@ -1832,7 +1840,7 @@ router = <span class="cls">RouterAgent</span>(
     fallback_agent_name=<span class="str">"general-agent"</span>,
 )</pre></div>
 
-  <p>Or use the factory with tuple-based routes (recommended, the old <code>Route(target=...)</code> API is removed):</p>
+  <p>Or use the factory with tuple-based routes (recommended — the old <code>Route(target=...)</code> API is removed):</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent <span class="kw">import</span> <span class="cls">BaseAgent</span>, <span class="cls">AgentRunner</span>, create_router_agent
 
 billing   = <span class="cls">BaseAgent</span>(name=<span class="str">"billing-agent"</span>,   instructions=<span class="str">"Handle billing questions."</span>)
@@ -1856,7 +1864,7 @@ response = <span class="kw">await</span> runner.run(router, <span class="str">"M
 
   <a class="anchor" id="build-planner"></a>
   <h4>Planner Workflow</h4>
-  <p>Decomposes a goal into sub-tasks and executes them, either with a single agent or by routing each step to a specialist from a pool.</p>
+  <p>Decomposes a goal into sub-tasks and executes them — either with a single agent or by routing each step to a specialist from a pool.</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.workflow <span class="kw">import</span> <span class="cls">PlannerAgent</span>
 <span class="kw">from</span> continuum.agent.config <span class="kw">import</span> <span class="cls">PlanningConfig</span>
 
@@ -1872,7 +1880,7 @@ planner = <span class="cls">PlannerAgent</span>(
 )</pre></div>
 
   <a class="anchor" id="build-advanced-wf"></a>
-  <h4>Advanced patterns</h4>
+  <h4>Debate, Scatter &amp; SupervisedSequential</h4>
   <div class="workflow-grid">
     <div class="workflow-card">
       <div class="wf-name">DebateAgent</div>
@@ -1921,7 +1929,7 @@ triage = <span class="cls">BaseAgent</span>(
     <tr><td><code>FULL</code></td><td>Complete conversation history</td><td>Short conversations, full context needed</td></tr>
     <tr><td><code>SUMMARY</code></td><td>LLM-generated abstract of the conversation</td><td>Long conversations, context window limits</td></tr>
     <tr><td><code>RECENT_N</code></td><td>Last N turns only</td><td>When only recent context matters</td></tr>
-    <tr><td><code>HYBRID</code></td><td>Summary of older messages + full recent N turns</td><td>Best of both, default recommendation</td></tr>
+    <tr><td><code>HYBRID</code></td><td>Summary of older messages + full recent N turns</td><td>Best of both — default recommendation</td></tr>
   </table>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.handoff <span class="kw">import</span> <span class="cls">Handoff</span>, <span class="cls">HistorySummarizationMode</span>
 
@@ -1940,14 +1948,14 @@ triage = <span class="cls">BaseAgent</span>(
 <section class="page-section" id="sec-run">
 
   <h1>Run Agents</h1>
-  <p class="section-intro"><code>AgentRunner</code> is the execution engine, it orchestrates LLM calls, tool invocations, memory retrieval, and handoffs.</p>
+  <p class="section-intro"><code>AgentRunner</code> is the execution engine — it orchestrates LLM calls, tool invocations, memory retrieval, and handoffs.</p>
 
   <div style="display:flex; gap:12px; margin: 16px 0 0;">
     <div class="callout callout-tip" style="flex:1; margin:0">
-      <strong>Single-agent example:</strong> <a href="https://github.com/shyftlabs/continuum/tree/main/playground/gateway-local-shop" target="_blank" rel="noopener"><code>playground/gateway-local-shop</code></a>, one agent with MCP tools over HTTP.
+      <strong>Single-agent example:</strong> <a href="https://github.com/shyftlabs/continuum/tree/main/playground/gateway-local-shop" target="_blank"><code>playground/gateway-local-shop</code></a> — one agent with MCP tools over HTTP.
     </div>
     <div class="callout callout-tip" style="flex:1; margin:0">
-      <strong>Multi-agent example:</strong> <a href="https://github.com/shyftlabs/continuum/tree/main/playground/gateway-multi-agent-shop" target="_blank" rel="noopener"><code>playground/gateway-multi-agent-shop</code></a>
+      <strong>Multi-agent example:</strong> <a href="https://github.com/shyftlabs/continuum/tree/main/playground/gateway-multi-agent-shop" target="_blank"><code>playground/gateway-multi-agent-shop</code></a>
     </div>
   </div>
 
@@ -1972,7 +1980,7 @@ runner = <span class="cls">AgentRunner</span>(
     agent,
     <span class="str">"What is my account balance?"</span>,
     user_id=<span class="str">"user-123"</span>,
-    session_id=<span class="str">"sess-456"</span>,  <span class="cm"># optional, loads Redis history</span>
+    session_id=<span class="str">"sess-456"</span>,  <span class="cm"># optional — loads Redis history</span>
     conversation_id=<span class="str">"conv-789"</span>,
     max_turns=<span class="num">15</span>,
     metadata={<span class="str">"channel"</span>: <span class="str">"web"</span>},
@@ -1998,7 +2006,7 @@ runner = <span class="cls">AgentRunner</span>(
         <span class="fn">print</span>(<span class="str">f"\n[calling tool: {event.data['tool_name']}]"</span>)
 
     <span class="kw">elif</span> event.type == <span class="cls">EventType</span>.RUN_END:
-        <span class="fn">print</span>(<span class="str">f"\nDone, {event.data['usage']['total_tokens']} tokens"</span>)</pre></div>
+        <span class="fn">print</span>(<span class="str">f"\nDone — {event.data['usage']['total_tokens']} tokens"</span>)</pre></div>
 
   <a class="anchor" id="run-events"></a>
   <h3>EventType Reference</h3>
@@ -2020,10 +2028,10 @@ runner = <span class="cls">AgentRunner</span>(
   <a class="anchor" id="run-session"></a>
   <h2>Session History</h2>
   <p>Pass a <code>session_id</code> to automatically load and save conversation history from Redis.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># Turn 1, user's first message</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># Turn 1 — user's first message</span>
 response1 = <span class="kw">await</span> runner.run(agent, <span class="str">"My name is Alice."</span>, session_id=<span class="str">"sess-1"</span>, user_id=<span class="str">"u-1"</span>)
 
-<span class="cm"># Turn 2, agent remembers context from Redis</span>
+<span class="cm"># Turn 2 — agent remembers context from Redis</span>
 response2 = <span class="kw">await</span> runner.run(agent, <span class="str">"What's my name?"</span>, session_id=<span class="str">"sess-1"</span>, user_id=<span class="str">"u-1"</span>)
 <span class="cm"># → "Your name is Alice."</span></pre></div>
 
@@ -2036,7 +2044,7 @@ response2 = <span class="kw">await</span> runner.run(agent, <span class="str">"W
 session_id = <span class="kw">await</span> session_client.get_or_create_session(
     session_id=session_id,          <span class="cm"># pass existing ID to resume</span>
     user_id=<span class="str">"user-123"</span>,
-    conversation_id=<span class="str">"conv-456"</span>,   <span class="cm"># optional, see below</span>
+    conversation_id=<span class="str">"conv-456"</span>,   <span class="cm"># optional — see below</span>
 )
 
 <span class="cm"># Step 2: run with that session_id</span>
@@ -2066,7 +2074,7 @@ response = <span class="kw">await</span> runner.run(
 
   <a class="anchor" id="run-session-multi"></a>
   <h3>Multi-agent session saving pattern</h3>
-  <p>Every workflow agent calls <code>runner.run()</code> once or multiple times internally. Without intervention, each sub-agent call auto-saves a turn, creating noisy intermediate history the user never saw. Prevent this with <code>suppress_session_log</code> + <code>save_turn()</code>:</p>
+  <p>Every workflow agent calls <code>runner.run()</code> once or multiple times internally. Without intervention, each sub-agent call auto-saves a turn — creating noisy intermediate history the user never saw. Prevent this with <code>suppress_session_log</code> + <code>save_turn()</code>:</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">async def</span> <span class="fn">execute</span>(self, input_text, runner, context) -> <span class="cls">AgentResponse</span>:
     context.suppress_session_log = <span class="cls">True</span>  <span class="cm"># blocks auto-save for ALL sub-agent runs</span>
 
@@ -2090,15 +2098,15 @@ response = <span class="kw">await</span> runner.run(
 
   <a class="anchor" id="run-final"></a>
   <h3>Deciding which agent's output is the final response</h3>
-  <p>In a multi-agent workflow, you must explicitly decide which agent's output is the final response, this is what you pass to <code>save_turn()</code>. Here are two examples</p>
+  <p>In a multi-agent workflow, you must explicitly decide which agent's output is the final response — this is what you pass to <code>save_turn()</code>. Here are two examples</p>
   <p><strong>Sequential:</strong> agents run one after another, each passing output to the next. The <em>last</em> agent may produce the final response:</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">await</span> runner.<span class="fn">save_turn</span>(session_id, user_input, last_agent_response.content)</pre></div>
 
-  <p><strong>Handoff / Router:</strong> sub-agents do work and their results are injected back into the top-level agent's message list. The top-level agent then synthesizes its own final response, so the <em>top-level agent's</em> output is what to save, not the sub-agents' intermediate results:</p>
+  <p><strong>Handoff / Router:</strong> sub-agents do work and their results are injected back into the top-level agent's message list. The top-level agent then synthesizes its own final response — so the <em>top-level agent's</em> output is what to save, not the sub-agents' intermediate results:</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">await</span> runner.<span class="fn">save_turn</span>(session_id, user_input, top_level_agent_response.content)</pre></div>
 
   <div class="callout callout-warn">
-    <strong>Saving the wrong output:</strong> If you save an intermediate agent's output by mistake, session history will contain turns the user never saw, and future turns will load them as prior context.
+    <strong>Saving the wrong output:</strong> If you save an intermediate agent's output by mistake, session history will contain turns the user never saw — and future turns will load them as prior context.
   </div>
 
   <a class="anchor" id="run-context"></a>
@@ -2122,24 +2130,24 @@ agent = <span class="cls">BaseAgent</span>(
 
   <a class="anchor" id="run-trace"></a>
   <h2>Time-Travel (Decision Trace)</h2>
-  <p>Continuum can record every decision in a run, each LLM call, tool call, handoff, and workflow step, as a structured, replayable <em>ledger</em>. Once recorded, you can rewind to any step, edit it, and re-execute only what's downstream; everything upstream replays from the saved checkpoint. <em>git rebase, for an agent run.</em></p>
+  <p>Continuum can record every decision in a run — each LLM call, tool call, handoff, and workflow step — as a structured, replayable <em>ledger</em>. Once recorded, you can rewind to any step, edit it, and re-execute only what's downstream; everything upstream replays from the saved checkpoint. <em>git rebase, for an agent run.</em></p>
   <div class="callout callout-info">
-    <strong>Two halves:</strong> <b>record</b> (the trace, what happened) and <b>what-if</b> (fork, rewind, change one input, replay). The feature is off by default and costs one boolean check per turn when disabled.
+    <strong>Two halves:</strong> <b>record</b> (the trace — what happened) and <b>what-if</b> (fork — rewind, change one input, replay). The feature is off by default and costs one boolean check per turn when disabled.
   </div>
   <div class="callout callout-tip">
-    <strong>Worked examples: </strong> <a href="https://github.com/shyftlabs/continuum/tree/main/playground/decision-trace-glassbox" target="_blank" rel="noopener"><code>playground/decision-trace-glassbox</code></a> runs across all nine workflow patterns (+ handoff), so you can fork and compare each one.
+    <strong>Worked examples: </strong> <a href="https://github.com/shyftlabs/continuum/tree/main/playground/decision-trace-timetravel" target="_blank"><code>playground/decision-trace-timetravel</code></a> runs across all nine workflow patterns (+ handoff), so you can fork and compare each one.
   </div>
 
   <a class="anchor" id="run-trace-enable"></a>
   <h3>Enable &amp; configure</h3>
   <p>Disabled by default. Opt in with environment variables (or set the same fields on <code>settings</code> programmatically). Recording is independent of <em>forkability</em>: turn on <code>CHECKPOINT</code> only when you want to rewind, since it stores per-step message snapshots.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># .env, everything off unless you opt in</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># .env — everything off unless you opt in</span>
 DECISION_TRACE_ENABLED=true
 DECISION_TRACE_DETAIL=full         <span class="cm"># off | full</span>
 DECISION_TRACE_STORE=redis         <span class="cm"># redis | memory | null</span>
 DECISION_TRACE_CHECKPOINT=true     <span class="cm"># per-step snapshots → enables fork/rewind</span>
 DECISION_TRACE_TTL_DAYS=14         <span class="cm"># auto-expiry of persisted traces</span></pre></div>
-  <p>…or flip the same switches programmatically before the first run, which is what the <code>decision-trace-glassbox</code> playground does:</p>
+  <p>…or flip the same switches programmatically before the first run — which is what the <code>decision-trace-timetravel</code> playground does:</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.config <span class="kw">import</span> settings
 settings.decision_trace_enabled = <span class="cls">True</span>
 settings.decision_trace_checkpoint = <span class="cls">True</span>   <span class="cm"># only if you want fork/rewind</span>
@@ -2155,7 +2163,7 @@ settings.decision_trace_store = <span class="str">"redis"</span></pre></div>
     </tbody>
   </table>
   <div class="callout callout-tip">
-    <strong>A note on storage cost.</strong> <code>CHECKPOINT=true</code> stores a full message snapshot at every step, so a persisted trace can be sizeable and Redis usage grows with run volume. That's the price of being able to rewind, and it's worth it when you need it. To keep it modest: leave <code>CHECKPOINT</code> off unless you actually fork, and rely on <code>TTL_DAYS</code> to auto-expire old traces. Note that <code>DETAIL</code> only affects the trace <em>returned on the response</em>, the persisted trace is always full, so it isn't a storage lever. With the whole feature off (the default), nothing is stored at all.
+    <strong>A note on storage cost.</strong> <code>CHECKPOINT=true</code> stores a full message snapshot at every step, so a persisted trace can be sizeable and Redis usage grows with run volume. That's the price of being able to rewind — and it's worth it when you need it. To keep it modest: leave <code>CHECKPOINT</code> off unless you actually fork, and rely on <code>TTL_DAYS</code> to auto-expire old traces. Note that <code>DETAIL</code> only affects the trace <em>returned on the response</em> — the persisted trace is always full — so it isn't a storage lever. With the whole feature off (the default), nothing is stored at all.
   </div>
 
   <a class="anchor" id="run-trace-inspect"></a>
@@ -2175,7 +2183,7 @@ data = stored.<span class="fn">to_dict</span>(<span class="cls">TraceDetail</spa
 
   <a class="anchor" id="run-trace-fork"></a>
   <h2>Fork &amp; rewind</h2>
-  <p><code>runner.fork()</code> resumes a past run at <code>from_step</code>: steps before it replay from the saved checkpoint (no LLM or tool calls), an optional <code>override</code> edits that step, and the loop re-executes forward. The parent run is never mutated, the fork is a new run that records its lineage.</p>
+  <p><code>runner.fork()</code> resumes a past run at <code>from_step</code>: steps before it replay from the saved checkpoint (no LLM or tool calls), an optional <code>override</code> edits that step, and the loop re-executes forward. The parent run is never mutated — the fork is a new run that records its lineage.</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># Rewind run X to a step, change one input, re-run only what's downstream</span>
 forked = <span class="kw">await</span> runner.fork(
     run_id,
@@ -2194,17 +2202,17 @@ forked = <span class="kw">await</span> runner.fork(
   <p>The <code>override</code> applies a small, well-defined edit to the restored messages before the loop re-runs:</p>
   <table class="param-table">
     <tbody>
-      <tr><td>system</td><td>str</td><td>Replace (or prepend) the system instruction, a "what-if the policy were…" edit.</td></tr>
-      <tr><td>set_tool_result</td><td>{tool_call_id, content}</td><td>Override a recorded tool result, the "what if the tool had returned X?" knob.</td></tr>
+      <tr><td>system</td><td>str</td><td>Replace (or prepend) the system instruction — a "what-if the policy were…" edit.</td></tr>
+      <tr><td>set_tool_result</td><td>{tool_call_id, content}</td><td>Override a recorded tool result — the "what if the tool had returned X?" knob.</td></tr>
       <tr><td>replace_last_user</td><td>str</td><td>Replace the most recent user message content.</td></tr>
       <tr><td>append</td><td>message dict</td><td>Append an extra message (e.g. one more instruction).</td></tr>
     </tbody>
   </table>
-  <p>Forking works across multi-agent runs too: it resumes the agent that produced the step and restores the handoff stack. <strong>All nine workflow orchestrators</strong>, <code>Sequential</code>, <code>Router</code>, <code>Loop</code>, <code>Reflection</code>, <code>Supervised</code>, <code>Planner</code>, <code>Parallel</code>, <code>Scatter</code>, and <code>Debate</code>, implement the <code>Forkable</code> protocol and resume from the stage that owns the step. Pipeline patterns replay earlier stages from cache; concurrent patterns (<code>Parallel</code>, <code>Scatter</code>, <code>Debate</code>) re-run only the forked branch and replay sibling branches' outputs from the saved trace.</p>
+  <p>Forking works across multi-agent runs too: it resumes the agent that produced the step and restores the handoff stack. <strong>All nine workflow orchestrators</strong> — <code>Sequential</code>, <code>Router</code>, <code>Loop</code>, <code>Reflection</code>, <code>Supervised</code>, <code>Planner</code>, <code>Parallel</code>, <code>Scatter</code>, and <code>Debate</code> — implement the <code>Forkable</code> protocol and resume from the stage that owns the step. Pipeline patterns replay earlier stages from cache; concurrent patterns (<code>Parallel</code>, <code>Scatter</code>, <code>Debate</code>) re-run only the forked branch and replay sibling branches' outputs from the saved trace.</p>
 
   <a class="anchor" id="run-trace-branch"></a>
   <h3>Branch &amp; diff</h3>
-  <p>Because upstream replays from cache, forking the same step at several values is cheap, run them concurrently and compare. <code>diff_traces()</code> reports what changed between two runs.</p>
+  <p>Because upstream replays from cache, forking the same step at several values is cheap — run them concurrently and compare. <code>diff_traces()</code> reports what changed between two runs.</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">import</span> asyncio
 <span class="kw">from</span> continuum.agent.trace <span class="kw">import</span> diff_traces
 <span class="kw">from</span> continuum.agent.trace.config <span class="kw">import</span> get_trace_store
@@ -2222,34 +2230,34 @@ delta = <span class="fn">diff_traces</span>(parent, child)   <span class="cm"># 
 
   <a class="anchor" id="run-trace-store"></a>
   <h3>Storage backends</h3>
-  <p><code>DECISION_TRACE_STORE</code> chooses where a finished trace is saved so it can be reloaded, and forked, later. A Redis backend that can't connect falls back to <code>null</code> so persistence never breaks a run.</p>
+  <p><code>DECISION_TRACE_STORE</code> chooses where a finished trace is saved so it can be reloaded — and forked — later. A Redis backend that can't connect falls back to <code>null</code> so persistence never breaks a run.</p>
   <table>
     <thead><tr><th>Backend</th><th>Where traces live</th><th>Survives restart / multi-process</th><th>Supports fork?</th></tr></thead>
     <tbody>
-      <tr><td><code>redis</code> (default)</td><td>External Redis server</td><td>Yes / Yes, needs Redis running</td><td>Yes</td></tr>
-      <tr><td><code>memory</code></td><td>A dict inside the running process</td><td>No / No, zero setup</td><td>Yes, in the same process</td></tr>
-      <tr><td><code>null</code></td><td>Discarded (no-op)</td><td>Not persisted</td><td>No, nothing to reload</td></tr>
+      <tr><td><code>redis</code> (default)</td><td>External Redis server</td><td>Yes / Yes — needs Redis running</td><td>Yes</td></tr>
+      <tr><td><code>memory</code></td><td>A dict inside the running process</td><td>No / No — zero setup</td><td>Yes, in the same process</td></tr>
+      <tr><td><code>null</code></td><td>Discarded (no-op)</td><td>— not persisted</td><td>No — nothing to reload</td></tr>
     </tbody>
   </table>
   <div class="callout callout-info">
-    Decision Trace is an <em>execution ledger</em> the runtime reads back to resume runs, separate from <a onclick="showSection('integrations'); scrollToAnchor('int-langfuse')">Langfuse</a>, the human-facing observability sink, which keeps running in parallel.
+    Decision Trace is an <em>execution ledger</em> the runtime reads back to resume runs — separate from <a onclick="showSection('integrations'); scrollToAnchor('int-langfuse')">Langfuse</a>, the human-facing observability sink, which keeps running in parallel.
   </div>
 
   <a class="anchor" id="run-trace-limits"></a>
   <h3>Limitations</h3>
   <div class="callout callout-warn">
     <ul style="margin:0; padding-left:18px;">
-      <li><strong>Return-to-parent handoffs aren't forkable.</strong> Resuming the child can't reconstruct the parent's final answer, so forking a step inside one raises a clear error, use <code>return_to_parent=False</code> for handoffs you intend to fork. However, you can rerun an upstream agent before the parent agent with return_to_parent=True.</li>
-      <li><strong>Overrides depend on how a stage resumes.</strong> Workflow orchestrators re-run the resumed stage <em>fresh</em>, they re-call its tools, so <code>set_tool_result</code> is ignored there; use <code>replace_last_user</code> or <code>system</code> to change a workflow stage's input. <code>set_tool_result</code> only takes effect where the fork <em>replays the snapshot verbatim</em> (single-agent and handoff resume).</li>
+      <li><strong>Return-to-parent handoffs aren't forkable.</strong> Resuming the child can't reconstruct the parent's final answer, so forking a step inside one raises a clear error — use <code>return_to_parent=False</code> for handoffs you intend to fork. However, you can rerun an upstream agent before the parent agent with return_to_parent=True.</li>
+      <li><strong>Overrides depend on how a stage resumes.</strong> Workflow orchestrators re-run the resumed stage <em>fresh</em> — they re-call its tools — so <code>set_tool_result</code> is ignored there; use <code>replace_last_user</code> or <code>system</code> to change a workflow stage's input. <code>set_tool_result</code> only takes effect where the fork <em>replays the snapshot verbatim</em> (single-agent and handoff resume).</li>
       <li><strong>Parallel can't rewind from its merge step.</strong> Forking a <em>branch</em> works in every concurrent pattern, but re-running only the final merge is supported by <code>Scatter</code> (gather-stage fork) and not yet by <code>Parallel</code>. Fork a branch instead, or use <code>Scatter</code> if you need to re-merge cached branch outputs.</li>
-      <li><strong>Planner mid-plan forks need an embedded plan.</strong> Forking a mid-plan step re-uses the plan recorded in the parent trace; traces recorded before plan-embedding existed can't mid-plan fork, fork from the plan stage (stage 0) to re-plan and re-execute instead.</li>
-      <li><strong>LLM nondeterminism.</strong> Re-executed steps are fresh model calls, so their <em>wording</em> can differ between runs even where your edit had no effect, a diff may show cosmetic text changes. Keep outcome-determining logic in tools and use <code>temperature=0</code> so verdicts and numbers stay stable; treat narrative diffs as informational.</li>
+      <li><strong>Planner mid-plan forks need an embedded plan.</strong> Forking a mid-plan step re-uses the plan recorded in the parent trace; traces recorded before plan-embedding existed can't mid-plan fork — fork from the plan stage (stage 0) to re-plan and re-execute instead.</li>
+      <li><strong>LLM nondeterminism.</strong> Re-executed steps are fresh model calls, so their <em>wording</em> can differ between runs even where your edit had no effect — a diff may show cosmetic text changes. Keep outcome-determining logic in tools and use <code>temperature=0</code> so verdicts and numbers stay stable; treat narrative diffs as informational.</li>
     </ul>
   </div>
 
   <a class="anchor" id="run-lifecycle"></a>
   <h2>App Lifecycle</h2>
-  <p>Use <code>OrchestratorLifecycle</code> to initialise and cleanly shut down all shared services (Redis, Langfuse, vector store). Use <code>Container</code> to inject custom clients, useful in tests and multi-tenant setups.</p>
+  <p>Use <code>OrchestratorLifecycle</code> to initialise and cleanly shut down all shared services (Redis, Langfuse, vector store). Use <code>Container</code> to inject custom clients — useful in tests and multi-tenant setups.</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.core <span class="kw">import</span> <span class="cls">OrchestratorLifecycle</span>, <span class="cls">Container</span>
 
 lifecycle = <span class="cls">OrchestratorLifecycle</span>()
@@ -2320,6 +2328,105 @@ agent = <span class="cls">BaseAgent</span>(
 )</pre></div>
 
 
+  <a class="anchor" id="run-data-labels"></a>
+  <h2>Data-Label Enforcement</h2>
+  <p>Make sensitivity labels such as <code>pii</code>, <code>confidential</code>, or <code>restricted</code> change what a run is <em>allowed to do</em>. A run carries a set of labels (<code>ctx.data_labels</code>); labels are added by <strong>producers</strong> and then <strong>gate</strong> six runtime sinks. Taint is monotonic (only added, propagates forward) and is enforced identically in streaming and non-streaming.</p>
+  <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># producer (taint) ─▶ ctx.data_labels = {"pii"} ─▶ gate at each sink (deny?)</span></pre></div>
+
+  <p><strong>Independent of <a onclick="scrollToAnchor('run-safety')" style="cursor:pointer;text-decoration:underline">Input / Output Scanning</a>.</strong> Scanners <em>sanitize text</em>; data labels <em>gate behavior</em>. Neither feeds the other — a scanner never taints a run.</p>
+
+  <h3>Defaults — opt-in &amp; inert</h3>
+  <p>With nothing configured the feature does nothing (zero behavior change, fully backward-compatible): no policy store on the agent, no producers, every run unlabeled. Policy evaluation is <strong>open-default-allow</strong> with <strong>deny-overrides</strong>.</p>
+  <table>
+    <tr><th>Setting</th><th>Default</th><th>Effect</th></tr>
+    <tr><td><code>BaseAgent(policy_store=…)</code></td><td><code>None</code></td><td>no gates run at all</td></tr>
+    <tr><td><code>AgentConfig.tool_data_labels</code></td><td><code>{}</code></td><td>no tool taints the run</td></tr>
+    <tr><td><code>AgentMemoryConfig.scope_data_labels</code></td><td><code>{}</code></td><td>no memory-read taint</td></tr>
+    <tr><td>run-level <code>data_labels</code></td><td><code>None</code></td><td>run starts clean</td></tr>
+    <tr><td>policy evaluation</td><td>open-default-allow</td><td>unmatched resource → allowed</td></tr>
+  </table>
+
+  <h3>Enable it in three steps</h3>
+  <p><strong>1 · Define policies.</strong> Subjects are matched against <code>[agent.name, *sorted(labels)]</code>, so a rule whose subject is a label fires for <em>any</em> run carrying that label. Resources support fnmatch globs.</p>
+  <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.security.policy <span class="kw">import</span> <span class="cls">AccessPolicy</span>, <span class="cls">PolicyStore</span>
+
+store = <span class="cls">PolicyStore</span>()
+store.<span class="fn">add_policy</span>(<span class="cls">AccessPolicy</span>(
+    name=<span class="str">"pii-no-cloud-model"</span>,
+    subjects=[<span class="str">"pii"</span>],                 <span class="cm"># fires whenever the run carries "pii"</span>
+    resources=[<span class="str">"llm:gpt-4o"</span>],         <span class="cm"># the cloud model</span>
+    effect=<span class="str">"deny"</span>,
+    denial_message=<span class="str">"PII may not be sent to the cloud model."</span>,
+))
+store.<span class="fn">add_policy</span>(<span class="cls">AccessPolicy</span>(
+    name=<span class="str">"confidential-no-exfil"</span>,
+    subjects=[<span class="str">"confidential"</span>],
+    resources=[<span class="str">"tool:send_*"</span>, <span class="str">"tool:web_*"</span>],   <span class="cm"># globs supported</span>
+    effect=<span class="str">"deny"</span>,
+    denial_message=<span class="str">"Confidential data may not leave via this tool."</span>,
+))</pre></div>
+
+  <p><strong>2 · Attach the store to the agent.</strong> The runner publishes it as the ambient policy for the whole run, so every sink is gated — you never thread it through call sites.</p>
+  <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>agent = <span class="cls">BaseAgent</span>(
+    name=<span class="str">"assistant"</span>, instructions=<span class="str">"..."</span>, model=<span class="str">"gpt-4o"</span>,
+    policy_store=store,
+)</pre></div>
+
+  <p><strong>3 · Declare at least one producer</strong> — otherwise nothing is ever labeled and the policies never fire.</p>
+  <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># (a) Tool provenance — a tool's result taints the run</span>
+<span class="cls">AgentConfig</span>(tool_data_labels={<span class="str">"lookup_patient"</span>: {<span class="str">"pii"</span>}})
+
+<span class="cm"># (b) Memory-read provenance — reading a scope taints the run</span>
+<span class="cls">AgentMemoryConfig</span>(scope_data_labels={<span class="cls">AgentMemoryScope</span>.USER: {<span class="str">"pii"</span>}})
+
+<span class="cm"># (c) Run-level — request known to carry sensitive data</span>
+ctx = <span class="fn">create_run_context</span>(user_id=<span class="str">"u1"</span>, data_labels={<span class="str">"pii"</span>})
+
+<span class="cm"># (d) Anywhere in your own code</span>
+ctx.<span class="fn">taint</span>(<span class="str">"confidential"</span>)</pre></div>
+
+  <h3>Sink reference</h3>
+  <p>Write policy <code>resources=[…]</code> using these strings. Each sink checks the policy with subjects <code>[agent.name, *sorted(labels)]</code>.</p>
+  <table>
+    <tr><th>Sink</th><th>Resource string</th><th>What a deny does</th></tr>
+    <tr><td>Model routing</td><td><code>llm:&lt;model&gt;</code></td><td>raises <code>ModelAccessDeniedError</code> (catch → reroute to an allowed model)</td></tr>
+    <tr><td>Tool call</td><td><code>tool:&lt;name&gt;</code> (globs)</td><td>tool result becomes <code>POLICY DENIED: …</code> (tool not run; model sees it)</td></tr>
+    <tr><td>Long-term memory</td><td><code>memory:&lt;scope&gt;</code> or <code>memory:*</code></td><td>write blocked (<code>MemoryAccessDeniedError</code> on explicit add; auto-store skipped)</td></tr>
+    <tr><td>Telemetry</td><td><code>telemetry</code></td><td>payload replaced with <code>{"_redacted": "…"}</code> before egress</td></tr>
+    <tr><td>Short-term session</td><td><code>session</code></td><td>assistant answer stored as a placeholder, not verbatim</td></tr>
+    <tr><td>Decision trace</td><td><code>telemetry</code> (reused)</td><td>trace content redacted before persistence; audit skeleton kept</td></tr>
+  </table>
+
+  <h3>End-to-end</h3>
+  <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum <span class="kw">import</span> <span class="cls">BaseAgent</span>, <span class="cls">AgentConfig</span>, <span class="cls">AgentRunner</span>
+<span class="kw">from</span> continuum.security.policy <span class="kw">import</span> <span class="cls">AccessPolicy</span>, <span class="cls">PolicyStore</span>
+<span class="kw">from</span> continuum.agent.exceptions <span class="kw">import</span> <span class="cls">ModelAccessDeniedError</span>
+
+store = <span class="cls">PolicyStore</span>()
+store.<span class="fn">add_policy</span>(<span class="cls">AccessPolicy</span>(name=<span class="str">"pii-no-cloud"</span>, subjects=[<span class="str">"pii"</span>],
+                              resources=[<span class="str">"llm:gpt-4o"</span>], effect=<span class="str">"deny"</span>,
+                              denial_message=<span class="str">"no PII on cloud"</span>))
+
+agent = <span class="cls">BaseAgent</span>(name=<span class="str">"clinic"</span>, instructions=<span class="str">"..."</span>, model=<span class="str">"gpt-4o"</span>,
+                  policy_store=store,
+                  config=<span class="cls">AgentConfig</span>(tool_data_labels={<span class="str">"lookup_patient"</span>: {<span class="str">"pii"</span>}}))
+
+runner = <span class="cls">AgentRunner</span>()  <span class="cm"># one per app; shared across runs</span>
+
+<span class="kw">try</span>:
+    resp = <span class="kw">await</span> runner.<span class="fn">run</span>(agent, <span class="str">"look up patient P-123"</span>)  <span class="cm"># taints pii → gpt-4o denied</span>
+<span class="kw">except</span> <span class="cls">ModelAccessDeniedError</span>:
+    agent.model = <span class="str">"gpt-4o-mini"</span>            <span class="cm"># allowed model</span>
+    resp = <span class="kw">await</span> runner.<span class="fn">run</span>(agent, <span class="str">"look up patient P-123"</span>)</pre></div>
+
+  <div class="callout callout-info">
+    <strong>"Model routing"</strong> is Continuum's gate; the gateway (<a onclick="scrollToAnchor('sec-smart')" style="cursor:pointer;text-decoration:underline">smart layer</a>) is a separate project (AURA) that does its own model routing. When using the gateway, rely on AURA for model routing instead of Continuum's "Model routing" gate.
+  </div>
+
+  <h3>Example</h3>
+  <p>A complete, runnable example lives at <code>playground/data-label-clinic/</code>.</p>
+
+
   <a class="anchor" id="run-testing"></a>
   <h2>Testing Guide</h2>
   <p>Continuum favors integration tests over mocks. The <code>[dev]</code> extra ships <code>fakeredis</code>, <code>respx</code>, and <code>pytest-asyncio</code>.</p>
@@ -2352,7 +2459,7 @@ agent = <span class="cls">BaseAgent</span>(
 <section class="page-section" id="sec-components">
 
   <h1>Components</h1>
-  <p class="section-intro">Continuum's building blocks, tools, memory, sessions, durable workflows.</p>
+  <p class="section-intro">Continuum's building blocks — tools, memory, sessions, durable workflows.</p>
 
   <a class="anchor" id="comp-mcp"></a>
   <h2>MCP Servers</h2>
@@ -2394,7 +2501,7 @@ agent = <span class="cls">BaseAgent</span>(
 
   <a class="anchor" id="comp-tool-filtering"></a>
   <h2>Tool Filtering</h2>
-  <p>When you have many MCP tools, semantic tool filtering sends only the relevant subset to the LLM each turn, reducing token cost and noise.</p>
+  <p>When you have many MCP tools, semantic tool filtering sends only the relevant subset to the LLM each turn — reducing token cost and noise.</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.config <span class="kw">import</span> <span class="cls">AgentConfig</span>, <span class="cls">ToolAttentionConfig</span>
 
 agent = <span class="cls">BaseAgent</span>(
@@ -2411,7 +2518,7 @@ agent = <span class="cls">BaseAgent</span>(
 
   <a class="anchor" id="comp-tool-context"></a>
   <h2>Tool Context Injection</h2>
-  <p>Some tools return a value (e.g. <code>session_id</code>, <code>cart_token</code>) that subsequent tool calls need as input. <code>ToolContextState</code> captures these values automatically and injects them into later calls, no agent prompt changes required.</p>
+  <p>Some tools return a value (e.g. <code>session_id</code>, <code>cart_token</code>) that subsequent tool calls need as input. <code>ToolContextState</code> captures these values automatically and injects them into later calls — no agent prompt changes required.</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.tools <span class="kw">import</span> <span class="cls">MCPServerStreamableHttp</span>
 
 <span class="cm"># Capture session_id from the login tool result, inject into every subsequent call</span>
@@ -2436,7 +2543,7 @@ shop_server = <span class="cls">MCPServerStreamableHttp</span>(
 
   <a class="anchor" id="comp-memory"></a>
   <h2>Long-term Memory</h2>
-  <p>Continuum uses <strong>mem0</strong> + Milvus (default) or Qdrant for persistent semantic memory. Facts are automatically extracted from conversations and stored as embeddings.</p>
+  <p>Continuum uses <a href="#int-langfuse">mem0</a> + Milvus(default) or Qdrant  for persistent semantic memory. Facts are automatically extracted from conversations and stored as embeddings.</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.agent.config <span class="kw">import</span> <span class="cls">AgentMemoryConfig</span>
 <span class="kw">from</span> continuum.memory.scopes <span class="kw">import</span> <span class="cls">MemoryScope</span>
 
@@ -2455,7 +2562,7 @@ agent = <span class="cls">BaseAgent</span>(
 
   <h3>Controlling what gets stored</h3>
   <p>Use <code>extraction_prompt</code> to tell mem0 exactly which facts to extract. Use <code>pre_store_filter</code> to remove PII or irrelevant facts <em>after</em> they are stored.</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># extraction_prompt, override mem0's default extraction logic</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># extraction_prompt — override mem0's default extraction logic</span>
 <span class="cls">AgentMemoryConfig</span>(
     store_memories=<span class="cls">True</span>,
     extraction_prompt=(
@@ -2464,7 +2571,7 @@ agent = <span class="cls">BaseAgent</span>(
     ),
 )
 
-<span class="cm"># pre_store_filter, runs after storage; facts not returned are deleted</span>
+<span class="cm"># pre_store_filter — runs after storage; facts not returned are deleted</span>
 <span class="kw">def</span> <span class="fn">remove_pii</span>(facts: <span class="fn">list</span>[<span class="fn">str</span>]) -> <span class="fn">list</span>[<span class="fn">str</span>]:
     <span class="kw">return</span> [f <span class="kw">for</span> f <span class="kw">in</span> facts <span class="kw">if</span> <span class="str">"credit card"</span> <span class="kw">not in</span> f]
 
@@ -2490,7 +2597,7 @@ results = <span class="kw">await</span> memory_client.search(<span class="str">"
 <span class="kw">await</span> memory_client.delete_all(user_id=<span class="str">"user-123"</span>)</pre></div>
 
   <div class="callout callout-tip">
-    <strong>Privacy tip:</strong> Consider exposing memory management in your frontend, let users view and delete what the AI remembers about them. This matters for GDPR compliance and user trust and experience.
+    <strong>Privacy tip:</strong> Consider exposing memory management in your frontend — let users view and delete what the AI remembers about them. This matters for GDPR compliance and user trust and experience.
   </div>
 
   <a class="anchor" id="comp-memory-scope"></a>
@@ -2530,7 +2637,8 @@ results = <span class="kw">await</span> memory.search(<span class="str">"user pr
 
   <a class="anchor" id="comp-session"></a>
   <h2>Sessions (Redis)</h2>
-  <p>Short-term conversation history stored in Redis. <code>AgentRunner</code> handles loading and saving automatically, you only use <code>SessionClient</code> directly when you need to manage sessions outside a run (e.g. building a chat history UI, clearing history, debugging).</p>
+  <p>Short-term conversation history stored in Redis. <code>AgentRunner</code> handles loading and saving automatically — you only use <code>SessionClient</code> directly when you need to manage sessions outside a run (e.g. building a chat history UI, clearing history, debugging).</p>
+  <p>Persistence initializes <strong>lazily</strong> — no connection is attempted (and no warnings logged) until the first session op, so a disabled or unconfigured Redis costs nothing. If Redis is unreachable, the client degrades to a non-durable in-memory store and keeps serving with a single warning instead of an error per request. Which you want is a choice: <code>degrade</code> (the default) keeps the app running through the outage, while <code>fail</code> raises instead — surfacing the error loudly so you can catch and debug it. Set <code>SESSION_FALLBACK_MODE</code> to opt in; it defaults to <code>degrade</code>. Either way the fallback flips a <code>session_persistence</code> health check to <code>degraded</code> and a <code>session_persistence_degraded</code> gauge to <code>1.0</code> for alerting.</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.session <span class="kw">import</span> <span class="cls">SessionClient</span>
 
 session = <span class="cls">SessionClient</span>()
@@ -2595,13 +2703,112 @@ handle = <span class="kw">await</span> client.execute_workflow(
 
   <a class="anchor" id="comp-hitl"></a>
   <h2>Human-in-the-Loop</h2>
-  <p>Workflows pause at <code>ApprovalStep</code> and send a notification to approvers. The workflow resumes only when approved, or auto-approves after timeout.</p>
+  <p>Workflows pause at <code>ApprovalStep</code> and send a notification to approvers. The workflow resumes only when approved — or auto-approves after timeout.</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cls">ApprovalStep</span>(
     description=<span class="str">"Approve the generated email before sending to customers"</span>,
     approvers=[<span class="str">"alice@company.com"</span>, <span class="str">"bob@company.com"</span>],
     timeout=<span class="num">3600</span>,           <span class="cm"># 1 hour, then auto-expires</span>
     auto_approve_if=<span class="str">"low_risk"</span>,  <span class="cm"># skip approval if condition agent returns this</span>
 )</pre></div>
+
+  <div class="callout callout-info">
+    <strong>HITL approver authorization (<code>decided_by ∈ approvers</code>).</strong> When <code>approvers</code> is non-empty, a decision is honored only if its <code>decided_by</code> is in the list — gating both approvals <em>and</em> rejections. Unauthorized decisions are recorded and ignored; the workflow stays paused until a listed approver resolves it (or it auto-expires at <code>timeout</code>). An empty <code>approvers</code> list means anyone may decide; <code>escalated</code> always routes through. A full workflow with this approval gate lives at <code>playground/temporal-leadflow/</code>.
+  </div>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.temporal.human_in_loop <span class="kw">import</span> <span class="cls">HumanInLoopManager</span>
+
+mgr = <span class="cls">HumanInLoopManager</span>(client=temporal_client)
+
+<span class="cm"># A decision is honored only if decided_by is in approvers:</span>
+<span class="kw">await</span> mgr.<span class="fn">approve</span>(workflow_id, request_id, decided_by=<span class="str">"alice@company.com"</span>)    <span class="cm"># honored</span>
+<span class="kw">await</span> mgr.<span class="fn">reject</span>(workflow_id, request_id, decided_by=<span class="str">"mallory@evil.com"</span>)     <span class="cm"># ignored — not an approver; stays pending</span>
+<span class="kw">await</span> mgr.<span class="fn">escalate</span>(workflow_id, request_id, escalate_to=<span class="str">"carol@company.com"</span>)  <span class="cm"># always allowed (re-targets)</span></pre></div>
+
+  <a class="anchor" id="comp-connectors"></a>
+  <h2>Connectors</h2>
+  <p>One uniform layer for every external service — Redis, the vector store (Milvus/Qdrant), Temporal, and Langfuse. Each connector exposes the same interface (<code>is_enabled</code> / <code>is_configured</code> / <code>mode</code> / <code>connect</code> / <code>aping</code> / <code>describe</code>) and registers in a shared registry, so services are configured and probed consistently. Most app code never touches connectors directly — the session, memory, temporal, and observability layers consume them internally; you reach for this module to <strong>inspect</strong>, <strong>probe</strong>, or <strong>add</strong> a service.</p>
+
+  <h3>Connection modes</h3>
+  <p>Every connector reports a <code>mode</code> <strong>inferred from configuration</strong> — no manual flag. This is what makes "connect via API keys, local Docker, or a custom host" just work.</p>
+  <table>
+    <tr><th>Mode</th><th>When</th><th>Inferred from</th></tr>
+    <tr><td><code>local_docker</code></td><td>Default host/ports (e.g. <code>continuum up</code>)</td><td>Host is <code>localhost</code> / the compose service name</td></tr>
+    <tr><td><code>cloud</code></td><td>Managed / API-key endpoint</td><td>An API key / token is set, or TLS is on</td></tr>
+    <tr><td><code>custom</code></td><td>Explicit non-default host, no cloud credential</td><td>Host set but matches neither above</td></tr>
+    <tr><td><code>disabled</code></td><td>Turned off</td><td>The service's <code>enabled</code> flag is <code>False</code></td></tr>
+  </table>
+
+  <h3>Inspect &amp; probe</h3>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.connectors <span class="kw">import</span> get_connector, health_check_all, list_connectors
+
+list_connectors()              <span class="cm"># ['langfuse', 'redis', 'temporal', 'vector_store']</span>
+
+redis = get_connector(<span class="str">"redis"</span>)
+redis.describe()               <span class="cm"># {'name': 'redis', 'mode': 'local_docker', 'host': ..., 'password': '****'}</span>
+<span class="kw">await</span> redis.aping()             <span class="cm"># True / False — never raises</span>
+
+<span class="cm"># Probe every enabled service at once (disabled ones cost zero connection attempts):</span>
+report = <span class="kw">await</span> health_check_all()</pre></div>
+  <p>Secrets come back masked in <code>describe()</code>, so the output is safe to log.</p>
+
+  <h3>Add a new service</h3>
+  <p>The cost is always <strong>config first, then one connector file, then one registration line</strong> — it does not grow as more connectors are added.</p>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># 1 — Settings fields (src/continuum/config.py → class Settings) so they're env-configurable</span>
+s3_enabled: bool = <span class="kw">False</span>
+s3_endpoint: str = <span class="str">"http://localhost:9000"</span>   <span class="cm"># local docker (minio)</span>
+s3_access_key: str | <span class="kw">None</span> = <span class="kw">None</span>           <span class="cm"># api key → cloud</span>
+
+<span class="cm"># 2 — The connector (src/continuum/connectors/s3.py)</span>
+<span class="kw">from</span> continuum.config <span class="kw">import</span> settings
+<span class="kw">from</span> continuum.connectors.base <span class="kw">import</span> <span class="cls">BaseConnector</span>, <span class="cls">ConnectionMode</span>
+<span class="kw">from</span> continuum.utils.secrets <span class="kw">import</span> mask_value
+
+<span class="kw">class</span> <span class="cls">S3Connector</span>(<span class="cls">BaseConnector</span>[<span class="cls">Any</span>]):
+    name = <span class="str">"s3"</span>
+
+    <span class="op">@</span>property
+    <span class="kw">def</span> <span class="fn">is_enabled</span>(self) -> bool: <span class="kw">return</span> settings.s3_enabled
+    <span class="kw">def</span> <span class="fn">is_configured</span>(self) -> bool: <span class="kw">return</span> bool(settings.s3_endpoint)
+
+    <span class="op">@</span>property
+    <span class="kw">def</span> <span class="fn">mode</span>(self) -> <span class="cls">ConnectionMode</span>:
+        <span class="kw">if not</span> settings.s3_enabled: <span class="kw">return</span> <span class="cls">ConnectionMode</span>.DISABLED
+        <span class="kw">if</span> settings.s3_access_key: <span class="kw">return</span> <span class="cls">ConnectionMode</span>.CLOUD      <span class="cm"># api key → cloud</span>
+        <span class="kw">if</span> <span class="str">"localhost"</span> <span class="kw">in</span> settings.s3_endpoint: <span class="kw">return</span> <span class="cls">ConnectionMode</span>.LOCAL_DOCKER
+        <span class="kw">return</span> <span class="cls">ConnectionMode</span>.CUSTOM
+
+    <span class="kw">async def</span> <span class="fn">connect</span>(self) -> <span class="cls">Any</span>:
+        <span class="kw">import</span> boto3
+        <span class="kw">return</span> boto3.client(
+            <span class="str">"s3"</span>,
+            endpoint_url=settings.s3_endpoint,
+            aws_access_key_id=settings.s3_access_key,
+            aws_secret_access_key=settings.s3_secret_key,
+        )
+
+    <span class="kw">async def</span> <span class="fn">aping</span>(self) -> bool:
+        <span class="kw">try</span>:
+            (<span class="kw">await</span> self.connect()).list_buckets(); <span class="kw">return</span> <span class="kw">True</span>
+        <span class="kw">except</span> Exception: <span class="kw">return</span> <span class="kw">False</span>
+
+    <span class="kw">def</span> <span class="fn">describe</span>(self) -> dict:
+        d = super().describe()
+        d.update(endpoint=settings.s3_endpoint,
+                 access_key=mask_value(settings.s3_access_key) <span class="kw">if</span> settings.s3_access_key <span class="kw">else</span> <span class="kw">None</span>)
+        <span class="kw">return</span> d
+
+<span class="cm"># 3 — Register it (registry.py → register_default_connectors(), one line)</span>
+<span class="kw">from</span> continuum.connectors.s3 <span class="kw">import</span> <span class="cls">S3Connector</span>
+register_connector(<span class="str">"s3"</span>, <span class="cls">S3Connector</span>(), replace=replace)
+
+<span class="cm"># 4 — Use it</span>
+<span class="kw">from</span> continuum.core.container <span class="kw">import</span> get_container
+s3 = get_container().connectors[<span class="str">"s3"</span>]   <span class="cm"># or get_connector("s3")</span>
+client = <span class="kw">await</span> s3.connect()              <span class="cm"># live client (you own it)</span></pre></div>
+  <p>It's now automatically in <code>health_check_all()</code>, gets uniform mode/describe/secret-masking, and is configurable via env. Override <code>aping</code> / <code>describe</code> when a cheaper probe or richer masked diagnostics exist.</p>
+
+  <div class="callout callout-info">
+    <strong>Which flavor?</strong> If <em>you own the client</em> (S3, Postgres, Redis, Temporal), <code>connect()</code> returns the live client and consumers call it. If <em>a library owns the client</em> (like mem0), expose a <code>to_&lt;lib&gt;_block()</code> config method the library consumes and use <code>connect()</code> only for a health-probe client — the <code>vector_store</code> pattern. <strong>LLM providers are intentionally not connectors</strong>: they're a per-request router (model-prefix routing, fallback chains), not a persistent connection.
+  </div>
 
 
 </section>
@@ -2614,7 +2821,7 @@ handle = <span class="kw">await</span> client.execute_workflow(
   <p class="section-intro">Continuum calls LLM providers directly via their official SDKs.</p>
 
   <h2>Provider Routing</h2>
-  <p>Continuum routes to providers automatically based on the model string prefix, no configuration needed.</p>
+  <p>Continuum routes to providers automatically based on the model string prefix — no configuration needed.</p>
   <table>
     <tr><th>Model name prefix</th><th>Provider</th><th>Examples</th></tr>
     <tr><td><code>claude-…</code> or <code>anthropic/…</code></td><td>Anthropic</td><td><code>claude-sonnet-4-5</code>, <code>claude-opus-4-5</code></td></tr>
@@ -2628,12 +2835,12 @@ handle = <span class="kw">await</span> client.execute_workflow(
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>agent = <span class="cls">BaseAgent</span>(name=<span class="str">"gpt-agent"</span>, instructions=<span class="str">"..."</span>, model=<span class="str">"gpt-4o"</span>)</pre></div>
   <table>
     <tr><th>Model</th><th>Context</th><th>Notes</th></tr>
-    <tr><td><code>gpt-5</code></td><td>400k</td><td>Latest, highest capability</td></tr>
+    <tr><td><code>gpt-5</code></td><td>—</td><td>Latest, highest capability</td></tr>
     <tr><td><code>gpt-4o</code></td><td>128k</td><td>Strong overall quality</td></tr>
     <tr><td><code>gpt-4o-mini</code></td><td>128k</td><td>Default model, fast &amp; cheap</td></tr>
-    <tr><td><code>o3-mini</code></td><td>200k</td><td>Reasoning model</td></tr>
+    <tr><td><code>o3-mini</code></td><td>—</td><td>Reasoning model</td></tr>
   </table>
-  <p>Required env: <code>OPENAI_API_KEY</code>, also used by mem0's default embedder.</p>
+  <p>Required env: <code>OPENAI_API_KEY</code> — also used by mem0's default embedder.</p>
 
   <a class="anchor" id="int-anthropic"></a>
   <h2>Anthropic</h2>
@@ -2641,7 +2848,7 @@ handle = <span class="kw">await</span> client.execute_workflow(
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>agent = <span class="cls">BaseAgent</span>(name=<span class="str">"claude-agent"</span>, instructions=<span class="str">"..."</span>, model=<span class="str">"claude-sonnet-4-5"</span>)</pre></div>
   <table>
     <tr><th>Model</th><th>Notes</th></tr>
-    <tr><td><code>claude-sonnet-4-5</code></td><td>Recommended, best balance</td></tr>
+    <tr><td><code>claude-sonnet-4-5</code></td><td>Recommended — best balance</td></tr>
     <tr><td><code>claude-opus-4-5</code></td><td>Highest capability</td></tr>
     <tr><td><code>claude-haiku-4-5</code></td><td>Fastest &amp; cheapest</td></tr>
   </table>
@@ -2677,7 +2884,7 @@ agent = <span class="cls">BaseAgent</span>(name=<span class="str">"azure-agent"<
   <a class="anchor" id="int-fallback"></a>
   <h3>Automatic Fallback</h3>
   <p>When <code>LLM_ENABLE_FALLBACK=true</code> (default), any provider error transparently retries on <code>FALLBACK_LLM_MODEL</code>. Set it to a different provider to get cross-provider resilience:</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># .env, primary OpenAI, fallback to Gemini</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># .env — primary OpenAI, fallback to Gemini</span>
 DEFAULT_LLM_MODEL=gpt-4o
 FALLBACK_LLM_MODEL=gemini/gemini-1.5-flash
 LLM_ENABLE_FALLBACK=true</pre></div>
@@ -2695,8 +2902,8 @@ LANGFUSE_HOST=http://localhost:3000</pre></div>
 
   <a class="anchor" id="int-observe"></a>
   <h2>Tracing Decorators</h2>
-  <p>Three decorators create Langfuse spans for custom functions, all imported from <code>continuum.observability</code>.</p>
-  <h3>@observe, generic span</h3>
+  <p>Three decorators create Langfuse spans for custom functions — all imported from <code>continuum.observability</code>.</p>
+  <h3>@observe — generic span</h3>
   <p>Add custom spans to any async function:</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.observability <span class="kw">import</span> observe
 
@@ -2704,7 +2911,7 @@ LANGFUSE_HOST=http://localhost:3000</pre></div>
 <span class="kw">async def</span> <span class="fn">preprocess</span>(text: <span class="fn">str</span>) -> <span class="fn">str</span>:
     <span class="kw">return</span> text.strip().lower()</pre></div>
 
-  <h3>@trace_tool, for tool / API functions</h3>
+  <h3>@trace_tool — for tool / API functions</h3>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.observability <span class="kw">import</span> trace_tool
 
 <span class="op">@</span><span class="fn">trace_tool</span>(<span class="str">"search_products"</span>)
@@ -2712,7 +2919,7 @@ LANGFUSE_HOST=http://localhost:3000</pre></div>
     <span class="cm"># creates a tool-type span with input/output captured</span>
     <span class="kw">return</span> <span class="kw">await</span> db.<span class="fn">search</span>(query)</pre></div>
 
-  <h3>@trace_agent, for custom agent wrappers</h3>
+  <h3>@trace_agent — for custom agent wrappers</h3>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.observability <span class="kw">import</span> trace_agent
 
 <span class="op">@</span><span class="fn">trace_agent</span>(<span class="str">"my-specialist"</span>)
@@ -2738,7 +2945,7 @@ QDRANT_COLLECTION=orchestrator_memories</pre></div>
 
   <a class="anchor" id="int-milvus"></a>
   <h2>Milvus <span class="tag tag-new">default</span></h2>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># .env (default, no change needed if using docker compose)</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># .env (default — no change needed if using docker compose)</span>
 VECTOR_STORE_PROVIDER=milvus
 MILVUS_HOST=localhost
 MILVUS_PORT=19530</pre></div>
@@ -2933,7 +3140,7 @@ specialist = <span class="cls">BaseAgent</span>(name=<span class="str">"speciali
 
   <a class="anchor" id="rs-intro"></a>
   <h1>Continuum Research</h1>
-  <p class="section-intro">The mechanisms behind reliable agents at scale, what makes Continuum more than a thin LLM wrapper. Each topic links a runtime concern to the module that implements it, with citations to the source files.</p>
+  <p class="section-intro">The mechanisms behind reliable agents at scale — what makes Continuum more than a thin LLM wrapper. Each topic links a runtime concern to the module that implements it, with citations to the source files.</p>
 
   <div class="hero-badges" style="margin-bottom: 24px;">
     <span class="badge badge-purple">Internals</span>
@@ -2946,9 +3153,9 @@ specialist = <span class="cls">BaseAgent</span>(name=<span class="str">"speciali
   <p>Continuum is a runtime, not a framework. Four principles guide every module:</p>
   <ol>
     <li><strong>Code-first, no YAML.</strong> Agents are Python dataclasses. The compiler is your friend.</li>
-    <li><strong>Async-native.</strong> Every I/O hop is non-blocking, LLM, MCP tools, Redis, vector store, Langfuse.</li>
+    <li><strong>Async-native.</strong> Every I/O hop is non-blocking — LLM, MCP tools, Redis, vector store, Langfuse.</li>
     <li><strong>Protocol-based abstractions.</strong> Replace any layer (LLM, memory, session, observability) by swapping the protocol implementation. No deep inheritance trees.</li>
-    <li><strong>Trace everything.</strong> Auto-tracing isn't a feature, it's a constraint. If a behaviour can't be traced, it shouldn't ship.</li>
+    <li><strong>Trace everything.</strong> Auto-tracing isn't a feature — it's a constraint. If a behaviour can't be traced, it shouldn't ship.</li>
   </ol>
 
   <a class="anchor" id="rs-tool-attention"></a>
@@ -2959,7 +3166,7 @@ specialist = <span class="cls">BaseAgent</span>(name=<span class="str">"speciali
     <tr><th>Field</th><th>Type</th><th>Default</th><th>Effect</th></tr>
     <tr><td>k</td><td>int</td><td>3</td><td>How many tools to promote per turn</td></tr>
     <tr><td>min_tools</td><td>int</td><td>5</td><td>Skip attention when the agent has fewer tools than this</td></tr>
-    <tr><td>NEED_TOOL fallback</td><td>enum</td><td>auto</td><td>If the LLM signals a missing tool, expand the candidate set and retry</td></tr>
+    <tr><td>NEED_TOOL fallback</td><td>—</td><td>auto</td><td>If the LLM signals a missing tool, expand the candidate set and retry</td></tr>
   </table>
 
   <div class="callout callout-tip">
@@ -3011,7 +3218,7 @@ agent = <span class="cls">BaseAgent</span>(
 
   <a class="anchor" id="rs-model-tier"></a>
   <h2>Smart layer · model_tier routing</h2>
-  <p>An alternative to Aura's gateway-side router, Continuum can route inline via <code>RouterAgent(routing_strategy="model_tier")</code>. A tier classifier (small LLM or heuristic) reads each prompt and dispatches to one of several pre-defined model tiers.</p>
+  <p>An alternative to Smart Inference's gateway-side router — Continuum can route inline via <code>RouterAgent(routing_strategy="model_tier")</code>. A tier classifier (small LLM or heuristic) reads each prompt and dispatches to one of several pre-defined model tiers.</p>
   <p>When <code>SMART_LAYER_ENABLED=true</code> and the strategy is <code>model_tier</code>, the router:</p>
   <ol>
     <li>Runs the tier classifier on the prompt → returns <code>cheap</code> / <code>mid</code> / <code>quality</code></li>
@@ -3026,7 +3233,7 @@ agent = <span class="cls">BaseAgent</span>(
   <table>
     <tr><th>Classifier</th><th>Where it runs</th><th>Best for</th></tr>
     <tr><td><code>light_only</code></td><td>regex + length heuristics</td><td>zero-latency baseline; never calls an LLM</td></tr>
-    <tr><td><code>qwen</code></td><td>HuggingFace Router API, <code>Qwen3-4B-Instruct</code></td><td>cloud routing without spinning a model</td></tr>
+    <tr><td><code>qwen</code></td><td>HuggingFace Router API — <code>Qwen3-4B-Instruct</code></td><td>cloud routing without spinning a model</td></tr>
     <tr><td><code>qwen_local</code></td><td>local OpenAI-compatible endpoint (MLX, vLLM)</td><td>air-gapped or zero-cost</td></tr>
   </table>
   <p>Set <code>LLM_ROUTE_TIER_CLASSIFIER_HEURISTIC_SHORTCUT=false</code> to skip the keyword shortcut and always run the classifier LLM.</p>
@@ -3039,7 +3246,7 @@ agent = <span class="cls">BaseAgent</span>(
     <tr><td><code>FULL</code></td><td>Verbatim message array</td><td>Specialist needs all detail</td></tr>
     <tr><td><code>SUMMARY</code></td><td>LLM-generated summary + open question</td><td>Long conversations, narrow specialist</td></tr>
     <tr><td><code>RECENT_N</code></td><td>Last N turns only</td><td>Topic just changed; old context is noise</td></tr>
-    <tr><td><code>HYBRID</code></td><td>Summary of older turns + last N verbatim</td><td>Default, best balance for most flows</td></tr>
+    <tr><td><code>HYBRID</code></td><td>Summary of older turns + last N verbatim</td><td>Default — best balance for most flows</td></tr>
   </table>
   <p>Continuum also tracks handoff <strong>depth</strong>, detects <strong>cycles</strong> (A→B→A→B), and emits <code>HANDOFF_RETURN</code> events when control returns to a parent agent.</p>
 
@@ -3049,8 +3256,8 @@ agent = <span class="cls">BaseAgent</span>(
   <table>
     <tr><th>Scope</th><th>Keyed by</th><th>Reach</th><th>Multi-tenant safe?</th></tr>
     <tr><td><code>USER</code></td><td>user_id</td><td>Per-user across all agents</td><td>✓ default</td></tr>
-    <tr><td><code>AGENT</code></td><td>agent_name</td><td>Per-agent across all users</td><td>One-way, shared by users</td></tr>
-    <tr><td><code>SHARED</code></td><td>shared_key</td><td>Global knowledge base</td><td>No, explicitly shared</td></tr>
+    <tr><td><code>AGENT</code></td><td>agent_name</td><td>Per-agent across all users</td><td>One-way — shared by users</td></tr>
+    <tr><td><code>SHARED</code></td><td>—</td><td>Global knowledge base</td><td>No — explicitly shared</td></tr>
     <tr><td><code>CONVERSATION</code></td><td>conversation_id</td><td>Ephemeral, single thread</td><td>✓</td></tr>
   </table>
 
@@ -3058,21 +3265,27 @@ agent = <span class="cls">BaseAgent</span>(
   <h2>IntelligentMemoryClient</h2>
   <p>A drop-in replacement for the standard <code>MemoryClient</code> that adds three behaviours:</p>
   <ul>
-    <li><strong>Adaptive extraction</strong>, uses a per-agent extraction prompt to filter what gets stored (e.g. "only pet preferences, never one-off cart actions").</li>
-    <li><strong>Relevance re-ranking</strong>, re-ranks recalled memories using a small LLM scorer before injecting them into the prompt.</li>
-    <li><strong>Deduplication</strong>, merges semantically equivalent memories to prevent drift.</li>
+    <li><strong>Adaptive extraction</strong> — uses a per-agent extraction prompt to filter what gets stored (e.g. "only pet preferences, never one-off cart actions").</li>
+    <li><strong>Relevance re-ranking</strong> — re-ranks recalled memories using a small LLM scorer before injecting them into the prompt.</li>
+    <li><strong>Deduplication</strong> — merges semantically equivalent memories to prevent drift.</li>
   </ul>
 
   <a class="anchor" id="rs-pii"></a>
   <h2>PII filtering on memory writes</h2>
-  <p>Before a memory is stored, Continuum can run it through a PII scrubber that redacts emails, phone numbers, SSNs, and credit cards. Configure via the memory client:</p>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">from</span> continuum.memory <span class="kw">import</span> <span class="cls">MemoryClient</span>, <span class="cls">PIIPolicy</span>
+  <p>Continuum does not ship a built-in PII scrubber — you supply your own redaction logic via <code>pre_store_filter</code>, which runs over extracted facts before they are written to memory. Return the facts with PII masked, or drop them entirely. With no filter configured, facts are stored unmodified.</p>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="kw">import</span> re
+<span class="kw">from</span> continuum <span class="kw">import</span> <span class="cls">AgentMemoryConfig</span>
 
-memory = <span class="cls">MemoryClient</span>(pii_policy=<span class="cls">PIIPolicy</span>.REDACT)</pre></div>
+<span class="cm"># pre_store_filter — runs over extracted facts; mask or drop PII before storage</span>
+<span class="kw">def</span> <span class="fn">redact_pii</span>(facts: <span class="fn">list</span>[<span class="fn">str</span>]) -> <span class="fn">list</span>[<span class="fn">str</span>]:
+    <span class="kw">return</span> [re.<span class="fn">sub</span>(<span class="str">r'\d{3}-\d{2}-\d{4}'</span>, <span class="str">'[SSN]'</span>, f) <span class="kw">for</span> f <span class="kw">in</span> facts]
+
+memory_config = <span class="cls">AgentMemoryConfig</span>(store_memories=<span class="cls">True</span>, pre_store_filter=redact_pii)</pre></div>
+  <p>To redact model <em>responses</em> (not memory), attach callables to <code>output_scanners</code> on <code>AgentConfig</code> (see <strong>Input / Output Scanning</strong>). Both are bring-your-own hooks: with none configured, no redaction occurs.</p>
 
   <a class="anchor" id="rs-artifacts"></a>
   <h2>Run artifacts</h2>
-  <p>MCP tools can return <code>structuredContent</code>, JSON payloads alongside their text output. Continuum captures these as run artifacts, exposing them on <code>AgentResponse.artifacts</code> for the application to consume (UI widgets, downstream pipelines, audit logs).</p>
+  <p>MCP tools can return <code>structuredContent</code> — JSON payloads alongside their text output. Continuum captures these as run artifacts, exposing them on <code>AgentResponse.artifacts</code> for the application to consume (UI widgets, downstream pipelines, audit logs).</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>response = <span class="kw">await</span> runner.<span class="fn">run</span>(agent, <span class="str">"checkout"</span>, user_id=<span class="str">"alice"</span>)
 <span class="kw">for</span> art <span class="kw">in</span> response.artifacts:
     <span class="fn">print</span>(art.tool_name, art.structured_content)
@@ -3082,9 +3295,9 @@ memory = <span class="cls">MemoryClient</span>(pii_policy=<span class="cls">PIIP
   <h2>Evaluation framework</h2>
   <p>Continuum ships with two opt-in eval stacks (<code>pip install -e ".[eval]"</code>):</p>
   <ul>
-    <li><strong>DeepEval</strong>, criterion-based evaluation with customisable metrics (faithfulness, correctness, toxicity).</li>
-    <li><strong>RAGAS</strong>, RAG-specific metrics (context precision, recall, answer relevance).</li>
-    <li><strong>EvaluatorAgent</strong>, a specialised <code>BaseAgent</code> whose job is grading other agents' outputs.</li>
+    <li><strong>DeepEval</strong> — criterion-based evaluation with customisable metrics (faithfulness, correctness, toxicity).</li>
+    <li><strong>RAGAS</strong> — RAG-specific metrics (context precision, recall, answer relevance).</li>
+    <li><strong>EvaluatorAgent</strong> — a specialised <code>BaseAgent</code> whose job is grading other agents' outputs.</li>
   </ul>
 
   <a class="anchor" id="rs-golden"></a>
@@ -3107,23 +3320,23 @@ dataset = <span class="kw">await</span> <span class="fn">build_golden_dataset</s
 
   <a class="anchor" id="ex-intro"></a>
   <h1>Example · Pet Shop Assistant</h1>
-  <p class="section-intro">An end-to-end walkthrough: an agent backed by an MCP shop server, routed through Aura, with Langfuse tracing and Redis-backed sessions. Copy the snippets in order and you'll have a working chat UI in under 10 minutes.</p>
+  <p class="section-intro">An end-to-end walkthrough: an agent backed by an MCP shop server, routed through Smart Inference, with Langfuse tracing and Redis-backed sessions. Copy the snippets in order and you'll have a working chat UI in under 10 minutes.</p>
 
   <div class="hero-badges" style="margin-bottom: 20px;">
     <span class="badge badge-blue">BaseAgent</span>
     <span class="badge badge-green">MCP tools</span>
-    <span class="badge badge-purple">Aura</span>
+    <span class="badge badge-purple">Smart Inference</span>
     <span class="badge badge-blue">FastAPI Web UI</span>
   </div>
 
   <div class="callout callout-tip">
-    <strong>Source.</strong> The complete code lives at <a href="https://github.com/shyftlabs/continuum/tree/main/playground/gateway-local-shop" target="_blank" rel="noopener"><code>playground/gateway-local-shop/</code></a>. This page is the annotated tour.
+    <strong>Source.</strong> The complete code lives at <a href="https://github.com/shyftlabs/continuum/tree/main/playground/gateway-local-shop" target="_blank"><code>playground/gateway-local-shop/</code></a>. This page is the annotated tour.
   </div>
 
   <a class="anchor" id="ex-arch"></a>
   <h2>Architecture</h2>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>┌──────────────┐    HTTP    ┌────────────────┐    OpenAI    ┌──────────────────┐
-│  Browser     │ ─────────► │  FastAPI UI    │              │  Aura            │
+│  Browser     │ ─────────► │  FastAPI UI    │              │  Smart Inference │
 │  /chat       │   POST     │  (web.py :8081)│              │  Gateway :8787   │
 └──────────────┘            └────────┬───────┘              └────────┬─────────┘
                                      │                               │
@@ -3156,11 +3369,11 @@ Session/memory:  Redis (:6380)  ·  Milvus (:19530)</pre></div>
   <a class="anchor" id="ex-infra"></a>
   <h2>2 · Spin up infra</h2>
   <ol class="steps">
-    <li><strong>Continuum stack</strong>, Redis, Milvus, Langfuse, ClickHouse, Postgres, MinIO
+    <li><strong>Continuum stack</strong> — Redis, Milvus, Langfuse, ClickHouse, Postgres, MinIO
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>cd continuum
-docker compose up -d redis-sdk milvus milvus-etcd postgres clickhouse minio langfuse-web langfuse-worker</pre></div>
+continuum up full</pre></div>
     </li>
-    <li><strong>Aura gateway</strong>, build, then run from Docker (sharing Continuum's Langfuse Redis)
+    <li><strong>Smart Inference gateway</strong> — build, then run from Docker (sharing Continuum's Langfuse Redis)
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>cd ../continuum-backend-smart-inference
 nvm use 22 &amp;&amp; npm install &amp;&amp; npm run build
 docker compose up -d gateway</pre></div>
@@ -3169,7 +3382,7 @@ docker compose up -d gateway</pre></div>
 
   <a class="anchor" id="ex-env"></a>
   <h2>3 · Configure env</h2>
-  <p><strong>Continuum</strong> (<code>continuum/.env</code>), point at the gateway and the local Langfuse:</p>
+  <p><strong>Continuum</strong> (<code>continuum/.env</code>) — point at the gateway and the local Langfuse:</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># LLM / routing</span>
 SMART_GATEWAY_URL=http://localhost:8787/v1
 SMART_GATEWAY_API_KEY=your-smart-gateway-api-key
@@ -3186,7 +3399,7 @@ SESSION_REDIS_PORT=6380
 VECTOR_STORE_PROVIDER=milvus
 MILVUS_PORT=19530</pre></div>
 
-  <p><strong>Aura</strong> (<code>continuum-backend-smart-inference/.env</code>), real provider keys:</p>
+  <p><strong>Smart Inference</strong> (<code>continuum-backend-smart-inference/.env</code>) — real provider keys:</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre>OPENAI_API_KEY=sk-…
 ANTHROPIC_API_KEY=sk-ant-…
 GEMINI_API_KEY=AIza…
@@ -3228,7 +3441,7 @@ _carts: <span class="cls">dict</span>[<span class="cls">str</span>, <span class=
 
   <a class="anchor" id="ex-agent"></a>
   <h2>5 · Agent + config</h2>
-  <p>The agent connects to the MCP server, defines memory + session policy, and uses Aura auto-routing.</p>
+  <p>The agent connects to the MCP server, defines memory + session policy, and uses Smart Inference auto-routing.</p>
 <div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># playground/gateway-local-shop/agent.py (excerpt)</span>
 <span class="kw">from</span> continuum <span class="kw">import</span> <span class="cls">AgentConfig</span>, <span class="cls">AgentMemoryConfig</span>, <span class="cls">AgentMemoryScope</span>, \
     <span class="cls">AgentRunner</span>, <span class="cls">BaseAgent</span>, <span class="cls">MCPServerStreamableHttp</span>, <span class="cls">ToolExecutor</span>
@@ -3287,7 +3500,7 @@ agent = <span class="cls">BaseAgent</span>(
 asyncio.<span class="fn">run</span>(main())</pre></div>
 
   <h3>FastAPI Web UI</h3>
-<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># web.py, POST /chat returns the agent's reply as JSON</span>
+<div class="code-wrapper"><button class="copy-btn" onclick="copyCode(this)">copy</button><pre><span class="cm"># web.py — POST /chat returns the agent's reply as JSON</span>
 <span class="op">@</span>app.<span class="fn">post</span>(<span class="str">"/chat"</span>)
 <span class="kw">async def</span> <span class="fn">chat</span>(req: <span class="cls">ChatRequest</span>):
     response = <span class="kw">await</span> shop_agent.<span class="fn">chat</span>(
@@ -3301,7 +3514,7 @@ asyncio.<span class="fn">run</span>(main())</pre></div>
 
   <a class="anchor" id="ex-run"></a>
   <h2>7 · Run a conversation</h2>
-  <p>Type any of these into the chat, the agent will route to the right tool automatically.</p>
+  <p>Type any of these into the chat — the agent will route to the right tool automatically.</p>
   <table>
     <tr><th>Prompt</th><th>What the agent does</th></tr>
     <tr><td><em>show me dog toys</em></td><td><code>search_products(animal="dog", category="toys")</code> → product list</td></tr>
@@ -3317,10 +3530,10 @@ asyncio.<span class="fn">run</span>(main())</pre></div>
   <a class="anchor" id="ex-customise"></a>
   <h2>Make it yours</h2>
   <ul>
-    <li><strong>Swap the domain</strong>, replace the MCP server with one that exposes your tools (Slack, Jira, internal APIs). The agent code doesn't change.</li>
-    <li><strong>Tighten the tier</strong>, set <code>gateway_mode="strict"</code> to drop latency to ~2–4s/turn (cheap-tier models).</li>
-    <li><strong>Persist memories</strong>, keep <code>memory_config</code> on and the agent will remember per-user facts across sessions.</li>
-    <li><strong>Add a workflow</strong>, wrap the agent in a <a onclick="showSection('build'); setTimeout(()=>scrollToAnchor('build-workflows'), 80)">RouterAgent</a> with a billing-specialist sibling and a triage agent.</li>
+    <li><strong>Swap the domain</strong> — replace the MCP server with one that exposes your tools (Slack, Jira, internal APIs). The agent code doesn't change.</li>
+    <li><strong>Tighten the tier</strong> — set <code>gateway_mode="strict"</code> to drop latency to ~2–4s/turn (cheap-tier models).</li>
+    <li><strong>Persist memories</strong> — keep <code>memory_config</code> on and the agent will remember per-user facts across sessions.</li>
+    <li><strong>Add a workflow</strong> — wrap the agent in a <a onclick="showSection('build'); setTimeout(()=>scrollToAnchor('build-workflows'), 80)">RouterAgent</a> with a billing-specialist sibling and a triage agent.</li>
   </ul>
 
 </section>
@@ -3334,22 +3547,22 @@ asyncio.<span class="fn">run</span>(main())</pre></div>
   <a class="anchor" id="com-contributing"></a>
   <h2>Contributing</h2>
   <ol class="steps">
-    <li><strong>Fork &amp; clone</strong>, work in a feature branch</li>
+    <li><strong>Fork &amp; clone</strong> — work in a feature branch</li>
     <li><strong>Install dev dependencies</strong>
 <pre>pip install -e <span class="str">".[dev,temporal,eval]"</span></pre>
     </li>
-    <li><strong>Write tests</strong>, unit + integration, no mocking the database
+    <li><strong>Write tests</strong> — unit + integration, no mocking the database
 <pre>pytest tests/ -v</pre>
     </li>
     <li><strong>Lint &amp; type-check</strong>
 <pre>ruff check src/
 mypy src/</pre>
     </li>
-    <li><strong>Submit a PR</strong>, describe what changed and why, reference the relevant docs section</li>
+    <li><strong>Submit a PR</strong> — describe what changed and why, reference the relevant docs section</li>
   </ol>
 
   <div class="callout callout-warn">
-    <strong>Integration tests over mocks:</strong> Continuum integration tests hit real services (Redis, Qdrant/Milvus). Run <code>docker compose up -d</code> before running the test suite.
+    <strong>Integration tests over mocks:</strong> Continuum integration tests hit real services (Redis, Qdrant/Milvus). Run <code>continuum up</code> before running the test suite.
   </div>
 
 
@@ -3388,7 +3601,7 @@ mypy src/</pre>
   <div class="footer-brand">
     <a href="https://continuum.shyftlabs.io" target="_blank" rel="noopener" aria-label="Continuum"><img class="footer-logo" src="assets/continuum-logo.png" alt="Continuum" /></a>
     <span class="footer-divider" aria-hidden="true"></span>
-    <span class="footer-meta">v1.0.0 · Built by</span>
+    <span class="footer-meta">v1.1.0 · Built by</span>
     <a class="footer-built" href="https://shyftlabs.io/" target="_blank" rel="noopener" aria-label="Shyftlabs"><img class="footer-shyft" src="assets/shyftlabs-logo.svg" alt="Shyftlabs" /></a>
   </div>
   <div class="footer-social">
