@@ -145,7 +145,19 @@ class RedisSessionProvider(BaseSessionProvider):
                 }
 
                 if self._config.redis_ssl:
-                    conn_kwargs["ssl"] = True
+                    # redis-py selects the TLS transport via the connection *class*,
+                    # not an ``ssl=True`` kwarg. Passing ``ssl=True`` into a
+                    # (Blocking)ConnectionPool forwards it verbatim to
+                    # ``AbstractConnection.__init__``, which rejects it
+                    # ("unexpected keyword argument 'ssl'") the moment the pool
+                    # builds its first connection — silently breaking every session
+                    # read/write against a TLS Redis (e.g. ElastiCache in-transit
+                    # encryption). Use SSLConnection instead.
+                    conn_kwargs["connection_class"] = redis.SSLConnection
+                    if self._config.redis_ssl_cert_reqs is not None:
+                        conn_kwargs["ssl_cert_reqs"] = self._config.redis_ssl_cert_reqs
+                    if self._config.redis_ssl_ca_certs is not None:
+                        conn_kwargs["ssl_ca_certs"] = self._config.redis_ssl_ca_certs
 
                 # Use a BlockingConnectionPool so bursts above max_connections queue and
                 # wait for a free connection (up to `timeout`s) rather than dropping the

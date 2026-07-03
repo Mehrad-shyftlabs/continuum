@@ -79,6 +79,23 @@ class SessionConfig(BaseModel):
         default_factory=lambda: settings.session_redis_ssl,
         description="Enable SSL/TLS for Redis",
     )
+    redis_ssl_cert_reqs: str | None = Field(
+        default_factory=lambda: settings.session_redis_ssl_cert_reqs,
+        description=(
+            "TLS peer-verification mode: 'required' (default), 'optional', or 'none'. "
+            "Only used when redis_ssl is True. None defers to the redis-py default "
+            "('required'), which is correct for managed TLS Redis (e.g. AWS "
+            "ElastiCache). Use 'none' for self-signed endpoints."
+        ),
+    )
+    redis_ssl_ca_certs: str | None = Field(
+        default_factory=lambda: settings.session_redis_ssl_ca_certs,
+        description=(
+            "Path to a CA bundle used to verify the Redis server certificate "
+            "(for private/self-signed CAs). Only used when redis_ssl is True. "
+            "None uses the system trust store."
+        ),
+    )
 
     # Connection Pool Configuration
     redis_max_connections: int = Field(

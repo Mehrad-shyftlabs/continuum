@@ -19,11 +19,14 @@ and Continuum adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - All published Docker host ports are overridable via `.env` (e.g. `QDRANT_PORT`, `SESSION_REDIS_PORT`, `MILVUS_PORT`, `LANGFUSE_WEB_PORT`, `TEMPORAL_PORT`), with defaults preserving prior behavior — avoids collisions on multi-project machines.
 - "Releasing (maintainers)" section in `CONTRIBUTING.md` linking the canonical [`docs/versioning.md`](docs/versioning.md) publish guide.
 - Open LLM provider registry — `register_provider(prefix, factory)` and `register_default_provider(factory)` let new backends extend model-name routing without editing core (`get_provider` now resolves via longest-prefix match against the registry).
+- Redis session provider now supports TLS peer-verification config: `SESSION_REDIS_SSL_CERT_REQS` (`required`/`optional`/`none`) and `SESSION_REDIS_SSL_CA_CERTS` (custom CA bundle path). Defaults preserve prior behavior (redis-py default `required` against the system trust store), correct for managed TLS Redis such as AWS ElastiCache; `none`/custom-CA enable self-signed endpoints.
+- `redis-sdk-tls` Docker Compose service (profile `tls-test`) + `tests/integration/redis_tls/gen_certs.sh` and `tests/integration/test_redis_session_tls.py` — a TLS-only Redis and an end-to-end session round-trip test mirroring ElastiCache in-transit encryption.
 
 ### Changed
 - _Nothing yet._
 
 ### Fixed
+- Redis session provider over TLS: `SESSION_REDIS_SSL=true` forwarded a bare `ssl=True` kwarg to the connection pool, which redis-py hands verbatim to `AbstractConnection.__init__` — raising `TypeError: unexpected keyword argument 'ssl'` the moment the pool built its first connection (lazily, at command time). Every session read/write against a TLS Redis (e.g. AWS ElastiCache in-transit encryption) failed silently (fail-open to a warning), breaking conversation history and tool-context persistence. The provider now selects TLS via `connection_class=SSLConnection`, the redis-py-sanctioned mechanism.
 - Docker healthchecks for `qdrant` (now probes `/readyz` over bash `/dev/tcp`, since the image ships no `curl`) and `temporal` (`BIND_ON_IP=0.0.0.0` so the localhost healthcheck can reach the frontend) — both previously reported `unhealthy` while serving correctly.
 - `continuum down`/`status`/`logs` now activate all compose profiles, so profiled containers from `minimal`/`standard` are no longer orphaned.
 - `structured_output` is now populated across all providers in both `run()` and `run_stream()`; previously it was left empty on several provider paths.
