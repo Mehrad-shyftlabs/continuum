@@ -173,6 +173,41 @@ services:
     networks:
       - orchestrator-network
 
+  # TLS-enabled Redis for the SSL session-provider integration test
+  # (tests/integration/test_redis_session_tls.py). Mirrors AWS ElastiCache
+  # in-transit encryption. First generate certs, then start the service:
+  #   bash tests/integration/redis_tls/gen_certs.sh
+  #   REDIS_TLS_CERT_DIR=$(pwd)/tests/integration/redis_tls/certs \
+  #     docker compose --profile tls-test up -d redis-sdk-tls
+  redis-sdk-tls:
+    profiles: ["tls-test"]
+    image: docker.io/redis:7
+    container_name: orchestrator-redis-sdk-tls
+    restart: unless-stopped
+    command: >
+      redis-server
+      --port 0
+      --tls-port 6379
+      --tls-cert-file /certs/redis.crt
+      --tls-key-file /certs/redis.key
+      --tls-ca-cert-file /certs/ca.crt
+      --tls-auth-clients no
+      --maxmemory-policy noeviction
+      --requirepass ${SESSION_REDIS_PASSWORD:-sdk123456789}
+    ports:
+      - "${SESSION_REDIS_TLS_PORT:-6390}:6379"
+    volumes:
+      - ${REDIS_TLS_CERT_DIR:-./tests/integration/redis_tls/certs}:/certs:ro
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "6379", "--tls", "--cacert", "/certs/ca.crt",
+             "-a", "${SESSION_REDIS_PASSWORD:-sdk123456789}", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+      start_period: 3s
+    networks:
+      - orchestrator-network
+
   postgres:
     profiles: ["standard", "full"]
     image: docker.io/postgres:${POSTGRES_VERSION:-17}
